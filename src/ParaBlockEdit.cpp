@@ -42,7 +42,7 @@ QString leftTrimmed(const QString &s) {
 ParaBlockEdit::ParaBlockEdit(QWidget *parent)
     : QWidget(parent)
     , d{new ParaBlockEditPrivate} {
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::ClickFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
 
     auto pal = palette();

@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
 
     const auto font_name = u8"更纱黑体 SC Light";
     QFontDatabase::addApplicationFont(QString("fonts/%1.ttf").arg(font_name));
-    QApplication::setFont(QFont(font_name));
+    QApplication::setFont(QFont(font_name, 16));
 
     FrontEditor client;
     auto        screen     = getCurrentScreen();

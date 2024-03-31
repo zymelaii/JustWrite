@@ -6,14 +6,17 @@
 #include <QFocusEvent>
 
 struct FrontEditorPrivate {
-    QVBoxLayout             *layout;
+    QVBoxLayout *layout;
+
     QVector<ParaBlockEdit *> para_pool;
     QVector<ParaBlockEdit *> active_para_blocks;
     int                      active_para;
+    int                      last_active_para;
 
     FrontEditorPrivate() {
-        layout      = nullptr;
-        active_para = -1;
+        layout           = nullptr;
+        active_para      = -1;
+        last_active_para = active_para;
     }
 };
 
@@ -43,7 +46,6 @@ void FrontEditor::enterNextParaBlock() {
     }
     auto para  = createParaBlock();
     int  index = d->active_para == -1 ? 0 : d->active_para + 1;
-    qDebug() << "join para block:" << index;
     d->active_para_blocks.insert(index, para);
     d->layout->insertWidget(index, para);
     setActiveParaBlock(index);
@@ -55,6 +57,7 @@ ParaBlockEdit *FrontEditor::createParaBlock() {
         para = d->para_pool.back();
         d->para_pool.pop_back();
         para->clearText();
+        para->show();
     } else {
         para = new ParaBlockEdit;
     }
@@ -70,8 +73,9 @@ ParaBlockEdit *FrontEditor::createParaBlock() {
 
 void FrontEditor::setActiveParaBlock(int index) {
     if (index < 0 || index >= d->active_para_blocks.size()) { return; }
-    auto para      = d->active_para_blocks[index];
-    d->active_para = index;
+    auto para           = d->active_para_blocks[index];
+    d->last_active_para = d->active_para;
+    d->active_para      = index;
     para->setFocus();
 }
 
@@ -85,14 +89,17 @@ void FrontEditor::trackInactiveParaBlock(ParaBlockEdit *target) {
     int index = d->active_para_blocks.indexOf(target);
     if (index == -1) { return; }
     if (!target->text().isEmpty()) { return; }
-    if (d->active_para == index) {
-        d->active_para = -1;
-    } else if (d->active_para > index) {
-        --d->active_para;
-    }
-    d->active_para_blocks.remove(index);
-    auto para = static_cast<ParaBlockEdit *>(d->layout->takeAt(index)->widget());
+
+    Q_ASSERT(d->active_para == index);
+    d->last_active_para = d->active_para;
+    d->active_para      = -1;
+
+    auto w = d->layout->takeAt(index)->widget();
+    Q_ASSERT(w);
+    auto para = static_cast<ParaBlockEdit *>(w);
+    para->hide();
     d->para_pool.push_back(para);
+    d->active_para_blocks.remove(index);
 
     disconnect(para, SIGNAL(finished()));
     disconnect(para, SIGNAL(gotFocus()));
@@ -101,9 +108,18 @@ void FrontEditor::trackInactiveParaBlock(ParaBlockEdit *target) {
 
 void FrontEditor::focusInEvent(QFocusEvent *e) {
     QWidget::focusInEvent(e);
-    if (d->active_para == -1) { enterNextParaBlock(); }
+    if (d->active_para_blocks.empty()) {
+        enterNextParaBlock();
+    } else if (d->active_para == -1) {
+        int active_para = d->last_active_para == -1 ? 0 : d->last_active_para;
+        setActiveParaBlock(active_para);
+    } else {
+        setActiveParaBlock(d->active_para);
+    }
 }
 
 void FrontEditor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
+    d->last_active_para = d->active_para;
+    d->active_para      = -1;
 }
