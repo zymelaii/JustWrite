@@ -200,13 +200,13 @@ void LimitedViewEditor::scroll(double delta) {
 
 void LimitedViewEditor::insert(const QString &text) {
     //! ATTENTION: must get block first to ensure the origin is right
-    auto &block = currentTextBlock().sync(d->text);
+    auto &para = currentTextBlock().sync(d->text);
     //! TODO: ensure no sel
-    const auto inserted = block.cursor_row == 0 && block.cursor_col == 0 ? leftTrimmed(text) : text;
+    const auto inserted = para.cursor_pos == 0 ? leftTrimmed(text) : text;
     d->text.insert(d->cursor_pos, inserted);
     const auto size  = inserted.length();
     d->cursor_pos   += size;
-    block.quickInsert(size);
+    para.quickInsert(size);
     for (int i = d->active_para_index + 1; i < d->paras.size(); ++i) { d->paras[i].shiftOrigin(size); }
     update();
 }
@@ -234,6 +234,7 @@ void LimitedViewEditor::moveToPreviousChar() {
         para.cursor_row = para.lines.size() - 1;
         para.cursor_col = para.line(para.cursor_row).length();
         para.cursor_pos = para.lines.back().text_endp - para.text_pos;
+        ++d->cursor_pos;
     } else {
         ++d->cursor_pos;
     }
@@ -257,6 +258,7 @@ void LimitedViewEditor::moveToNextChar() {
         para.cursor_row = 0;
         para.cursor_col = 0;
         para.cursor_pos = 0;
+        --d->cursor_pos;
     } else {
         --d->cursor_pos;
     }

@@ -106,27 +106,36 @@ QStringView TextBlockLayout::line(int index) const {
 }
 
 TextBlockLayout TextBlockLayout::split() {
-    //! FIXME: split but not complete
     TextBlockLayout block;
     block.reset(text_ref, text_pos + cursor_pos);
+    block.setMaxWidth(max_width);
     for (int i = cursor_row + 1; i < lines.size(); ++i) { block.lines.push_back(lines[i]); }
-    if (cursor_col == 0) {
-        block.lines[0] = lines[cursor_row];
-        if (cursor_row > 0) {
-            --cursor_row;
-            cursor_col = line(cursor_row).length();
-        }
+
+    int remove_from = cursor_row + 1;
+
+    if (cursor_col == 0 && cursor_row == 0) {
+        block.lines[0]       = lines[0];
+        block.lines[0].dirty = true;
+        reset(text_ref, text_pos);
+    } else if (cursor_col == 0) {
+        block.lines[0]       = lines[cursor_row];
+        block.lines[0].dirty = true;
+        --cursor_row;
+        cursor_col = line(cursor_row).length();
+        --remove_from;
     } else if (auto line_size = line(cursor_row).length(); cursor_col < line_size) {
-        block.lines[0].text_endp    += line_size - cursor_col;
-        lines[cursor_row].text_endp -= line_size - cursor_col;
+        const auto len               = line_size - cursor_col;
+        block.lines[0].text_endp    += len;
+        block.lines[0].dirty         = true;
+        lines[cursor_row].text_endp -= len;
+        lines[cursor_row].dirty      = true;
     } else if (block.lines.size() > 1) {
-        qDebug() << "c";
         block.lines.remove(0);
         block.lines[0].dirty = true;
     }
-    int remove_from = cursor_row > 0 && cursor_col == 0 ? cursor_row : cursor_row + 1;
+
     lines.remove(remove_from, lines.size() - remove_from);
-    lines[cursor_row].dirty = true;
+
     return block;
 }
 
@@ -146,10 +155,10 @@ int TextBlockLayout::boundingTextLength(const QFontMetrics &fm, QStringView text
 }
 
 QDebug operator<<(QDebug dbg, const TextBlockLayout &block) {
-    dbg.nospace() << "[";
+    dbg.nospace().noquote() << QString("{ origin: %1, lines: [").arg(block.text_pos);
     for (int i = 0; i < block.lines.size(); ++i) {
         dbg.nospace().noquote() << QString(R"({ endp: %1, text: "%2" },)").arg(block.lines[i].text_endp).arg(block.line(i));
     }
-    dbg.nospace() << "]";
+    dbg.nospace() << "]}";
     return dbg.maybeSpace();
 }
