@@ -1,35 +1,62 @@
-#include "FrontEditor.h"
-#include <QGuiApplication>
-#include <QApplication>
-#include <QScreen>
-#include <QFontDatabase>
+#include "JustWrite.h"
+#include "LimitedViewEditor.h"
+#include "KeyShortcut.h"
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QKeyEvent>
 
-constexpr QSize PREFERRED_CLIENT_SIZE(1000, 600);
+namespace Ui {
+struct JustWrite {
+    QHBoxLayout       *layout;
+    LimitedViewEditor *editor;
 
-QScreen *getCurrentScreen() {
-    return QGuiApplication::screenAt(QCursor::pos());
+    JustWrite(::JustWrite *parent) {
+        layout = new QHBoxLayout(parent);
+        editor = new LimitedViewEditor;
+
+        layout->addWidget(editor);
+
+        layout->setSpacing(0);
+        layout->setContentsMargins({});
+
+        auto pal = editor->palette();
+        pal.setColor(QPalette::Base, Qt::transparent);
+        pal.setColor(QPalette::Text, Qt::white);
+        pal.setColor(QPalette::Highlight, QColor(50, 100, 150, 150));
+        editor->setPalette(pal);
+    }
+};
+} // namespace Ui
+
+struct JustWritePrivate {
+    KeyShortcut shortcut;
+
+    JustWritePrivate() {
+        shortcut.loadDefaultShortcuts();
+    }
+};
+
+QKeySequence mkkeyseq(QKeyEvent *e) {
+    return QKeySequence(e->key() | e->modifiers());
 }
 
-QRect getPreferredGeometry(const QRect &parent_geo) {
-    const auto w    = qMin(parent_geo.width(), PREFERRED_CLIENT_SIZE.width());
-    const auto h    = qMin(parent_geo.height(), PREFERRED_CLIENT_SIZE.height());
-    const auto left = parent_geo.left() + (parent_geo.width() - w) / 2;
-    const auto top  = parent_geo.top() + (parent_geo.height() - h) / 2;
-    return QRect(left, top, w, h);
+JustWrite::JustWrite(QWidget *parent)
+    : QWidget(parent)
+    , d{new JustWritePrivate}
+    , ui{new Ui::JustWrite(this)} {
+    ui->editor->installEventFilter(this);
+    ui->editor->setFocus();
 }
 
-int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
+JustWrite::~JustWrite() {
+    delete d;
+    delete ui;
+}
 
-    const auto font_name = u8"更纱黑体 SC Light";
-    QFontDatabase::addApplicationFont(QString("fonts/%1.ttf").arg(font_name));
-    QApplication::setFont(QFont(font_name, 16));
-
-    FrontEditor client;
-    auto        screen     = getCurrentScreen();
-    const auto  screen_geo = screen->geometry();
-    client.setGeometry(getPreferredGeometry(screen_geo));
-    client.show();
-
-    return app.exec();
+bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
+    if (event->type() == QEvent::KeyPress) {
+        auto e = static_cast<QKeyEvent *>(event);
+        if (mkkeyseq(e) == d->shortcut.toggle_align_center) { ui->editor->setAlignCenter(!ui->editor->alignCenter()); }
+    }
+    return false;
 }

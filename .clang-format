@@ -59,7 +59,7 @@ BreakBeforeBraces: Attach
 #! If true, ternary operators will be placed after line breaks.
 BreakBeforeTernaryOperators: true
 #! The column limit.
-ColumnLimit: 180
+ColumnLimit: 128
 #! A regular expression that describes comments with special meaning, which should not be split into lines or otherwise changed.
 CommentPragmas: '^(!<)? IWYU pragma:'
 #! The number of characters to use for indentation of constructor initializer lists as well as inheritance lists.
