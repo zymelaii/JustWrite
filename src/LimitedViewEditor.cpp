@@ -161,9 +161,22 @@ TextBlockLayout &LimitedViewEditor::currentTextBlock() {
         para.reset(d->text, d->cursor_pos);
         para.setMaxWidth(textArea().width());
         d->paras.push_back(para);
-        d->active_para_index = 0;
+        switchTextBlock(0);
     }
     return d->paras[d->active_para_index];
+}
+
+void LimitedViewEditor::switchTextBlock(int index) {
+    if (index < 0 || index >= d->paras.size() || index == d->active_para_index) { return; }
+    if (d->active_para_index != -1) {
+        auto &para = currentTextBlock();
+        if (para.isEmpty()) {
+            if (index > d->active_para_index) { --index; }
+            d->paras.remove(d->active_para_index);
+        }
+    }
+    d->active_para_index = index;
+    update();
 }
 
 void LimitedViewEditor::insertMultiLineText(const QString &text) {
@@ -176,7 +189,7 @@ void LimitedViewEditor::insertMultiLineText(const QString &text) {
         para.reset(d->text, d->cursor_pos);
         para.setMaxWidth(textArea().width());
         d->paras.push_back(para);
-        d->active_para_index = d->paras.size() - 1;
+        switchTextBlock(d->paras.size() - 1);
         insert(text);
     }
 }
@@ -229,7 +242,7 @@ void LimitedViewEditor::moveToPreviousChar() {
         para.cursor_col = para.line(para.cursor_row).length() - 1;
         --para.cursor_pos;
     } else if (d->active_para_index > 0) {
-        --d->active_para_index;
+        switchTextBlock(d->active_para_index - 1);
         auto &para      = currentTextBlock();
         para.cursor_row = para.lines.size() - 1;
         para.cursor_col = para.line(para.cursor_row).length();
@@ -253,7 +266,7 @@ void LimitedViewEditor::moveToNextChar() {
         para.cursor_col = 1;
         ++para.cursor_pos;
     } else if (d->active_para_index + 1 < d->paras.size()) {
-        ++d->active_para_index;
+        switchTextBlock(d->active_para_index + 1);
         auto &para      = currentTextBlock();
         para.cursor_row = 0;
         para.cursor_col = 0;
@@ -305,7 +318,7 @@ void LimitedViewEditor::splitIntoNewLine() {
     Q_ASSERT(!d->paras.isEmpty());
     auto para = currentTextBlock().split();
     d->paras.insert(d->active_para_index + 1, para);
-    ++d->active_para_index;
+    switchTextBlock(d->active_para_index + 1);
     d->blink_cursor_should_paint = true;
     update();
 }

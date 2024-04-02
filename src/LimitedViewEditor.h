@@ -35,6 +35,8 @@ public:
 
     TextBlockLayout &currentTextBlock();
 
+    void switchTextBlock(int index);
+
     void insertMultiLineText(const QString &text);
 
     void scroll(double delta);

@@ -48,6 +48,10 @@ struct TextBlockLayout {
         return *this;
     }
 
+    bool isEmpty() const {
+        return lines[0].text_endp == text_pos;
+    }
+
     static int boundingTextLength(const QFontMetrics &fm, QStringView text, int &width);
 };
 
