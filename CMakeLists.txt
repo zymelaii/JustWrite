@@ -1,11 +1,20 @@
 cmake_minimum_required(VERSION 3.5)
 
+file(READ "VERSION" APP_VERSION)
+string(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)" _ ${APP_VERSION})
+set(MAJOR_VERSION ${CMAKE_MATCH_1})
+set(MINOR_VERSION ${CMAKE_MATCH_2})
+set(PATCH_VERSION ${CMAKE_MATCH_3})
+math(EXPR PATCH_VERSION "${PATCH_VERSION} + 1")
+set(APP_VERSION "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
+file(WRITE "VERSION" "${APP_VERSION}")
+
 project(
     JustWrite
-    VERSION 0.1.0
+    VERSION "${APP_VERSION}"
     DESCRIPTION "One of the most focused novel writer in the world!"
     HOMEPAGE_URL "https://github.com/zymelaii/JustWrite"
-    LANGUAGES C CXX
+    LANGUAGES CXX
 )
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
