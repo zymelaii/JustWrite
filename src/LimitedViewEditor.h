@@ -1,6 +1,5 @@
 #pragma once
 
-#include "TextBlockLayout.h"
 #include <QWidget>
 
 struct LimitedViewEditorPrivate;
@@ -19,42 +18,22 @@ signals:
     void textAreaChanged(QRect area);
 
 public:
-    int  paraBlockSpacing() const;
-    void setParaBlockSpacing(int spacing);
-
-    int  minTextLineChars() const;
-    void setMinTextLineChars(int min_chars);
-
-    double textLineSpacingRatio() const;
-    void   setTextLineSpacingRatio(double ratio);
-
     bool alignCenter() const;
     void setAlignCenter(bool value);
 
     QRect textArea() const;
 
-    TextBlockLayout &currentTextBlock();
-
-    void switchTextBlock(int index);
-
-    void insertMultiLineText(const QString &text);
-
     void scroll(double delta);
+    void scrollToStart();
+    void scrollToEnd();
 
+    void move(int offset);
     void insert(const QString &text);
-    void deleteForward();
-    void deleteBackward();
+    void del(int times);
+    void copy();
+    void cut();
     void paste();
-    void moveToPreviousChar();
-    void moveToNextChar();
-    void moveToEndOfLine();
-    void moveToStartOfLine();
-    void moveToPreviousLine();
-    void moveToNextLine();
     void splitIntoNewLine();
-
-protected:
-    void updateTextBlockMaxWidth(int max_width);
 
 protected:
     void resizeEvent(QResizeEvent *e) override;

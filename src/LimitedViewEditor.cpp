@@ -1,4 +1,5 @@
 #include "LimitedViewEditor.h"
+#include "TextViewEngine.h"
 #include <QResizeEvent>
 #include <QPaintEvent>
 #include <QFocusEvent>
@@ -15,46 +16,29 @@
 #include <QTimer>
 
 struct LimitedViewEditorPrivate {
-    int    min_text_line_chars;
-    double text_line_spacing_ratio;
-    int    para_block_spacing;
-
-    int cursor_pos;
-
-    bool preedit;
-    int  preedit_start_pos;
-
-    int active_para_index;
-
-    bool align_center;
-
-    double scroll;
-
-    bool   blink_cursor_should_paint;
-    QTimer blink_timer;
-
-    QString                  text;
-    QVector<TextBlockLayout> paras;
+    int                     min_text_line_chars;
+    bool                    align_center;
+    double                  scroll;
+    bool                    blink_cursor_should_paint;
+    QTimer                  blink_timer;
+    int                     cursor_pos;
+    QString                 text;
+    jwrite::TextViewEngine *engine;
 
     LimitedViewEditorPrivate() {
-        min_text_line_chars     = 12;
-        text_line_spacing_ratio = 1.0;
-        para_block_spacing      = 6;
-
-        cursor_pos = 0;
-
-        preedit           = false;
-        preedit_start_pos = -1;
-
-        active_para_index = -1;
-
-        align_center = false;
-
-        scroll = 0.0;
-
+        engine                    = nullptr;
+        min_text_line_chars       = 12;
+        cursor_pos                = 0;
+        align_center              = false;
+        scroll                    = 0.0;
         blink_cursor_should_paint = true;
         blink_timer.setInterval(500);
         blink_timer.setSingleShot(false);
+    }
+
+    ~LimitedViewEditorPrivate() {
+        Q_ASSERT(engine);
+        delete engine;
     }
 };
 
@@ -71,11 +55,14 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
     setAttribute(Qt::WA_InputMethodEnabled);
     setAcceptDrops(true);
 
-    setAlignCenter(false);
+    setAlignCenter(true);
+
+    d->engine = new jwrite::TextViewEngine(fontMetrics(), textArea().width());
+
+    scrollToStart();
 
     connect(this, &LimitedViewEditor::textAreaChanged, this, [this](QRect area) {
-        if (d->paras.empty()) { return; }
-        if (auto max_width = area.width(); max_width != d->paras[0].max_width) { updateTextBlockMaxWidth(max_width); }
+        d->engine->resetMaxWidth(area.width());
         update();
     });
     connect(&d->blink_timer, &QTimer::timeout, this, [this] {
@@ -89,47 +76,17 @@ LimitedViewEditor::~LimitedViewEditor() {
 }
 
 QSize LimitedViewEditor::minimumSizeHint() const {
-    const auto fm          = fontMetrics();
-    const auto char_width  = fm.horizontalAdvance(QChar(U'\u3000'));
-    const auto margins     = contentsMargins();
-    const auto line_height = fm.height() + fm.descent();
-    const auto hori_margin = margins.left() + margins.right();
-    const auto vert_margin = margins.top() + margins.bottom();
-    const auto min_width   = d->min_text_line_chars * char_width + hori_margin;
-    const auto min_height  = d->text_line_spacing_ratio * line_height * 3 + d->para_block_spacing * 2 + vert_margin;
+    const auto margins      = contentsMargins();
+    const auto line_spacing = d->engine->line_height * d->engine->line_spacing_ratio;
+    const auto hori_margin  = margins.left() + margins.right();
+    const auto vert_margin  = margins.top() + margins.bottom();
+    const auto min_width    = d->min_text_line_chars * d->engine->standard_char_width + hori_margin;
+    const auto min_height   = line_spacing * 3 + d->engine->block_spacing * 2 + vert_margin;
     return QSize(min_width, min_height);
 }
 
 QSize LimitedViewEditor::sizeHint() const {
     return minimumSizeHint();
-}
-
-int LimitedViewEditor::paraBlockSpacing() const {
-    return d->para_block_spacing;
-}
-
-void LimitedViewEditor::setParaBlockSpacing(int spacing) {
-    d->para_block_spacing = qMax(0, spacing);
-    update();
-}
-
-int LimitedViewEditor::minTextLineChars() const {
-    return d->min_text_line_chars;
-}
-
-void LimitedViewEditor::setMinTextLineChars(int min_chars) {
-    d->min_text_line_chars = qMax(4, min_chars);
-    updateGeometry();
-    update();
-}
-
-double LimitedViewEditor::textLineSpacingRatio() const {
-    return d->text_line_spacing_ratio;
-}
-
-void LimitedViewEditor::setTextLineSpacingRatio(double ratio) {
-    d->text_line_spacing_ratio = qBound(0.75, ratio, 2.5);
-    update();
 }
 
 bool LimitedViewEditor::alignCenter() const {
@@ -155,99 +112,74 @@ QRect LimitedViewEditor::textArea() const {
     return rect() - contentsMargins();
 }
 
-TextBlockLayout &LimitedViewEditor::currentTextBlock() {
-    if (d->active_para_index == -1) {
-        TextBlockLayout para;
-        para.reset(d->text, d->cursor_pos);
-        para.setMaxWidth(textArea().width());
-        d->paras.push_back(para);
-        switchTextBlock(0);
+void LimitedViewEditor::scroll(double delta) {
+    const auto e            = d->engine;
+    const auto line_spacing = e->line_spacing_ratio * e->line_height;
+    double     max_scroll   = line_spacing + e->block_spacing;
+    double     min_scroll   = 0;
+    for (auto block : e->active_blocks) {
+        min_scroll -= block->lines.size() * line_spacing + e->block_spacing;
     }
-    return d->paras[d->active_para_index];
-}
-
-void LimitedViewEditor::switchTextBlock(int index) {
-    if (index < 0 || index >= d->paras.size() || index == d->active_para_index) { return; }
-    if (d->active_para_index != -1) {
-        auto &para = currentTextBlock();
-        if (para.isEmpty()) {
-            if (index > d->active_para_index) { --index; }
-            d->paras.remove(d->active_para_index);
-        }
-    }
-    d->active_para_index = index;
+    min_scroll += line_spacing + e->block_spacing;
+    d->scroll   = qBound<double>(min_scroll, d->scroll + delta, max_scroll);
     update();
 }
 
-void LimitedViewEditor::insertMultiLineText(const QString &text) {
-    auto lines = text.split("\n");
-    insert(lines.front());
-    for (int i = 1; i < lines.size(); ++i) {
-        const auto text = lines[i].trimmed();
-        if (text.isEmpty()) { continue; }
-        TextBlockLayout para;
-        para.reset(d->text, d->cursor_pos);
-        para.setMaxWidth(textArea().width());
-        d->paras.push_back(para);
-        switchTextBlock(d->paras.size() - 1);
-        insert(text);
-    }
+void LimitedViewEditor::scrollToStart() {
+    const auto   e               = d->engine;
+    const auto   line_spacing    = e->line_spacing_ratio * e->line_height;
+    const double max_scroll      = line_spacing + e->block_spacing;
+    d->scroll                    = max_scroll;
+    d->blink_cursor_should_paint = true;
+    update();
 }
 
-void LimitedViewEditor::scroll(double delta) {
-    const auto fm          = fontMetrics();
-    const auto line_height = fm.height() + fm.descent();
-
-    double max_scroll = d->text_line_spacing_ratio * line_height + d->para_block_spacing;
-    double min_scroll = 0;
-
-    for (auto &para : d->paras) {
-        min_scroll -= para.lines.size() * d->text_line_spacing_ratio * line_height + d->para_block_spacing;
+void LimitedViewEditor::scrollToEnd() {
+    const auto e            = d->engine;
+    const auto line_spacing = e->line_spacing_ratio * e->line_height;
+    double     min_scroll   = 0;
+    for (auto block : e->active_blocks) {
+        min_scroll -= block->lines.size() * line_spacing + e->block_spacing;
     }
-    min_scroll += d->text_line_spacing_ratio * line_height + d->para_block_spacing;
+    min_scroll                   += line_spacing + e->block_spacing;
+    d->scroll                     = min_scroll;
+    d->blink_cursor_should_paint  = true;
+    update();
+}
 
-    d->scroll = qBound<double>(min_scroll, d->scroll + delta, max_scroll);
-
+void LimitedViewEditor::move(int offset) {
+    const int text_offset         = d->engine->commitMovement(offset);
+    d->cursor_pos                += text_offset;
+    d->blink_cursor_should_paint  = true;
     update();
 }
 
 void LimitedViewEditor::insert(const QString &text) {
-    //! ATTENTION: must get block first to ensure the origin is right
-    auto &para = currentTextBlock().sync(d->text);
-    //! TODO: ensure no sel
-    const auto inserted = para.cursor_pos == 0 ? leftTrimmed(text) : text;
-    d->text.insert(d->cursor_pos, inserted);
-    const auto size  = inserted.length();
-    d->cursor_pos   += size;
-    para.quickInsert(size);
-    for (int i = d->active_para_index + 1; i < d->paras.size(); ++i) { d->paras[i].shiftOrigin(size); }
+    Q_ASSERT(d->engine->isCursorAvailable());
+    d->text.insert(d->cursor_pos, text);
+    const int len  = text.length();
+    d->cursor_pos += len;
+    d->engine->commitInsertion(len);
+    d->blink_cursor_should_paint = true;
     update();
 }
 
-void LimitedViewEditor::deleteForward() {
-    auto &para = currentTextBlock();
-    if (para.deleteForward()) {
-        d->text.remove(d->cursor_pos, 1);
-        for (int i = d->active_para_index + 1; i < d->paras.size(); ++i) { d->paras[i].shiftOrigin(-1); }
-    } else if (d->active_para_index + 1 != d->paras.size()) {
-        para.mergeNextBlock(d->paras[d->active_para_index + 1]);
-        d->paras.remove(d->active_para_index + 1);
-    }
-    update();
+void LimitedViewEditor::del(int times) {
+    //! NOTE: times means delete |times| chars, and the sign indicates the del direction
+    //! TODO: delete selected text
+    //! TODO: delete action
 }
 
-void LimitedViewEditor::deleteBackward() {
-    auto &para = currentTextBlock();
-    if (para.deleteBackward()) {
-        d->text.remove(d->cursor_pos, 1);
-        --d->cursor_pos;
-        for (int i = d->active_para_index + 1; i < d->paras.size(); ++i) { d->paras[i].shiftOrigin(-1); }
-    } else if (d->active_para_index > 0) {
-        para.joinPrevBlock(d->paras[d->active_para_index - 1]);
-        switchTextBlock(d->active_para_index - 1);
-        d->paras.remove(d->active_para_index + 1);
-    }
-    update();
+void LimitedViewEditor::copy() {
+    //! TODO: handle out-of-view copy action
+    //! TODO: copy to clipboard
+}
+
+void LimitedViewEditor::cut() {
+    //! TODO: handle out of view cut action
+    //! TODO: copy to clipboard
+    copy();
+    //! TODO: remove the cut region
 }
 
 void LimitedViewEditor::paste() {
@@ -255,159 +187,14 @@ void LimitedViewEditor::paste() {
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
     //! TODO: optimize large text paste
-    insertMultiLineText(mime->text());
-}
-
-void LimitedViewEditor::moveToPreviousChar() {
-    auto &para = currentTextBlock();
-    --d->cursor_pos;
-    if (para.cursor_col > 0) {
-        --para.cursor_col;
-        --para.cursor_pos;
-    } else if (para.cursor_row > 0) {
-        --para.cursor_row;
-        para.cursor_col = para.line(para.cursor_row).length() - 1;
-        --para.cursor_pos;
-    } else if (d->active_para_index > 0) {
-        switchTextBlock(d->active_para_index - 1);
-        auto &para      = currentTextBlock();
-        para.cursor_row = para.lines.size() - 1;
-        para.cursor_col = para.line(para.cursor_row).length();
-        para.cursor_pos = para.lines.back().text_endp - para.text_pos;
-        ++d->cursor_pos;
-    } else {
-        ++d->cursor_pos;
-    }
-    d->blink_cursor_should_paint = true;
-    update();
-}
-
-void LimitedViewEditor::moveToNextChar() {
-    auto &para = currentTextBlock();
-    ++d->cursor_pos;
-    if (para.cursor_col < para.line(para.cursor_row).length()) {
-        ++para.cursor_col;
-        ++para.cursor_pos;
-    } else if (para.cursor_row < para.lines.size() && !para.line(para.cursor_row + 1).isEmpty()) {
-        ++para.cursor_row;
-        para.cursor_col = 1;
-        ++para.cursor_pos;
-    } else if (d->active_para_index + 1 < d->paras.size()) {
-        switchTextBlock(d->active_para_index + 1);
-        auto &para      = currentTextBlock();
-        para.cursor_row = 0;
-        para.cursor_col = 0;
-        para.cursor_pos = 0;
-        --d->cursor_pos;
-    } else {
-        --d->cursor_pos;
-    }
-    d->blink_cursor_should_paint = true;
-    update();
-}
-
-void LimitedViewEditor::moveToEndOfLine() {
-    auto &para = currentTextBlock();
-    if (auto size = para.line(para.cursor_row).length(); para.cursor_col < size) {
-        int offset       = size - para.cursor_col;
-        para.cursor_pos += offset;
-        para.cursor_col  = size;
-        d->cursor_pos   += offset;
-    } else {
-        int offset       = para.lines.back().text_endp - para.text_pos - para.cursor_pos;
-        para.cursor_pos += offset;
-        para.cursor_row  = para.lines.size() - 1;
-        para.cursor_col  = para.line(para.cursor_row).length();
-        d->cursor_pos   += offset;
-    }
-    d->blink_cursor_should_paint = true;
-    update();
-}
-
-void LimitedViewEditor::moveToStartOfLine() {
-    auto &para = currentTextBlock();
-    if (para.cursor_col > 0) {
-        d->cursor_pos   -= para.cursor_col;
-        para.cursor_pos -= para.cursor_col;
-        para.cursor_col  = 0;
-    } else {
-        d->cursor_pos   -= para.cursor_pos;
-        para.cursor_col  = 0;
-        para.cursor_row  = 0;
-        para.cursor_pos  = 0;
-    }
-    d->blink_cursor_should_paint = true;
-    update();
-}
-
-void LimitedViewEditor::moveToPreviousLine() {
-    auto &para   = currentTextBlock();
-    int   offset = -1;
-    if (para.cursor_row > 0) {
-        const auto col = para.cursor_col;
-        --para.cursor_row;
-        const auto len   = para.lengthOfLine(para.cursor_row);
-        para.cursor_col  = qMin(col, len);
-        offset           = len - para.cursor_col + col;
-        para.cursor_pos -= offset;
-    } else if (d->active_para_index != 0) {
-        switchTextBlock(d->active_para_index - 1);
-        const auto col  = para.cursor_col;
-        auto      &para = currentTextBlock();
-        para.cursor_row = para.lines.size() - 1;
-        const auto len  = para.lengthOfLine(para.cursor_row);
-        para.cursor_col = qMin(col, len);
-        offset          = len - para.cursor_col + col;
-        para.cursor_pos = para.lines.back().text_endp - para.text_pos - (len - para.cursor_col);
-    }
-    if (offset != -1) { d->cursor_pos -= offset; }
-    d->blink_cursor_should_paint = true;
-    update();
-}
-
-void LimitedViewEditor::moveToNextLine() {
-    auto &para   = currentTextBlock();
-    int   offset = -1;
-    if (para.cursor_row + 1 < para.lines.size()) {
-        const auto col  = para.cursor_col;
-        const auto mean = para.lengthOfLine(para.cursor_row) - col;
-        ++para.cursor_row;
-        const auto len   = para.lengthOfLine(para.cursor_row);
-        para.cursor_col  = qMin(col, len);
-        offset           = mean + para.cursor_col;
-        para.cursor_pos += offset;
-    } else if (d->active_para_index < d->paras.size()) {
-        switchTextBlock(d->active_para_index + 1);
-        const auto col  = para.cursor_col;
-        const auto mean = para.lengthOfLine(para.cursor_row) - col;
-        auto      &para = currentTextBlock();
-        para.cursor_row = 0;
-        const auto len  = para.lengthOfLine(para.cursor_row);
-        para.cursor_col = qMin(col, len);
-        para.cursor_pos = para.cursor_col;
-        offset          = mean + para.cursor_col;
-    }
-    if (offset != -1) { d->cursor_pos += offset; }
-    d->blink_cursor_should_paint = true;
+    //! TODO: paste into cursor pos
     update();
 }
 
 void LimitedViewEditor::splitIntoNewLine() {
-    //! FIXME: dead recursion
-    Q_ASSERT(!d->paras.isEmpty());
-    auto para = currentTextBlock().split();
-    d->paras.insert(d->active_para_index + 1, para);
-    switchTextBlock(d->active_para_index + 1);
+    d->engine->breakBlockAtCursorPos();
     d->blink_cursor_should_paint = true;
     update();
-}
-
-void LimitedViewEditor::updateTextBlockMaxWidth(int max_width) {
-    for (auto &para : d->paras) {
-        para.setMaxWidth(max_width);
-        para.render(fontMetrics());
-    }
-    //! TODO: maybe need more or less text blocks
 }
 
 void LimitedViewEditor::resizeEvent(QResizeEvent *e) {
@@ -417,8 +204,8 @@ void LimitedViewEditor::resizeEvent(QResizeEvent *e) {
 }
 
 void LimitedViewEditor::paintEvent(QPaintEvent *e) {
-    //! FIXME: better not to render in paint event
-    for (auto &para : d->paras) { para.sync(d->text).render(fontMetrics()); }
+    auto engine = d->engine;
+    engine->render();
 
     QPainter p(this);
     auto     pal = palette();
@@ -429,44 +216,45 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     //! draw test area
     p.setPen(pal.text().color());
 
-    const auto   fm           = fontMetrics();
-    const double para_spacing = d->para_block_spacing;
-    const double line_height  = fm.height() + fm.descent();
-    const double line_spacing = line_height * d->text_line_spacing_ratio;
+    const auto  &fm           = engine->fm;
+    const double line_spacing = engine->line_height * engine->line_spacing_ratio;
     const double y_offset     = 0.0;
 
     const auto flags     = Qt::AlignBaseline | Qt::TextDontClip;
     const auto text_area = textArea();
     double     y_pos     = text_area.top() + d->scroll;
 
-    for (auto &para : d->paras) {
-        for (int i = 0; i < para.lines.size(); ++i) {
-            const auto &line = para.lines[i];
-            const auto  text = para.line(i);
-            const auto  incr = text.length() < 2 ? 0.0 : line.mean_width * 1.0 / (text.length() - 1);
-            QRectF      bb(text_area.left() + line.offset, y_pos, para.max_width - line.offset, line_height);
+    for (const auto &block : engine->active_blocks) {
+        for (const auto &line : block->lines) {
+            const auto text   = line.text();
+            const auto incr   = line.charSpacing();
+            const auto offset = line.isFirstLine() ? engine->standard_char_width * 2 : 0;
+            QRectF     bb(
+                text_area.left() + offset, y_pos, engine->max_width - offset, engine->line_height);
             for (auto &c : text) {
                 p.drawText(bb, flags, c);
                 bb.setLeft(bb.left() + incr + fm.horizontalAdvance(c));
             }
             y_pos += line_spacing;
         }
-        y_pos += para_spacing;
+        y_pos += engine->block_spacing;
     }
 
     //! draw cursor
-    if (hasFocus() && !d->paras.isEmpty() && d->blink_cursor_should_paint) {
-        const auto &para         = currentTextBlock();
-        const auto &line         = para.lines[para.cursor_row];
-        const auto  text         = para.line(para.cursor_row);
-        const auto  incr         = text.length() < 2 ? 0.0 : line.mean_width * 1.0 / (text.length() - 1);
-        const auto  text_width   = fm.horizontalAdvance(text.mid(0, para.cursor_col).toString());
-        double      cursor_x_pos = text_area.left() + line.offset + text_width + para.cursor_col * incr;
+    if (engine->isCursorAvailable() && d->blink_cursor_should_paint) {
+        const auto &line         = engine->currentLine();
+        const auto &cursor       = engine->cursor;
+        const auto  text         = line.text().mid(0, cursor.col);
+        const auto  incr         = line.charSpacing();
+        const auto  text_width   = fm.horizontalAdvance(text.toString());
+        const auto  offset       = line.isFirstLine() ? engine->standard_char_width * 2 : 0;
+        double      cursor_x_pos = text_area.left() + offset + text_width + cursor.col * incr;
         double      cursor_y_pos = text_area.top() + d->scroll;
-        for (int i = 0; i < d->active_para_index; ++i) {
-            cursor_y_pos += line_height * d->paras[i].lines.size() + para_spacing;
+        for (int i = 0; i < engine->active_block_index; ++i) {
+            cursor_y_pos +=
+                line_spacing * engine->active_blocks[i]->lines.size() + engine->block_spacing;
         }
-        cursor_y_pos += para.cursor_row * line_height;
+        cursor_y_pos += cursor.row * line_spacing;
         p.drawLine(cursor_x_pos, cursor_y_pos, cursor_x_pos, cursor_y_pos + fm.height());
     }
 }
@@ -475,43 +263,69 @@ void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
     QWidget::focusInEvent(e);
     d->blink_cursor_should_paint = true;
     d->blink_timer.start();
-    //! force to create one para block
-    const auto _ = currentTextBlock();
+    if (auto e = d->engine; e->isEmpty()) {
+        e->setTextRefUnsafe(&d->text, 0);
+        e->insertBlock(0);
+        //! TODO: move it into a safe method
+        e->active_block_index = 0;
+    }
 }
 
 void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
     d->blink_timer.stop();
+    //! TODO: unset cursor if posible
 }
 
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
     if (auto text = e->text(); !text.isEmpty() && text.at(0).isPrint()) {
         insert(text.at(0));
-    } else if (auto key = e->key() | e->modifiers(); key == Qt::Key_Return || key == Qt::Key_Enter) {
+    } else if (const auto key = e->key() | e->modifiers();
+               key == Qt::Key_Return || key == Qt::Key_Enter) {
         splitIntoNewLine();
-    } else if (e->matches(QKeySequence::Paste)) {
-        paste();
-    } else if (e->matches(QKeySequence::MoveToNextPage)) {
-        scroll(-textArea().height() * 0.5);
+    } else if (e->matches(QKeySequence::MoveToPreviousChar)) {
+        move(-1);
+    } else if (e->matches(QKeySequence::MoveToNextChar)) {
+        move(1);
+    } else if (e->matches(QKeySequence::MoveToStartOfLine)) {
+        const auto &cursor = d->engine->cursor;
+        const int   offset = cursor.col == 0 ? cursor.pos : cursor.col;
+        move(-offset);
+    } else if (e->matches(QKeySequence::MoveToEndOfLine)) {
+        const auto &cursor = d->engine->cursor;
+        const auto  block  = d->engine->currentBlock();
+        auto        len    = block->lengthOfLine(cursor.row);
+        const int offset = cursor.col == len ? block->textLength() - cursor.pos : len - cursor.col;
+        move(offset);
     } else if (e->matches(QKeySequence::MoveToPreviousPage)) {
         scroll(textArea().height() * 0.5);
-    } else if (e->matches(QKeySequence::MoveToNextChar)) {
-        moveToNextChar();
-    } else if (e->matches(QKeySequence::MoveToPreviousChar)) {
-        moveToPreviousChar();
-    } else if (e->matches(QKeySequence::MoveToEndOfLine)) {
-        moveToEndOfLine();
-    } else if (e->matches(QKeySequence::MoveToStartOfLine)) {
-        moveToStartOfLine();
-    } else if (e->matches(QKeySequence::Delete)) {
-        deleteForward();
-    } else if ((e->key() | e->modifiers()) == Qt::Key_Backspace) {
-        deleteBackward();
-    } else if (e->matches(QKeySequence::MoveToNextLine)) {
-        moveToNextLine();
-    } else if (e->matches(QKeySequence::MoveToPreviousLine)) {
-        moveToPreviousLine();
+    } else if (e->matches(QKeySequence::MoveToNextPage)) {
+        scroll(-textArea().height() * 0.5);
+    } else if (e->matches(QKeySequence::MoveToStartOfDocument)) {
+        auto &cursor                  = d->engine->cursor;
+        d->engine->active_block_index = 0;
+        cursor.pos                    = 0;
+        cursor.row                    = 0;
+        cursor.col                    = 0;
+        d->cursor_pos                 = 0;
+        scrollToStart();
+    } else if (e->matches(QKeySequence::MoveToEndOfDocument)) {
+        auto &cursor                  = d->engine->cursor;
+        d->engine->active_block_index = d->engine->active_blocks.size() - 1;
+        auto block                    = d->engine->currentBlock();
+        cursor.pos                    = block->textLength();
+        cursor.row                    = block->lines.size() - 1;
+        cursor.col                    = block->lengthOfLine(block->lines.size() - 1);
+        d->cursor_pos                 = d->text.size();
+        scrollToEnd();
+    } else if (e->matches(QKeySequence::Copy)) {
+        copy();
+    } else if (e->matches(QKeySequence::Cut)) {
+        cut();
+    } else if (e->matches(QKeySequence::Paste)) {
+        paste();
     }
+
     e->accept();
 }
 
@@ -532,20 +346,16 @@ void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void LimitedViewEditor::wheelEvent(QWheelEvent *e) {
-    if (d->paras.empty()) { return; }
-
-    const auto fm          = fontMetrics();
-    const auto line_height = fm.height() + fm.descent();
-
+    const auto engine = d->engine;
+    if (engine->isEmpty()) { return; }
     const double ratio = 1.0 / 180 * 3;
-    const auto   delta = e->angleDelta().y() * line_height * ratio;
-
+    const auto   delta = e->angleDelta().y() * engine->line_height * ratio;
     scroll(delta);
 }
 
 void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
     if (!e->preeditString().isEmpty()) {
-        //! TODO: display preedit string
+        //! TODO: display preedit string, controlled by engine
     } else {
         insert(e->commitString());
     }

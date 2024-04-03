@@ -56,7 +56,9 @@ JustWrite::~JustWrite() {
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto e = static_cast<QKeyEvent *>(event);
-        if (mkkeyseq(e) == d->shortcut.toggle_align_center) { ui->editor->setAlignCenter(!ui->editor->alignCenter()); }
+        if (mkkeyseq(e) == d->shortcut.toggle_align_center) {
+            ui->editor->setAlignCenter(!ui->editor->alignCenter());
+        }
     }
     return false;
 }
