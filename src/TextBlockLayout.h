@@ -40,8 +40,19 @@ struct TextBlockLayout {
     void render(const QFontMetrics &fm);
 
     QStringView line(int index) const;
+    int         originOfLine(int index) const;
+    int         lengthOfLine(int index) const;
+
+    int length() const {
+        return lines.back().text_endp - text_pos;
+    }
 
     TextBlockLayout split();
+
+    bool deleteBackward();
+    bool deleteForward();
+    void mergeNextBlock(TextBlockLayout &block);
+    void joinPrevBlock(TextBlockLayout &block);
 
     TextBlockLayout &sync(QStringView source) {
         text_ref = source;

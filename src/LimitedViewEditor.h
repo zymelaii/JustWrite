@@ -42,11 +42,15 @@ public:
     void scroll(double delta);
 
     void insert(const QString &text);
+    void deleteForward();
+    void deleteBackward();
     void paste();
     void moveToPreviousChar();
     void moveToNextChar();
     void moveToEndOfLine();
     void moveToStartOfLine();
+    void moveToPreviousLine();
+    void moveToNextLine();
     void splitIntoNewLine();
 
 protected:

@@ -224,10 +224,37 @@ void LimitedViewEditor::insert(const QString &text) {
     update();
 }
 
+void LimitedViewEditor::deleteForward() {
+    auto &para = currentTextBlock();
+    if (para.deleteForward()) {
+        d->text.remove(d->cursor_pos, 1);
+        for (int i = d->active_para_index + 1; i < d->paras.size(); ++i) { d->paras[i].shiftOrigin(-1); }
+    } else if (d->active_para_index + 1 != d->paras.size()) {
+        para.mergeNextBlock(d->paras[d->active_para_index + 1]);
+        d->paras.remove(d->active_para_index + 1);
+    }
+    update();
+}
+
+void LimitedViewEditor::deleteBackward() {
+    auto &para = currentTextBlock();
+    if (para.deleteBackward()) {
+        d->text.remove(d->cursor_pos, 1);
+        --d->cursor_pos;
+        for (int i = d->active_para_index + 1; i < d->paras.size(); ++i) { d->paras[i].shiftOrigin(-1); }
+    } else if (d->active_para_index > 0) {
+        para.joinPrevBlock(d->paras[d->active_para_index - 1]);
+        switchTextBlock(d->active_para_index - 1);
+        d->paras.remove(d->active_para_index + 1);
+    }
+    update();
+}
+
 void LimitedViewEditor::paste() {
     auto clipboard = QGuiApplication::clipboard();
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
+    //! TODO: optimize large text paste
     insertMultiLineText(mime->text());
 }
 
@@ -309,6 +336,58 @@ void LimitedViewEditor::moveToStartOfLine() {
         para.cursor_row  = 0;
         para.cursor_pos  = 0;
     }
+    d->blink_cursor_should_paint = true;
+    update();
+}
+
+void LimitedViewEditor::moveToPreviousLine() {
+    auto &para   = currentTextBlock();
+    int   offset = -1;
+    if (para.cursor_row > 0) {
+        const auto col = para.cursor_col;
+        --para.cursor_row;
+        const auto len   = para.lengthOfLine(para.cursor_row);
+        para.cursor_col  = qMin(col, len);
+        offset           = len - para.cursor_col + col;
+        para.cursor_pos -= offset;
+    } else if (d->active_para_index != 0) {
+        switchTextBlock(d->active_para_index - 1);
+        const auto col  = para.cursor_col;
+        auto      &para = currentTextBlock();
+        para.cursor_row = para.lines.size() - 1;
+        const auto len  = para.lengthOfLine(para.cursor_row);
+        para.cursor_col = qMin(col, len);
+        offset          = len - para.cursor_col + col;
+        para.cursor_pos = para.lines.back().text_endp - para.text_pos - (len - para.cursor_col);
+    }
+    if (offset != -1) { d->cursor_pos -= offset; }
+    d->blink_cursor_should_paint = true;
+    update();
+}
+
+void LimitedViewEditor::moveToNextLine() {
+    auto &para   = currentTextBlock();
+    int   offset = -1;
+    if (para.cursor_row + 1 < para.lines.size()) {
+        const auto col  = para.cursor_col;
+        const auto mean = para.lengthOfLine(para.cursor_row) - col;
+        ++para.cursor_row;
+        const auto len   = para.lengthOfLine(para.cursor_row);
+        para.cursor_col  = qMin(col, len);
+        offset           = mean + para.cursor_col;
+        para.cursor_pos += offset;
+    } else if (d->active_para_index < d->paras.size()) {
+        switchTextBlock(d->active_para_index + 1);
+        const auto col  = para.cursor_col;
+        const auto mean = para.lengthOfLine(para.cursor_row) - col;
+        auto      &para = currentTextBlock();
+        para.cursor_row = 0;
+        const auto len  = para.lengthOfLine(para.cursor_row);
+        para.cursor_col = qMin(col, len);
+        para.cursor_pos = para.cursor_col;
+        offset          = mean + para.cursor_col;
+    }
+    if (offset != -1) { d->cursor_pos += offset; }
     d->blink_cursor_should_paint = true;
     update();
 }
@@ -408,7 +487,7 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
     if (auto text = e->text(); !text.isEmpty() && text.at(0).isPrint()) {
         insert(text.at(0));
-    } else if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) && e->modifiers() == Qt::NoModifier) {
+    } else if (auto key = e->key() | e->modifiers(); key == Qt::Key_Return || key == Qt::Key_Enter) {
         splitIntoNewLine();
     } else if (e->matches(QKeySequence::Paste)) {
         paste();
@@ -424,6 +503,14 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         moveToEndOfLine();
     } else if (e->matches(QKeySequence::MoveToStartOfLine)) {
         moveToStartOfLine();
+    } else if (e->matches(QKeySequence::Delete)) {
+        deleteForward();
+    } else if ((e->key() | e->modifiers()) == Qt::Key_Backspace) {
+        deleteBackward();
+    } else if (e->matches(QKeySequence::MoveToNextLine)) {
+        moveToNextLine();
+    } else if (e->matches(QKeySequence::MoveToPreviousLine)) {
+        moveToPreviousLine();
     }
     e->accept();
 }
@@ -475,5 +562,5 @@ void LimitedViewEditor::dragEnterEvent(QDragEnterEvent *e) {
 void LimitedViewEditor::dropEvent(QDropEvent *e) {
     QWidget::dropEvent(e);
     const auto urls = e->mimeData()->urls();
-    //! TODO: allow to open local document
+    //! TODO: filter plain text files and handle open action
 }

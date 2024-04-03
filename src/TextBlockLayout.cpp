@@ -98,11 +98,18 @@ void TextBlockLayout::render(const QFontMetrics &fm) {
     }
 }
 
+int TextBlockLayout::originOfLine(int index) const {
+    Q_ASSERT(index >= 0 && index < lines.size());
+    return index == 0 ? text_pos : lines[index - 1].text_endp;
+}
+
+int TextBlockLayout::lengthOfLine(int index) const {
+    return lines[index].text_endp - originOfLine(index);
+}
+
 QStringView TextBlockLayout::line(int index) const {
-    if (index < 0 || index >= lines.size()) { return {}; }
-    const auto pos  = index == 0 ? text_pos : lines[index - 1].text_endp;
-    const auto size = lines[index].text_endp - pos;
-    return text_ref.mid(pos, size);
+    const auto size = lengthOfLine(index);
+    return text_ref.mid(lines[index].text_endp - size, size);
 }
 
 TextBlockLayout TextBlockLayout::split() {
@@ -121,9 +128,9 @@ TextBlockLayout TextBlockLayout::split() {
         block.lines[0]       = lines[cursor_row];
         block.lines[0].dirty = true;
         --cursor_row;
-        cursor_col = line(cursor_row).length();
+        cursor_col = lengthOfLine(cursor_row);
         --remove_from;
-    } else if (auto line_size = line(cursor_row).length(); cursor_col < line_size) {
+    } else if (auto line_size = lengthOfLine(cursor_row); cursor_col < line_size) {
         const auto len               = line_size - cursor_col;
         block.lines[0].text_endp    += len;
         block.lines[0].dirty         = true;
@@ -137,6 +144,47 @@ TextBlockLayout TextBlockLayout::split() {
     lines.remove(remove_from, lines.size() - remove_from);
 
     return block;
+}
+
+bool TextBlockLayout::deleteBackward() {
+    if (cursor_pos == 0) { return false; }
+    Q_ASSERT(!(cursor_col == 0 && cursor_row == 0));
+    if (cursor_col == 0) {
+        --cursor_row;
+        cursor_col = lengthOfLine(cursor_row) - 1;
+    } else {
+        --cursor_col;
+    }
+    --cursor_pos;
+    lines[cursor_row].dirty = true;
+    for (int i = cursor_row; i < lines.size(); ++i) { --lines[cursor_row].text_endp; }
+    if (lines.size() > 1 && lengthOfLine(lines.size() - 1) == 0) { lines.remove(lines.size() - 1); }
+    return true;
+}
+
+bool TextBlockLayout::deleteForward() {
+    if (cursor_pos == lines.back().text_endp - text_pos) { return false; }
+    Q_ASSERT(!(cursor_col == lengthOfLine(cursor_row) && cursor_row == lines.size()));
+    if (cursor_col == lengthOfLine(cursor_row)) {
+        lines[cursor_row + 1].dirty = true;
+    } else {
+        lines[cursor_row].dirty = true;
+    }
+    --lines.back().text_endp;
+    if (lines.size() > 1 && lengthOfLine(lines.size() - 1) == 0) { lines.remove(lines.size() - 1); }
+    return true;
+}
+
+void TextBlockLayout::mergeNextBlock(TextBlockLayout &block) {
+    block.joinPrevBlock(*this);
+}
+
+void TextBlockLayout::joinPrevBlock(TextBlockLayout &block) {
+    auto &line = block.lines.back();
+    Q_ASSERT(line.text_endp == text_pos);
+    line.text_endp = lines[0].text_endp;
+    line.dirty     = true;
+    for (int i = 1; i < lines.size(); ++i) { block.lines.push_back(lines[i]); }
 }
 
 int TextBlockLayout::boundingTextLength(const QFontMetrics &fm, QStringView text, int &width) {
