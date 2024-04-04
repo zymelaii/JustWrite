@@ -147,6 +147,16 @@ void LimitedViewEditor::scrollToEnd() {
     postUpdateRequest();
 }
 
+void LimitedViewEditor::insertDirtyText(const QString &text) {
+    auto text_list = text.split('\n');
+    for (int i = 0; i < text_list.size(); ++i) {
+        auto text = text_list[i].trimmed();
+        if (text.isEmpty()) { continue; }
+        insert(text);
+        splitIntoNewLine();
+    }
+}
+
 void LimitedViewEditor::move(int offset) {
     bool      cursor_moved  = false;
     const int text_offset   = d->engine->commitMovement(offset, &cursor_moved);
@@ -174,24 +184,23 @@ void LimitedViewEditor::del(int times) {
 }
 
 void LimitedViewEditor::copy() {
-    //! TODO: handle out-of-view copy action
-    //! TODO: copy to clipboard
+    if (!d->engine->isCursorAvailable()) { return; }
+    auto clipboard  = QGuiApplication::clipboard();
+    auto block_text = d->engine->currentBlock()->text().toString();
+    clipboard->setText(block_text);
 }
 
 void LimitedViewEditor::cut() {
-    //! TODO: handle out of view cut action
-    //! TODO: copy to clipboard
     copy();
-    //! TODO: remove the cut region
+    move(-d->engine->cursor.pos);
+    del(d->engine->currentBlock()->textLength());
 }
 
 void LimitedViewEditor::paste() {
     auto clipboard = QGuiApplication::clipboard();
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
-    //! TODO: optimize large text paste
-    //! TODO: paste into cursor pos
-    postUpdateRequest();
+    insertDirtyText(clipboard->text());
 }
 
 void LimitedViewEditor::splitIntoNewLine() {

@@ -27,6 +27,8 @@ public:
     void scrollToStart();
     void scrollToEnd();
 
+    void insertDirtyText(const QString &text);
+
     void move(int offset);
     void insert(const QString &text);
     void del(int times);
