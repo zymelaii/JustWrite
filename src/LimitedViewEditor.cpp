@@ -222,7 +222,7 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     //! draw margins
     p.fillRect(rect(), QColor(30, 30, 30));
 
-    //! draw test area
+    //! draw text area
     p.setPen(pal.text().color());
 
     const auto  &fm           = engine->fm;
@@ -233,7 +233,12 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     const auto text_area = textArea();
     double     y_pos     = text_area.top() + d->scroll;
 
-    for (const auto &block : engine->active_blocks) {
+    double active_block_y0 = 0.0;
+    double active_block_y1 = 0.0;
+
+    for (int i = 0; i < engine->active_blocks.size(); ++i) {
+        const auto block = engine->active_blocks[i];
+        if (i == engine->active_block_index) { active_block_y0 = y_pos; }
         for (const auto &line : block->lines) {
             const auto text   = line.text();
             const auto incr   = line.charSpacing();
@@ -246,7 +251,22 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
             }
             y_pos += line_spacing;
         }
+        if (i == engine->active_block_index) { active_block_y1 = y_pos; }
         y_pos += engine->block_spacing;
+    }
+
+    //! draw highlight text block
+    if (engine->isCursorAvailable()) {
+        QRect highlight_rect(
+            text_area.left() - 8,
+            active_block_y0 - engine->block_spacing,
+            text_area.width() + 16,
+            active_block_y1 - active_block_y0 + engine->block_spacing * 1.5);
+        p.save();
+        p.setBrush(QColor(255, 255, 255, 10));
+        p.setPen(Qt::transparent);
+        p.drawRoundedRect(highlight_rect, 4, 4);
+        p.restore();
     }
 
     //! draw cursor
