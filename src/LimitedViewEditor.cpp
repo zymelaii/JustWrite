@@ -54,6 +54,7 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
     setFocusPolicy(Qt::ClickFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
     setAcceptDrops(true);
+    setMouseTracking(true);
 
     setAlignCenter(true);
 
@@ -348,6 +349,58 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 
 void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
+
+    if (const auto e = d->engine; e->isEmpty() || e->isDirty()) { return; }
+
+    const auto &area = textArea();
+    if (!area.contains(e->pos())) { return; }
+
+    QPointF      pos           = e->pos() - area.topLeft() - QPointF(0, d->scroll);
+    const double line_spacing  = d->engine->line_height * d->engine->line_spacing_ratio;
+    const double block_spacing = d->engine->block_spacing;
+
+    int    block_index = 0;
+    double y_pos       = 0.0;
+    double y_limit     = y_pos;
+    while (block_index < d->engine->active_blocks.size()) {
+        auto block = d->engine->active_blocks[block_index];
+        y_limit    = y_pos + block->lines.size() * line_spacing + block_spacing;
+        if (pos.y() < y_limit) { break; }
+        if (block_index + 1 == d->engine->active_blocks.size()) { break; }
+        y_pos = y_limit;
+        ++block_index;
+    }
+
+    auto        block  = d->engine->active_blocks[block_index];
+    const int   row    = qBound<int>(0, (pos.y() - y_pos) / line_spacing, block->lines.size() - 1);
+    const auto &line   = block->lines[row];
+    const auto  text   = line.text();
+    const auto  incr   = line.charSpacing();
+    const auto  offset = line.isFirstLine() ? d->engine->standard_char_width * 2 : 0;
+
+    double      x_pos = offset;
+    int         col   = 0;
+    const auto &fm    = d->engine->fm;
+    while (col < text.length()) {
+        if (pos.x() < x_pos) { break; }
+        x_pos += fm.horizontalAdvance(text[col++]) + incr;
+    }
+
+    auto &active_block_index = d->engine->active_block_index;
+    auto &cursor             = d->engine->cursor;
+    if (active_block_index == block_index && cursor.row == row && cursor.col == col) { return; }
+
+    auto      last_block  = d->engine->currentBlock();
+    const int old_pos     = last_block->text_pos + cursor.pos;
+    const int new_pos     = block->text_pos + line.textOffset() + col;
+    d->cursor_pos        += new_pos - old_pos;
+
+    active_block_index = block_index;
+    cursor.pos         = line.textOffset() + col;
+    cursor.row         = row;
+    cursor.col         = col;
+
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::mouseReleaseEvent(QMouseEvent *e) {
@@ -360,6 +413,12 @@ void LimitedViewEditor::mouseDoubleClickEvent(QMouseEvent *e) {
 
 void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
     QWidget::mouseMoveEvent(e);
+    const auto &area = textArea();
+    if (area.contains(e->pos())) {
+        setCursor(Qt::IBeamCursor);
+    } else {
+        setCursor(Qt::ArrowCursor);
+    }
 }
 
 void LimitedViewEditor::wheelEvent(QWheelEvent *e) {

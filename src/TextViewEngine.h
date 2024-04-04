@@ -84,6 +84,7 @@ struct TextViewEngine {
     void             reset(const QFontMetrics &metrics, int width);
     TextBlock       *allocBlock();
     bool             isEmpty() const;
+    bool             isDirty() const;
     bool             isCursorAvailable() const;
     void             markAsDirty();
     TextLine        &currentLine();

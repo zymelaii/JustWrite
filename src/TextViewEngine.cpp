@@ -153,6 +153,10 @@ bool TextViewEngine::isEmpty() const {
     return active_blocks.isEmpty();
 }
 
+bool TextViewEngine::isDirty() const {
+    return dirty;
+}
+
 bool TextViewEngine::isCursorAvailable() const {
     return active_block_index != -1;
 }
