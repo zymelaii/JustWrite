@@ -469,6 +469,9 @@ void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
     const auto &saved_cursor          = d->engine->saved_cursor;
     const auto  last_preedit_text_len = cursor.pos - saved_cursor.pos;
 
+    //! FIXME: methods for IME preedit introduce some unexpected bugs, but i can't concretely
+    //! describe them so far
+
     if (const auto preedit_text = e->preeditString(); !preedit_text.isEmpty()) {
         if (!d->engine->preedit) {
             d->engine->beginPreEdit(d->preedit_text);
