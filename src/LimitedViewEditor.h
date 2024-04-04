@@ -36,6 +36,9 @@ public:
     void splitIntoNewLine();
 
 protected:
+    void postUpdateRequest();
+
+protected:
     void resizeEvent(QResizeEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
     void focusInEvent(QFocusEvent *e) override;

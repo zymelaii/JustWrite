@@ -126,12 +126,11 @@ void LimitedViewEditor::scroll(double delta) {
 }
 
 void LimitedViewEditor::scrollToStart() {
-    const auto   e               = d->engine;
-    const auto   line_spacing    = e->line_spacing_ratio * e->line_height;
-    const double max_scroll      = line_spacing + e->block_spacing;
-    d->scroll                    = max_scroll;
-    d->blink_cursor_should_paint = true;
-    update();
+    const auto   e            = d->engine;
+    const auto   line_spacing = e->line_spacing_ratio * e->line_height;
+    const double max_scroll   = line_spacing + e->block_spacing;
+    d->scroll                 = max_scroll;
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::scrollToEnd() {
@@ -141,17 +140,16 @@ void LimitedViewEditor::scrollToEnd() {
     for (auto block : e->active_blocks) {
         min_scroll -= block->lines.size() * line_spacing + e->block_spacing;
     }
-    min_scroll                   += line_spacing + e->block_spacing;
-    d->scroll                     = min_scroll;
-    d->blink_cursor_should_paint  = true;
-    update();
+    min_scroll += line_spacing + e->block_spacing;
+    d->scroll   = min_scroll;
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::move(int offset) {
-    const int text_offset         = d->engine->commitMovement(offset, nullptr);
-    d->cursor_pos                += text_offset;
-    d->blink_cursor_should_paint  = true;
-    update();
+    bool      cursor_moved  = false;
+    const int text_offset   = d->engine->commitMovement(offset, &cursor_moved);
+    d->cursor_pos          += text_offset;
+    if (cursor_moved) { postUpdateRequest(); }
 }
 
 void LimitedViewEditor::insert(const QString &text) {
@@ -160,24 +158,17 @@ void LimitedViewEditor::insert(const QString &text) {
     const int len  = text.length();
     d->cursor_pos += len;
     d->engine->commitInsertion(len);
-    d->blink_cursor_should_paint = true;
-    update();
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::del(int times) {
     //! NOTE: times means delete |times| chars, and the sign indicates the del direction
     //! TODO: delete selected text
-    //! TODO: delete action
-
     int       deleted  = 0;
     const int offset   = d->engine->commitDeletion(times, deleted);
     d->cursor_pos     += offset;
     d->text.remove(d->cursor_pos, deleted);
-
-    qDebug("text-offset: %d, deleted: %d", offset, deleted);
-
-    d->blink_cursor_should_paint = true;
-    update();
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::copy() {
@@ -198,13 +189,19 @@ void LimitedViewEditor::paste() {
     if (!mime->hasText()) { return; }
     //! TODO: optimize large text paste
     //! TODO: paste into cursor pos
-    update();
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::splitIntoNewLine() {
     d->engine->breakBlockAtCursorPos();
+    postUpdateRequest();
+}
+
+void LimitedViewEditor::postUpdateRequest() {
     d->blink_cursor_should_paint = true;
+    d->blink_timer.stop();
     update();
+    d->blink_timer.start();
 }
 
 void LimitedViewEditor::resizeEvent(QResizeEvent *e) {
@@ -271,20 +268,19 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
 
 void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
     QWidget::focusInEvent(e);
-    d->blink_cursor_should_paint = true;
-    d->blink_timer.start();
     if (auto e = d->engine; e->isEmpty()) {
         e->setTextRefUnsafe(&d->text, 0);
         e->insertBlock(0);
         //! TODO: move it into a safe method
         e->active_block_index = 0;
     }
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
     d->blink_timer.stop();
-    //! TODO: unset cursor if posible
+    //! TODO: unset cursor if possible
 }
 
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
