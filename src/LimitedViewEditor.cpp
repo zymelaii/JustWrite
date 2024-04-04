@@ -315,7 +315,8 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
 }
 
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
-    const auto key = e->key() | e->modifiers();
+    const auto  key    = e->key() | e->modifiers();
+    const auto &cursor = d->engine->cursor;
 
     if (auto text = e->text(); !text.isEmpty() && text.at(0).isPrint()) {
         insert(text.at(0));
@@ -326,14 +327,12 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
     } else if (e->matches(QKeySequence::MoveToNextChar)) {
         move(1);
     } else if (e->matches(QKeySequence::MoveToStartOfLine)) {
-        const auto &cursor = d->engine->cursor;
-        const int   offset = cursor.col == 0 ? cursor.pos : cursor.col;
+        const int offset = cursor.col == 0 ? cursor.pos : cursor.col;
         move(-offset);
     } else if (e->matches(QKeySequence::MoveToEndOfLine)) {
-        const auto &cursor = d->engine->cursor;
-        const auto  block  = d->engine->currentBlock();
-        auto        len    = block->lengthOfLine(cursor.row);
-        const int offset = cursor.col == len ? block->textLength() - cursor.pos : len - cursor.col;
+        const auto block  = d->engine->currentBlock();
+        auto       len    = block->lengthOfLine(cursor.row);
+        const int  offset = cursor.col == len ? block->textLength() - cursor.pos : len - cursor.col;
         move(offset);
     } else if (e->matches(QKeySequence::MoveToPreviousPage)) {
         scroll(textArea().height() * 0.5);
@@ -372,6 +371,39 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         const auto block  = d->engine->currentBlock();
         const auto cursor = d->engine->cursor;
         del(block->lengthOfLine(cursor.row) - cursor.col);
+    } else if (e->matches(QKeySequence::MoveToPreviousLine)) {
+        auto block = d->engine->currentBlock();
+        if (d->engine->active_block_index == 0 && cursor.row == 0) {
+            move(-cursor.pos);
+        } else if (cursor.row == 0) {
+            const auto prev_block  = d->engine->active_blocks[d->engine->active_block_index - 1];
+            const int  equiv_col   = prev_block->lines.size() == 1 ? cursor.col : cursor.col + 2;
+            const int  line_length = prev_block->lengthOfLine(prev_block->lines.size() - 1);
+            const int  col         = qMin(equiv_col, line_length);
+            move(-(cursor.pos + (line_length - col) + 1));
+        } else {
+            const int equiv_col = cursor.row - 1 == 0 ? cursor.col - 2 : cursor.col;
+            const int col       = qBound(0, equiv_col, block->lengthOfLine(cursor.row - 1));
+            const int pos       = block->offsetOfLine(cursor.row - 1) + col;
+            move(pos - cursor.pos);
+        }
+    } else if (e->matches(QKeySequence::MoveToNextLine)) {
+        const auto &cursor = d->engine->cursor;
+        auto        block  = d->engine->currentBlock();
+        if (d->engine->active_block_index + 1 == d->engine->active_blocks.size()
+            && cursor.row + 1 == block->lines.size()) {
+            move(block->textLength() - cursor.pos);
+        } else if (cursor.row + 1 == block->lines.size()) {
+            const auto next_block = d->engine->active_blocks[d->engine->active_block_index + 1];
+            const int  equiv_col  = cursor.row == 0 ? cursor.col : cursor.col - 2;
+            const int  col        = qBound(0, equiv_col, next_block->lengthOfLine(0));
+            move(block->textLength() - cursor.pos + col + 1);
+        } else {
+            const int equiv_col = cursor.row == 0 ? cursor.col + 2 : cursor.col;
+            const int col       = qMin(equiv_col, block->lengthOfLine(cursor.row + 1));
+            const int pos       = block->offsetOfLine(cursor.row + 1) + col;
+            move(pos - cursor.pos);
+        }
     }
 
     e->accept();
