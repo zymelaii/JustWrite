@@ -148,7 +148,7 @@ void LimitedViewEditor::scrollToEnd() {
 }
 
 void LimitedViewEditor::move(int offset) {
-    const int text_offset         = d->engine->commitMovement(offset);
+    const int text_offset         = d->engine->commitMovement(offset, nullptr);
     d->cursor_pos                += text_offset;
     d->blink_cursor_should_paint  = true;
     update();
@@ -168,6 +168,16 @@ void LimitedViewEditor::del(int times) {
     //! NOTE: times means delete |times| chars, and the sign indicates the del direction
     //! TODO: delete selected text
     //! TODO: delete action
+
+    int       deleted  = 0;
+    const int offset   = d->engine->commitDeletion(times, deleted);
+    d->cursor_pos     += offset;
+    d->text.remove(d->cursor_pos, deleted);
+
+    qDebug("text-offset: %d, deleted: %d", offset, deleted);
+
+    d->blink_cursor_should_paint = true;
+    update();
 }
 
 void LimitedViewEditor::copy() {
@@ -278,10 +288,11 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
 }
 
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
+    const auto key = e->key() | e->modifiers();
+
     if (auto text = e->text(); !text.isEmpty() && text.at(0).isPrint()) {
         insert(text.at(0));
-    } else if (const auto key = e->key() | e->modifiers();
-               key == Qt::Key_Return || key == Qt::Key_Enter) {
+    } else if (key == Qt::Key_Return || key == Qt::Key_Enter) {
         splitIntoNewLine();
     } else if (e->matches(QKeySequence::MoveToPreviousChar)) {
         move(-1);
@@ -324,6 +335,16 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         cut();
     } else if (e->matches(QKeySequence::Paste)) {
         paste();
+    } else if (e->matches(QKeySequence::Delete)) {
+        del(1);
+    } else if (key == Qt::Key_Backspace) {
+        del(-1);
+    } else if (key == QKeySequence::fromString("Ctrl+U")) {
+        del(-d->engine->cursor.col);
+    } else if (key == QKeySequence::fromString("Ctrl+K")) {
+        const auto block  = d->engine->currentBlock();
+        const auto cursor = d->engine->cursor;
+        del(block->lengthOfLine(cursor.row) - cursor.col);
     }
 
     e->accept();

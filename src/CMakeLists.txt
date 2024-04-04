@@ -16,4 +16,5 @@ target_link_options(
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE true)
+	target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE "-O3")
 endif()

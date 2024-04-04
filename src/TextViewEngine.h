@@ -102,7 +102,8 @@ struct TextViewEngine {
     void insertBlock(int index);
     void breakBlockAtCursorPos();
     void commitInsertion(int text_length);
-    int  commitMovement(int offset);
+    int  commitDeletion(int times, int &deleted);
+    int  commitMovement(int offset, bool *moved);
 
     static int boundingTextLength(const QFontMetrics &fm, QStringView text, int &width);
 };

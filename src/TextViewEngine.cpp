@@ -292,9 +292,75 @@ void TextViewEngine::commitInsertion(int text_length) {
     cursor.col += text_length;
 }
 
-int TextViewEngine::commitMovement(int offset) {
+int TextViewEngine::commitDeletion(int times, int &deleted) {
     Q_ASSERT(isCursorAvailable());
     Q_ASSERT(!preedit);
+
+    bool      cursor_moved = false;
+    const int text_offset  = times < 0 ? commitMovement(times, &cursor_moved) : 0;
+    if (times < 0 && !cursor_moved) {
+        deleted = 0;
+        return 0;
+    }
+
+    int total_shift = 0;
+    times           = qAbs(times);
+
+    //! stage 1-1: delete within block
+    //! stage 1-2: delete from cursor pos to end of the block
+    auto block = currentBlock();
+    if (const auto mean = block->textLength() - cursor.pos; times <= mean) {
+        block->markAsDirty(cursor.row);
+        block->joinDirtyLines();
+        block->lines.back().endp_offset -= times;
+        total_shift                     += times;
+        times                            = 0;
+    } else {
+        block->lines.remove(cursor.row + 1, block->lines.size() - cursor.row - 1);
+        block->lines.back().endp_offset  = cursor.pos;
+        total_shift                     += mean;
+        times                           -= mean;
+    }
+
+    //! stage 2: delete any complete blocks from the end of block
+    int tail_block_index = active_block_index;
+    while (tail_block_index + 1 < active_blocks.size()) {
+        const auto stride = active_blocks[tail_block_index + 1]->textLength() + 1;
+        if (times < stride) { break; }
+        times       -= stride;
+        total_shift += stride - 1;
+        ++tail_block_index;
+    }
+
+    //! stage 3: join part of last deleted block into the current block
+    if (cursor.pos == block->textLength() && times > 0
+        && tail_block_index + 1 < active_blocks.size()) {
+        const auto len                   = active_blocks[++tail_block_index]->textLength();
+        block->lines.back().endp_offset += len - times + 1;
+        total_shift                     += times - 1;
+    }
+    active_blocks.remove(active_block_index + 1, tail_block_index - active_block_index);
+
+    //! stage 4: sync following lines & blocks
+    block->markAsDirty(cursor.row);
+    for (int i = cursor.row + 1; i < block->lines.size(); ++i) {
+        block->lines[i].endp_offset -= total_shift;
+    }
+    for (int i = active_block_index + 1; i < active_blocks.size(); ++i) {
+        block->text_pos -= total_shift;
+    }
+
+    deleted = total_shift;
+
+    return text_offset;
+}
+
+int TextViewEngine::commitMovement(int offset, bool *moved) {
+    Q_ASSERT(isCursorAvailable());
+    Q_ASSERT(!preedit);
+
+    const int last_active_block_index = active_block_index;
+    const int last_cursor_pos         = cursor.pos;
 
     cursor.pos += offset;
 
@@ -325,6 +391,10 @@ int TextViewEngine::commitMovement(int offset) {
                                      && cursor.row + 1 < block->lines.size()) {
         ++cursor.row;
         cursor.col = 0;
+    }
+
+    if (moved) {
+        *moved = last_active_block_index != active_block_index || last_cursor_pos != cursor.pos;
     }
 
     return offset;
