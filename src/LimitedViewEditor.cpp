@@ -19,6 +19,7 @@ struct LimitedViewEditorPrivate {
     int                     min_text_line_chars;
     bool                    align_center;
     double                  scroll;
+    bool                    edit_op_happens;
     bool                    blink_cursor_should_paint;
     QTimer                  blink_timer;
     int                     cursor_pos;
@@ -32,6 +33,7 @@ struct LimitedViewEditorPrivate {
         cursor_pos                = 0;
         align_center              = false;
         scroll                    = 0.0;
+        edit_op_happens           = false;
         blink_cursor_should_paint = true;
         blink_timer.setInterval(500);
         blink_timer.setSingleShot(false);
@@ -210,6 +212,7 @@ void LimitedViewEditor::splitIntoNewLine() {
 
 void LimitedViewEditor::postUpdateRequest() {
     d->blink_cursor_should_paint = true;
+    d->edit_op_happens           = true;
     d->blink_timer.stop();
     update();
     d->blink_timer.start();
@@ -302,8 +305,19 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
                 line_spacing * engine->active_blocks[i]->lines.size() + engine->block_spacing;
         }
         cursor_y_pos += cursor.row * line_spacing;
+        if (d->edit_op_happens) {
+            if (cursor_y_pos > text_area.bottom()) {
+                const double delta = cursor_y_pos + fm.height() - text_area.bottom();
+                scroll(-delta - d->engine->block_spacing);
+            } else if (cursor_y_pos + fm.height() < text_area.top()) {
+                const double delta = text_area.top() - cursor_y_pos;
+                scroll(delta + d->engine->block_spacing);
+            }
+        }
         p.drawLine(cursor_x_pos, cursor_y_pos, cursor_x_pos, cursor_y_pos + fm.height());
     }
+
+    d->edit_op_happens = false;
 }
 
 void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
