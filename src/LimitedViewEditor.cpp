@@ -361,6 +361,10 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         scroll(textArea().height() * 0.5);
     } else if (e->matches(QKeySequence::MoveToNextPage)) {
         scroll(-textArea().height() * 0.5);
+    } else if (key == QKeySequence::fromString("Ctrl+Up")) {
+        scroll(d->engine->line_height * d->engine->line_spacing_ratio);
+    } else if (key == QKeySequence::fromString("Ctrl+Down")) {
+        scroll(-d->engine->line_height * d->engine->line_spacing_ratio);
     } else if (e->matches(QKeySequence::MoveToStartOfDocument)) {
         auto &cursor                  = d->engine->cursor;
         d->engine->active_block_index = 0;
