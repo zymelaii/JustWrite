@@ -253,12 +253,16 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     if (engine->isCursorAvailable() && d->blink_cursor_should_paint) {
         const auto &line         = engine->currentLine();
         const auto &cursor       = engine->cursor;
-        const auto  text         = line.text().mid(0, cursor.col);
-        const auto  incr         = line.charSpacing();
-        const auto  text_width   = fm.horizontalAdvance(text.toString());
         const auto  offset       = line.isFirstLine() ? engine->standard_char_width * 2 : 0;
-        double      cursor_x_pos = text_area.left() + offset + text_width + cursor.col * incr;
+        double      cursor_x_pos = text_area.left() + offset + line.charSpacing() * cursor.col;
         double      cursor_y_pos = text_area.top() + d->scroll;
+        //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)` directly,
+        //! and the reason is that the text_width calcualated by that has a few difference with the
+        //! render result of the text, and the cursor will seems not in the correct place, and this
+        //! problem was extremely serious in pure latin texts
+        for (const auto &c : line.text().mid(0, cursor.col)) {
+            cursor_x_pos += fm.horizontalAdvance(c);
+        }
         for (int i = 0; i < engine->active_block_index; ++i) {
             cursor_y_pos +=
                 line_spacing * engine->active_blocks[i]->lines.size() + engine->block_spacing;
