@@ -247,7 +247,7 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
 
     for (int i = 0; i < engine->active_blocks.size(); ++i) {
         const auto block        = engine->active_blocks[i];
-        const auto block_stride = block->lines.size() * engine->line_height * line_spacing;
+        const auto block_stride = block->lines.size() * engine->line_height + engine->block_spacing;
         if (y_pos + block_stride < text_area.top() || y_pos > text_area.bottom()) {
             y_pos += block_stride;
             continue;
