@@ -1,4 +1,6 @@
-def find-process [name: string] -> int {
+def find-process [
+    name: string,
+] -> int {
     ps | where name =~ 'JustWrite' | get 0.pid --ignore-errors | default '-1' | into int
 }
 
@@ -25,7 +27,9 @@ def unlock-target [] {
     rm -f build/.lock
 }
 
-def test-and-update-md5 [file: string] {
+def test-and-update-md5 [
+    file: string,
+] {
     let md5_list = 'build/.md5-list';
     if not ($md5_list | path exists) {
         '{}' | save -f $md5_list
@@ -44,7 +48,9 @@ def test-and-update-md5 [file: string] {
     }
 }
 
-def "jwrite config" [build_type: string@build_type_completer] {
+def "jwrite config" [
+    build_type: string@build_type_completer, # Build type
+] {
     do --ignore-errors {
         if $build_type == 'Default' {
             cmake -B build -S . -G Ninja -DCMAKE_INSTALL_PREFIX=build/JustWrite
@@ -55,7 +61,9 @@ def "jwrite config" [build_type: string@build_type_completer] {
 }
 
 # Build JustWrite.
-export def "jwrite build" [build_type: string@build_type_completer = 'Default'] {
+export def "jwrite build" [
+    build_type: string@build_type_completer = 'Default', # Build type
+] {
     lock-target
     let date = date now | format date "%Y-%m-%d %H:%M:%S"
     print $"\e[37;1m($date) [INFO]\e[0m build JustWrite"
@@ -88,8 +96,14 @@ export def "jwrite run" [] {
 }
 
 # Run JustWrite auto-build server.
-export def "jwrite watch" [build_type: string@build_type_completer = 'Default'] {
+export def "jwrite watch" [
+    build_type: string@build_type_completer = 'Default', # Build type
+    --build-once (-b), # Build once immediately after setup
+] {
     ls -f src | each {|e| test-and-update-md5 $e.name }
+    if $build_once {
+        jwrite build $build_type
+    }
     unlock-target
     watch -r true src { |op, path|
         if (test-and-update-md5 $path) {
