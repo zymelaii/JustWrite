@@ -88,7 +88,7 @@ export def "jwrite run" [] {
 }
 
 # Run JustWrite auto-build server.
-export def "jwrite watch" [build_type: string@build_type_completer] {
+export def "jwrite watch" [build_type: string@build_type_completer = 'Default'] {
     ls -f src | each {|e| test-and-update-md5 $e.name }
     unlock-target
     watch -r true src { |op, path|
@@ -97,7 +97,7 @@ export def "jwrite watch" [build_type: string@build_type_completer] {
             if $pid != -1 {
                 kill -f -q $pid
             }
-            cmake-build $build_type
+            jwrite build $build_type
         }
     }
     unlock-target
