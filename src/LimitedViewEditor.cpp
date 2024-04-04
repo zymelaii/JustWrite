@@ -355,6 +355,8 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     const auto &area = textArea();
     if (!area.contains(e->pos())) { return; }
 
+    //! TODO: cache block bounds to accelerate location query
+
     QPointF      pos           = e->pos() - area.topLeft() - QPointF(0, d->scroll);
     const double line_spacing  = d->engine->line_height * d->engine->line_spacing_ratio;
     const double block_spacing = d->engine->block_spacing;
@@ -382,8 +384,10 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     int         col   = 0;
     const auto &fm    = d->engine->fm;
     while (col < text.length()) {
-        if (pos.x() < x_pos) { break; }
-        x_pos += fm.horizontalAdvance(text[col++]) + incr;
+        const double char_width = fm.horizontalAdvance(text[col]) + incr;
+        if (pos.x() < x_pos + 0.5 * char_width) { break; }
+        x_pos += char_width;
+        ++col;
     }
 
     auto &active_block_index = d->engine->active_block_index;
