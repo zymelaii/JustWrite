@@ -44,6 +44,7 @@ struct TextBlock {
     int         offsetOfLine(int index) const;
     int         lengthOfLine(int index) const;
     QStringView textOfLine(int index) const;
+    QStringView text() const;
     void        squeezeAndExtendLastLine(int length);
     void        render();
 };
@@ -72,7 +73,11 @@ struct TextViewEngine {
 
     int            text_ref_origin;
     const QString *text_ref;
+
     bool           preedit;
+    CursorPosition saved_cursor;
+    int            saved_text_pos;
+    int            saved_text_length;
     const QString *preedit_text_ref;
 
     bool dirty;
@@ -105,6 +110,9 @@ struct TextViewEngine {
     void commitInsertion(int text_length);
     int  commitDeletion(int times, int &deleted);
     int  commitMovement(int offset, bool *moved);
+    void beginPreEdit(QString &ref);
+    void updatePreEditText(int text_length);
+    void commitPreEdit();
 
     static int boundingTextLength(const QFontMetrics &fm, QStringView text, int &width);
 };

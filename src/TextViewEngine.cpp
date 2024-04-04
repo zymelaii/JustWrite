@@ -81,6 +81,11 @@ QStringView TextBlock::textOfLine(int index) const {
     return QStringView(*text_ref).mid(text_pos + offset, lines[index].endp_offset - offset);
 }
 
+QStringView TextBlock::text() const {
+    Q_ASSERT(text_ref);
+    return QStringView(*text_ref).mid(text_pos, textLength());
+}
+
 void TextBlock::squeezeAndExtendLastLine(int length) {
     Q_ASSERT(!lines.isEmpty());
     Q_ASSERT(length >= 0 && length < lengthOfLine(lines.size() - 1));
@@ -283,17 +288,21 @@ void TextViewEngine::breakBlockAtCursorPos() {
 
 void TextViewEngine::commitInsertion(int text_length) {
     Q_ASSERT(isCursorAvailable());
-    Q_ASSERT(!preedit);
+
     auto block = currentBlock();
     for (int i = cursor.row; i < block->lines.size(); ++i) {
         block->lines[i].endp_offset += text_length;
     }
-    for (int i = active_block_index + 1; i < active_blocks.size(); ++i) {
-        active_blocks[i]->text_pos += text_length;
-    }
+
     block->markAsDirty(cursor.row);
     cursor.pos += text_length;
     cursor.col += text_length;
+
+    if (preedit) { return; }
+
+    for (int i = active_block_index + 1; i < active_blocks.size(); ++i) {
+        active_blocks[i]->text_pos += text_length;
+    }
 }
 
 int TextViewEngine::commitDeletion(int times, int &deleted) {
@@ -402,6 +411,50 @@ int TextViewEngine::commitMovement(int offset, bool *moved) {
     }
 
     return offset;
+}
+
+void TextViewEngine::beginPreEdit(QString &ref) {
+    Q_ASSERT(isCursorAvailable());
+    Q_ASSERT(!preedit);
+
+    auto block       = currentBlock();
+    ref              = block->text().toString();
+    preedit_text_ref = &ref;
+
+    saved_text_pos    = block->text_pos;
+    saved_text_length = block->textLength();
+    saved_cursor      = cursor;
+    block->text_ref   = preedit_text_ref;
+    block->text_pos   = 0;
+    preedit           = true;
+}
+
+void TextViewEngine::updatePreEditText(int text_length) {
+    Q_ASSERT(preedit);
+    Q_ASSERT(text_length >= 0);
+
+    const int last_length = cursor.pos - saved_cursor.pos;
+    const int offset      = text_length - last_length;
+    auto      block       = currentBlock();
+
+    block->markAsDirty(saved_cursor.row);
+    block->joinDirtyLines();
+    block->lines.back().endp_offset += offset;
+    cursor.pos                      += offset;
+}
+
+void TextViewEngine::commitPreEdit() {
+    Q_ASSERT(preedit);
+
+    auto block      = currentBlock();
+    block->text_ref = text_ref;
+    block->text_pos = saved_text_pos;
+    cursor          = saved_cursor;
+    preedit         = false;
+
+    block->markAsDirty(cursor.row);
+    block->joinDirtyLines();
+    block->lines.back().endp_offset = saved_text_length;
 }
 
 int TextViewEngine::boundingTextLength(const QFontMetrics &fm, QStringView text, int &width) {

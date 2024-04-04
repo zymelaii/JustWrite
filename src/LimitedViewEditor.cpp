@@ -23,6 +23,7 @@ struct LimitedViewEditorPrivate {
     QTimer                  blink_timer;
     int                     cursor_pos;
     QString                 text;
+    QString                 preedit_text;
     jwrite::TextViewEngine *engine;
 
     LimitedViewEditorPrivate() {
@@ -351,6 +352,7 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
 
     if (const auto e = d->engine; e->isEmpty() || e->isDirty()) { return; }
+    if (d->engine->preedit) { return; }
 
     const auto &area = textArea();
     if (!area.contains(e->pos())) { return; }
@@ -434,11 +436,27 @@ void LimitedViewEditor::wheelEvent(QWheelEvent *e) {
 }
 
 void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
-    if (!e->preeditString().isEmpty()) {
-        //! TODO: display preedit string, controlled by engine
+    const auto &cursor                = d->engine->cursor;
+    const auto &saved_cursor          = d->engine->saved_cursor;
+    const auto  last_preedit_text_len = cursor.pos - saved_cursor.pos;
+
+    if (const auto preedit_text = e->preeditString(); !preedit_text.isEmpty()) {
+        if (!d->engine->preedit) {
+            d->engine->beginPreEdit(d->preedit_text);
+        } else {
+            d->preedit_text.remove(saved_cursor.pos, last_preedit_text_len);
+        }
+        d->preedit_text.insert(saved_cursor.pos, preedit_text);
+        d->engine->updatePreEditText(preedit_text.length());
     } else {
-        insert(e->commitString());
+        const auto commit_text = e->commitString();
+        if (d->engine->preedit) { d->engine->commitPreEdit(); }
+        d->engine->commitInsertion(commit_text.length());
+        d->text.insert(d->cursor_pos, commit_text);
+        d->cursor_pos += commit_text.length();
     }
+
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::dragEnterEvent(QDragEnterEvent *e) {
