@@ -27,6 +27,8 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
+option(BUILD_TEST "Build the unittests" ON)
+
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(OpenGL REQUIRED)
 
@@ -34,10 +36,21 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(BUILD_TEST OFF)
+endif()
+
+set(INSTALL_TARGETS ${CMAKE_PROJECT_NAME})
+
 add_subdirectory(src)
 
+if(BUILD_TEST)
+    add_subdirectory(test)
+    list(APPEND INSTALL_TARGETS jwrite-test)
+endif()
+
 install(
-	TARGETS ${CMAKE_PROJECT_NAME}
+	TARGETS ${INSTALL_TARGETS}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
 	RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}
 )

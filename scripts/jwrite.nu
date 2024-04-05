@@ -32,6 +32,7 @@ def test-and-update-md5 [
 ] {
     let md5_list = 'build/.md5-list';
     if not ($md5_list | path exists) {
+        mkdir ($md5_list | path dirname)
         '{}' | save -f $md5_list
     }
     mut cached_hash = open $md5_list | from json
@@ -95,23 +96,37 @@ export def "jwrite run" [] {
     ./build/JustWrite/JustWrite.exe
 }
 
+# Run JustWrite unittests.
+export def "jwrite test" [] {
+    let target = './build/JustWrite/jwrite-test.exe'
+    if not ($target | path exists) { return }
+    wait-target
+    ^$target
+}
+
 # Run JustWrite auto-build server.
 export def "jwrite watch" [
     build_type: string@build_type_completer = 'Default', # Build type
     --build-once (-b), # Build once immediately after setup
 ] {
-    ls -f src | each {|e| test-and-update-md5 $e.name }
+    let dirs = [src, test]
+    for dir in $dirs {
+        ls -f $dir | each {|e| test-and-update-md5 $e.name }
+    }
     if $build_once {
         jwrite build $build_type
     }
     unlock-target
-    watch -r true src { |op, path|
-        if (test-and-update-md5 $path) {
+    watch -r true . { |op, path|
+        for dir in $dirs {
+            if not ($path | path relative-to (pwd)| str starts-with $'($dir)\') { continue }
+            if not (test-and-update-md5 $path) { break }
             let pid = find-process JustWrite
             if $pid != -1 {
                 kill -f -q $pid
             }
             jwrite build $build_type
+            break
         }
     }
     unlock-target
