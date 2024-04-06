@@ -557,6 +557,8 @@ void LimitedViewEditor::wheelEvent(QWheelEvent *e) {
 }
 
 void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
+    if (!d->engine->isCursorAvailable()) { return; }
+
     const auto &cursor                = d->engine->cursor;
     const auto &saved_cursor          = d->engine->saved_cursor;
     const auto  last_preedit_text_len = cursor.pos - saved_cursor.pos;
