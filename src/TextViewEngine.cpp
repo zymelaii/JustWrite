@@ -360,7 +360,7 @@ int TextViewEngine::commitDeletion(int times, int &deleted) {
         block->lines[i].endp_offset -= total_shift;
     }
     for (int i = active_block_index + 1; i < active_blocks.size(); ++i) {
-        block->text_pos -= total_shift;
+        active_blocks[i]->text_pos -= total_shift;
     }
 
     deleted = total_shift;
