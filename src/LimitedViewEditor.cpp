@@ -371,7 +371,7 @@ void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
 void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
     d->blink_timer.stop();
-    //! TODO: unset cursor if possible
+    d->engine->active_block_index = -1;
 }
 
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
@@ -521,15 +521,11 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     auto &cursor             = d->engine->cursor;
     if (active_block_index == block_index && cursor.row == row && cursor.col == col) { return; }
 
-    auto      last_block  = d->engine->currentBlock();
-    const int old_pos     = last_block->text_pos + cursor.pos;
-    const int new_pos     = block->text_pos + line.textOffset() + col;
-    d->cursor_pos        += new_pos - old_pos;
-
     active_block_index = block_index;
     cursor.pos         = line.textOffset() + col;
     cursor.row         = row;
     cursor.col         = col;
+    d->cursor_pos      = d->engine->currentBlock()->text_pos + cursor.pos;
 
     postUpdateRequest();
 }
