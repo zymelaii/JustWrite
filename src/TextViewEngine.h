@@ -35,18 +35,20 @@ struct TextBlock {
 
     int dirty_line_nr;
 
-    void        reset(const QString *ref, int pos);
-    void        release();
-    void        markAsDirty(int line_nr);
-    bool        isDirty() const;
-    void        joinDirtyLines();
-    int         textLength() const;
-    int         offsetOfLine(int index) const;
-    int         lengthOfLine(int index) const;
-    QStringView textOfLine(int index) const;
-    QStringView text() const;
-    void        squeezeAndExtendLastLine(int length);
-    void        render();
+    void            reset(const QString *ref, int pos);
+    void            release();
+    void            markAsDirty(int line_nr);
+    bool            isDirty() const;
+    void            joinDirtyLines();
+    int             textLength() const;
+    int             offsetOfLine(int index) const;
+    int             lengthOfLine(int index) const;
+    TextLine       &currentLine();
+    const TextLine &currentLine() const;
+    QStringView     textOfLine(int index) const;
+    QStringView     text() const;
+    void            squeezeAndExtendLastLine(int length);
+    void            render();
 };
 
 struct TextViewEngine {

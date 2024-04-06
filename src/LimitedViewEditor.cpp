@@ -14,6 +14,7 @@
 #include <QGuiApplication>
 #include <QClipboard>
 #include <QTimer>
+#include <QMap>
 
 struct LimitedViewEditorPrivate {
     int                     min_text_line_chars;
@@ -159,6 +160,38 @@ void LimitedViewEditor::insertDirtyText(const QString &text) {
     }
 }
 
+bool LimitedViewEditor::insertedPairFilter(const QString &text) {
+    static QMap<QString, QString> QUOTE_PAIRS{
+        {"“", "”"},
+        {"‘", "’"},
+        {"（", "）"},
+        {"【", "】"},
+        {"《", "》"},
+        {"〔", "〕"},
+        {"〈", "〉"},
+        {"「", "」"},
+        {"『", "』"},
+        {"〖", "〗"},
+        {"［", "］"},
+        {"｛", "｝"},
+    };
+
+    if (QUOTE_PAIRS.count(text)) {
+        auto matched = QUOTE_PAIRS[text];
+        insert(text + matched);
+        move(-1);
+        return true;
+    }
+
+    if (auto index = QUOTE_PAIRS.values().indexOf(text); index != -1) {
+        int pos = d->engine->currentBlock()->text_pos + d->engine->cursor.pos;
+        if (pos == d->engine->text_ref->length()) { return false; }
+        if (d->engine->text_ref->at(pos) == text) { return true; }
+    }
+
+    return false;
+}
+
 void LimitedViewEditor::move(int offset) {
     bool      cursor_moved  = false;
     const int text_offset   = d->engine->commitMovement(offset, &cursor_moved);
@@ -168,10 +201,14 @@ void LimitedViewEditor::move(int offset) {
 
 void LimitedViewEditor::insert(const QString &text) {
     Q_ASSERT(d->engine->isCursorAvailable());
+
+    if (insertedPairFilter(text)) { return; }
+
     d->text.insert(d->cursor_pos, text);
     const int len  = text.length();
     d->cursor_pos += len;
     d->engine->commitInsertion(len);
+
     postUpdateRequest();
 }
 
@@ -539,15 +576,11 @@ void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
         }
         d->preedit_text.insert(saved_cursor.pos, preedit_text);
         d->engine->updatePreEditText(preedit_text.length());
+        postUpdateRequest();
     } else {
-        const auto commit_text = e->commitString();
         if (d->engine->preedit) { d->engine->commitPreEdit(); }
-        d->engine->commitInsertion(commit_text.length());
-        d->text.insert(d->cursor_pos, commit_text);
-        d->cursor_pos += commit_text.length();
+        insert(e->commitString());
     }
-
-    postUpdateRequest();
 }
 
 void LimitedViewEditor::dragEnterEvent(QDragEnterEvent *e) {

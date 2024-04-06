@@ -74,6 +74,20 @@ int TextBlock::lengthOfLine(int index) const {
     return lines[index].endp_offset - offsetOfLine(index);
 }
 
+TextLine &TextBlock::currentLine() {
+    Q_ASSERT(
+        parent->active_block_index != -1
+        && this == parent->active_blocks[parent->active_block_index]);
+    return lines[parent->cursor.row];
+}
+
+const TextLine &TextBlock::currentLine() const {
+    Q_ASSERT(
+        parent->active_block_index != -1
+        && this == parent->active_blocks[parent->active_block_index]);
+    return lines[parent->cursor.row];
+}
+
 QStringView TextBlock::textOfLine(int index) const {
     Q_ASSERT(index >= 0 && index < lines.size());
     Q_ASSERT(text_ref);

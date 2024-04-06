@@ -28,6 +28,7 @@ public:
     void scrollToEnd();
 
     void insertDirtyText(const QString &text);
+    bool insertedPairFilter(const QString &text);
 
     void move(int offset);
     void insert(const QString &text);
