@@ -430,11 +430,11 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
     } else if (key == Qt::Key_Backspace) {
         del(-1);
     } else if (key == QKeySequence::fromString("Ctrl+U")) {
-        del(-d->engine->cursor.col);
+        del(-qMax(d->engine->cursor.col, 1));
     } else if (key == QKeySequence::fromString("Ctrl+K")) {
         const auto block  = d->engine->currentBlock();
         const auto cursor = d->engine->cursor;
-        del(block->lengthOfLine(cursor.row) - cursor.col);
+        del(qMax(block->lengthOfLine(cursor.row) - cursor.col, 1));
     } else if (e->matches(QKeySequence::MoveToPreviousLine)) {
         auto block = d->engine->currentBlock();
         if (d->engine->active_block_index == 0 && cursor.row == 0) {
