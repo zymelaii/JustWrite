@@ -468,6 +468,10 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             const int pos       = block->offsetOfLine(cursor.row + 1) + col;
             move(pos - cursor.pos);
         }
+    } else if (key == QKeySequence::fromString("Ctrl+Return")) {
+        d->engine->insertBlock(d->engine->active_block_index + 1);
+        auto block = d->engine->currentBlock();
+        move(block->textLength() - d->engine->cursor.pos + 1);
     }
 
     e->accept();
