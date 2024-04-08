@@ -57,8 +57,10 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
     , d{new LimitedViewEditorPrivate} {
     setFocusPolicy(Qt::ClickFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
+    setAutoFillBackground(true);
     setAcceptDrops(true);
     setMouseTracking(true);
+    setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 
     setAlignCenter(true);
 
@@ -209,6 +211,7 @@ void LimitedViewEditor::insert(const QString &text) {
     d->cursor_pos += len;
     d->engine->commitInsertion(len);
 
+    emit textChanged(*d->engine->text_ref);
     postUpdateRequest();
 }
 
@@ -219,6 +222,8 @@ void LimitedViewEditor::del(int times) {
     const int offset   = d->engine->commitDeletion(times, deleted);
     d->cursor_pos     += offset;
     d->text.remove(d->cursor_pos, deleted);
+
+    emit textChanged(*d->engine->text_ref);
     postUpdateRequest();
 }
 
@@ -267,9 +272,6 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
 
     QPainter p(this);
     auto     pal = palette();
-
-    //! draw margins
-    p.fillRect(rect(), QColor(30, 30, 30));
 
     //! draw text area
     p.setPen(pal.text().color());

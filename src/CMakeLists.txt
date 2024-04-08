@@ -9,11 +9,6 @@ target_link_libraries(
 	PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets
 )
 
-target_link_options(
-	${CMAKE_PROJECT_NAME}
-	PRIVATE "-static"
-)
-
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE true)
 	target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE "-O3")

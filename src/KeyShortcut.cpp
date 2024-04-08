@@ -2,6 +2,7 @@
 
 void KeyShortcut::loadDefaultShortcuts() {
     toggle_align_center = QKeySequence::fromString("Ctrl+E");
+    toggle_sidebar      = QKeySequence::fromString("Ctrl+Alt+B");
 }
 
 bool KeyShortcut::matches(QKeyEvent *e, QKeySequence::StandardKey key) {

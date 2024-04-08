@@ -1,44 +1,95 @@
 #include "JustWrite.h"
 #include "LimitedViewEditor.h"
+#include "JustWriteSidebar.h"
+#include "StatusBar.h"
 #include "KeyShortcut.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QSplitter>
+#include <QStatusBar>
+#include <QLabel>
+#include <QDateTime>
+#include <QTimer>
 
 namespace Ui {
 struct JustWrite {
-    QHBoxLayout       *layout;
-    LimitedViewEditor *editor;
+    jwrite::StatusBar  *status_bar;
+    ::JustWriteSidebar *sidebar;
+    LimitedViewEditor  *editor;
+    QLabel             *total_words;
+    QLabel             *datetime;
 
     JustWrite(::JustWrite *parent) {
-        layout = new QHBoxLayout(parent);
-        editor = new LimitedViewEditor;
+        auto layout         = new QVBoxLayout(parent);
+        auto content        = new QWidget;
+        auto layout_content = new QHBoxLayout(content);
+        auto splitter       = new QSplitter;
+        status_bar          = new jwrite::StatusBar;
+        sidebar             = new ::JustWriteSidebar(splitter);
+        editor              = new LimitedViewEditor(splitter);
 
-        layout->addWidget(editor);
-
-        layout->setSpacing(0);
+        layout->addWidget(content);
+        layout->addWidget(status_bar);
         layout->setContentsMargins({});
+        layout->setSpacing(0);
+
+        layout_content->addWidget(splitter);
+        layout_content->setContentsMargins({});
 
         auto pal = editor->palette();
-        pal.setColor(QPalette::Base, Qt::transparent);
+        pal.setColor(QPalette::Window, QColor(30, 30, 30));
         pal.setColor(QPalette::Text, Qt::white);
         pal.setColor(QPalette::Highlight, QColor(50, 100, 150, 150));
         editor->setPalette(pal);
+
+        pal = sidebar->palette();
+        pal.setColor(QPalette::Window, QColor(38, 38, 38));
+        pal.setColor(QPalette::WindowText, Qt::white);
+        pal.setColor(QPalette::Base, QColor(38, 38, 38));
+        pal.setColor(QPalette::Button, QColor(55, 55, 55));
+        pal.setColor(QPalette::Text, Qt::white);
+        pal.setColor(QPalette::ButtonText, Qt::white);
+        sidebar->setPalette(pal);
+
+        pal = parent->palette();
+        pal.setColor(QPalette::Window, QColor(30, 30, 30));
+        pal.setColor(QPalette::WindowText, Qt::white);
+        parent->setPalette(pal);
+
+        splitter->setOrientation(Qt::Horizontal);
+        splitter->setStretchFactor(0, 0);
+        splitter->setStretchFactor(1, 1);
+        splitter->setCollapsible(0, false);
+        splitter->setCollapsible(1, false);
+
+        content->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+
+        auto font = status_bar->font();
+        font.setPointSize(10);
+        pal.setColor(QPalette::Window, QColor(0, 120, 200));
+        status_bar->setPalette(pal);
+        status_bar->setFont(font);
+        status_bar->setSpacing(20);
+        status_bar->setContentsMargins(12, 4, 12, 4);
+        total_words = status_bar->addItem("全本共 0 字");
+        datetime    = status_bar->addItemAtRightSide("0000-00-00");
+
+        parent->setAutoFillBackground(true);
     }
 };
 } // namespace Ui
 
 struct JustWritePrivate {
     KeyShortcut shortcut;
+    QTimer      sec_timer;
 
     JustWritePrivate() {
         shortcut.loadDefaultShortcuts();
+        sec_timer.setInterval(1000);
+        sec_timer.setSingleShot(false);
     }
 };
-
-QKeySequence mkkeyseq(QKeyEvent *e) {
-    return QKeySequence(e->key() | e->modifiers());
-}
 
 JustWrite::JustWrite(QWidget *parent)
     : QWidget(parent)
@@ -46,6 +97,19 @@ JustWrite::JustWrite(QWidget *parent)
     , ui{new Ui::JustWrite(this)} {
     ui->editor->installEventFilter(this);
     ui->editor->setFocus();
+
+    connect(ui->sidebar, &JustWriteSidebar::requestNewVolume, this, &JustWrite::newVolume);
+    connect(ui->sidebar, &JustWriteSidebar::requestNewChapter, this, [this] {
+        newChapter("");
+    });
+    connect(ui->editor, &LimitedViewEditor::textChanged, this, [this](const QString &text) {
+        ui->total_words->setText(QString("全本共 %1 字").arg(text.length()));
+    });
+    connect(&d->sec_timer, &QTimer::timeout, this, [this] {
+        ui->datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
+    });
+
+    d->sec_timer.start();
 }
 
 JustWrite::~JustWrite() {
@@ -53,12 +117,30 @@ JustWrite::~JustWrite() {
     delete ui;
 }
 
+void JustWrite::newVolume() {
+    //! TODO: rt.
+}
+
+void JustWrite::newChapter(const QString &name) {
+    //! TODO: rt.
+}
+
+void JustWrite::openChapter(int index) {
+    //! TODO: rt.
+}
+
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
-        auto e = static_cast<QKeyEvent *>(event);
-        if (mkkeyseq(e) == d->shortcut.toggle_align_center) {
+        auto       e   = static_cast<QKeyEvent *>(event);
+        const auto key = QKeySequence(e->key() | e->modifiers());
+        if (key == d->shortcut.toggle_align_center) {
             ui->editor->setAlignCenter(!ui->editor->alignCenter());
+        } else if (key == d->shortcut.toggle_sidebar) {
+            ui->sidebar->setVisible(!ui->sidebar->isVisible());
+        } else {
+            return false;
         }
+        return true;
     }
     return false;
 }

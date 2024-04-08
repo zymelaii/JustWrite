@@ -1,4 +1,14 @@
 <RCC>
     <qresource prefix="/">
+        <file>res/icons/light/side-bar-line.png</file>
+        <file>res/icons/light/book-2-line.png</file>
+        <file>res/icons/light/folder-2-line.png</file>
+        <file>res/icons/light/article-line.png</file>
+        <file>res/icons/light/arrow-drop-down-line.png</file>
+        <file>res/icons/light/arrow-drop-right-line.png</file>
+        <file>res/icons/dark/side-bar-line.png</file>
+        <file>res/icons/dark/book-2-line.png</file>
+        <file>res/icons/dark/folder-2-line.png</file>
+        <file>res/icons/dark/article-line.png</file>
     </qresource>
 </RCC>
