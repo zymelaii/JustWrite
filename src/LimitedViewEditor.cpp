@@ -1,5 +1,6 @@
 #include "LimitedViewEditor.h"
 #include "TextViewEngine.h"
+#include "TextInputFilter.h"
 #include <QResizeEvent>
 #include <QPaintEvent>
 #include <QFocusEvent>
@@ -377,103 +378,176 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
 }
 
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
-    const auto  key    = e->key() | e->modifiers();
+    const auto  action = textInputFilter(e);
     const auto &cursor = d->engine->cursor;
 
-    if (auto text = e->text(); !text.isEmpty() && text.at(0).isPrint()) {
-        insert(text.at(0));
-    } else if (key == Qt::Key_Return || key == Qt::Key_Enter) {
-        splitIntoNewLine();
-    } else if (e->matches(QKeySequence::MoveToPreviousChar)) {
-        move(-1);
-    } else if (e->matches(QKeySequence::MoveToNextChar)) {
-        move(1);
-    } else if (e->matches(QKeySequence::MoveToStartOfLine)) {
-        const int offset = cursor.col == 0 ? cursor.pos : cursor.col;
-        move(-offset);
-    } else if (e->matches(QKeySequence::MoveToEndOfLine)) {
-        const auto block  = d->engine->currentBlock();
-        auto       len    = block->lengthOfLine(cursor.row);
-        const int  offset = cursor.col == len ? block->textLength() - cursor.pos : len - cursor.col;
-        move(offset);
-    } else if (e->matches(QKeySequence::MoveToPreviousPage)) {
-        scroll(textArea().height() * 0.5);
-    } else if (e->matches(QKeySequence::MoveToNextPage)) {
-        scroll(-textArea().height() * 0.5);
-    } else if (key == QKeySequence::fromString("Ctrl+Up")) {
-        scroll(d->engine->line_height * d->engine->line_spacing_ratio);
-    } else if (key == QKeySequence::fromString("Ctrl+Down")) {
-        scroll(-d->engine->line_height * d->engine->line_spacing_ratio);
-    } else if (e->matches(QKeySequence::MoveToStartOfDocument)) {
-        auto &cursor                  = d->engine->cursor;
-        d->engine->active_block_index = 0;
-        cursor.pos                    = 0;
-        cursor.row                    = 0;
-        cursor.col                    = 0;
-        d->cursor_pos                 = 0;
-        scrollToStart();
-    } else if (e->matches(QKeySequence::MoveToEndOfDocument)) {
-        auto &cursor                  = d->engine->cursor;
-        d->engine->active_block_index = d->engine->active_blocks.size() - 1;
-        auto block                    = d->engine->currentBlock();
-        cursor.pos                    = block->textLength();
-        cursor.row                    = block->lines.size() - 1;
-        cursor.col                    = block->lengthOfLine(block->lines.size() - 1);
-        d->cursor_pos                 = d->text.size();
-        scrollToEnd();
-    } else if (e->matches(QKeySequence::Copy)) {
-        copy();
-    } else if (e->matches(QKeySequence::Cut)) {
-        cut();
-    } else if (e->matches(QKeySequence::Paste)) {
-        paste();
-    } else if (e->matches(QKeySequence::Delete)) {
-        del(1);
-    } else if (key == Qt::Key_Backspace) {
-        del(-1);
-    } else if (key == QKeySequence::fromString("Ctrl+U")) {
-        del(-qMax(d->engine->cursor.col, 1));
-    } else if (key == QKeySequence::fromString("Ctrl+K")) {
-        const auto block  = d->engine->currentBlock();
-        const auto cursor = d->engine->cursor;
-        del(qMax(block->lengthOfLine(cursor.row) - cursor.col, 1));
-    } else if (e->matches(QKeySequence::MoveToPreviousLine)) {
-        auto block = d->engine->currentBlock();
-        if (d->engine->active_block_index == 0 && cursor.row == 0) {
-            move(-cursor.pos);
-        } else if (cursor.row == 0) {
-            const auto prev_block  = d->engine->active_blocks[d->engine->active_block_index - 1];
-            const int  equiv_col   = prev_block->lines.size() == 1 ? cursor.col : cursor.col + 2;
-            const int  line_length = prev_block->lengthOfLine(prev_block->lines.size() - 1);
-            const int  col         = qMin(equiv_col, line_length);
-            move(-(cursor.pos + (line_length - col) + 1));
-        } else {
-            const int equiv_col = cursor.row - 1 == 0 ? cursor.col - 2 : cursor.col;
-            const int col       = qBound(0, equiv_col, block->lengthOfLine(cursor.row - 1));
-            const int pos       = block->offsetOfLine(cursor.row - 1) + col;
-            move(pos - cursor.pos);
-        }
-    } else if (e->matches(QKeySequence::MoveToNextLine)) {
-        const auto &cursor = d->engine->cursor;
-        auto        block  = d->engine->currentBlock();
-        if (d->engine->active_block_index + 1 == d->engine->active_blocks.size()
-            && cursor.row + 1 == block->lines.size()) {
-            move(block->textLength() - cursor.pos);
-        } else if (cursor.row + 1 == block->lines.size()) {
-            const auto next_block = d->engine->active_blocks[d->engine->active_block_index + 1];
-            const int  equiv_col  = cursor.row == 0 ? cursor.col : cursor.col - 2;
-            const int  col        = qBound(0, equiv_col, next_block->lengthOfLine(0));
-            move(block->textLength() - cursor.pos + col + 1);
-        } else {
-            const int equiv_col = cursor.row == 0 ? cursor.col + 2 : cursor.col;
-            const int col       = qMin(equiv_col, block->lengthOfLine(cursor.row + 1));
-            const int pos       = block->offsetOfLine(cursor.row + 1) + col;
-            move(pos - cursor.pos);
-        }
-    } else if (key == QKeySequence::fromString("Ctrl+Return")) {
-        d->engine->insertBlock(d->engine->active_block_index + 1);
-        auto block = d->engine->currentBlock();
-        move(block->textLength() - d->engine->cursor.pos + 1);
+    switch (action) {
+        case TextInputType::Reject: {
+            return;
+        } break;
+        case TextInputType::Printable: {
+            const auto text = translatePrintableChar(e);
+            if (text == '\t') { return; }
+            if (text == '\n') {
+                splitIntoNewLine();
+            } else {
+                insert(text);
+            }
+        } break;
+        case TextInputType::Copy: {
+            copy();
+        } break;
+        case TextInputType::Cut: {
+            cut();
+        } break;
+        case TextInputType::Paste: {
+            paste();
+        } break;
+        case TextInputType::ScrollUp: {
+            scroll(d->engine->line_height * d->engine->line_spacing_ratio);
+        } break;
+        case TextInputType::ScrollDown: {
+            scroll(-d->engine->line_height * d->engine->line_spacing_ratio);
+        } break;
+        case TextInputType::MoveToPrevChar: {
+            move(-1);
+        } break;
+        case TextInputType::MoveToNextChar: {
+            move(1);
+        } break;
+        case TextInputType::MoveToPrevWord: {
+        } break;
+        case TextInputType::MoveToNextWord: {
+        } break;
+        case TextInputType::MoveToPrevLine: {
+            auto block = d->engine->currentBlock();
+            if (d->engine->active_block_index == 0 && cursor.row == 0) {
+                move(-cursor.pos);
+            } else if (cursor.row == 0) {
+                const auto prev_block = d->engine->active_blocks[d->engine->active_block_index - 1];
+                const int  equiv_col  = prev_block->lines.size() == 1 ? cursor.col : cursor.col + 2;
+                const int  line_length = prev_block->lengthOfLine(prev_block->lines.size() - 1);
+                const int  col         = qMin(equiv_col, line_length);
+                move(-(cursor.pos + (line_length - col) + 1));
+            } else {
+                const int equiv_col = cursor.row - 1 == 0 ? cursor.col - 2 : cursor.col;
+                const int col       = qBound(0, equiv_col, block->lengthOfLine(cursor.row - 1));
+                const int pos       = block->offsetOfLine(cursor.row - 1) + col;
+                move(pos - cursor.pos);
+            }
+        } break;
+        case TextInputType::MoveToNextLine: {
+            const auto &cursor = d->engine->cursor;
+            auto        block  = d->engine->currentBlock();
+            if (d->engine->active_block_index + 1 == d->engine->active_blocks.size()
+                && cursor.row + 1 == block->lines.size()) {
+                move(block->textLength() - cursor.pos);
+            } else if (cursor.row + 1 == block->lines.size()) {
+                const auto next_block = d->engine->active_blocks[d->engine->active_block_index + 1];
+                const int  equiv_col  = cursor.row == 0 ? cursor.col : cursor.col - 2;
+                const int  col        = qBound(0, equiv_col, next_block->lengthOfLine(0));
+                move(block->textLength() - cursor.pos + col + 1);
+            } else {
+                const int equiv_col = cursor.row == 0 ? cursor.col + 2 : cursor.col;
+                const int col       = qMin(equiv_col, block->lengthOfLine(cursor.row + 1));
+                const int pos       = block->offsetOfLine(cursor.row + 1) + col;
+                move(pos - cursor.pos);
+            }
+        } break;
+        case TextInputType::MoveToStartOfLine: {
+            const int offset = cursor.col == 0 ? cursor.pos : cursor.col;
+            move(-offset);
+        } break;
+        case TextInputType::MoveToEndOfLine: {
+            const auto block = d->engine->currentBlock();
+            auto       len   = block->lengthOfLine(cursor.row);
+            const int  offset =
+                cursor.col == len ? block->textLength() - cursor.pos : len - cursor.col;
+            move(offset);
+        } break;
+        case TextInputType::MoveToStartOfBlock: {
+        } break;
+        case TextInputType::MoveToEndOfBlock: {
+        } break;
+        case TextInputType::MoveToStartOfDocument: {
+            auto &cursor                  = d->engine->cursor;
+            d->engine->active_block_index = 0;
+            cursor.pos                    = 0;
+            cursor.row                    = 0;
+            cursor.col                    = 0;
+            d->cursor_pos                 = 0;
+            scrollToStart();
+        } break;
+        case TextInputType::MoveToEndOfDocument: {
+            auto &cursor                  = d->engine->cursor;
+            d->engine->active_block_index = d->engine->active_blocks.size() - 1;
+            auto block                    = d->engine->currentBlock();
+            cursor.pos                    = block->textLength();
+            cursor.row                    = block->lines.size() - 1;
+            cursor.col                    = block->lengthOfLine(block->lines.size() - 1);
+            d->cursor_pos                 = d->text.size();
+            scrollToEnd();
+        } break;
+        case TextInputType::MoveToPrevPage: {
+            scroll(textArea().height() * 0.5);
+        } break;
+        case TextInputType::MoveToNextPage: {
+            scroll(-textArea().height() * 0.5);
+        } break;
+        case TextInputType::MoveToPrevBlock: {
+            if (d->engine->active_block_index > 0) {
+                --d->engine->active_block_index;
+                d->engine->cursor.reset();
+                d->cursor_pos = d->engine->currentBlock()->text_pos;
+                postUpdateRequest();
+            }
+        } break;
+        case TextInputType::MoveToNextBlock: {
+            if (d->engine->active_block_index + 1 < d->engine->active_blocks.size()) {
+                ++d->engine->active_block_index;
+                d->engine->cursor.reset();
+                d->cursor_pos = d->engine->currentBlock()->text_pos;
+                postUpdateRequest();
+            }
+        } break;
+        case TextInputType::DeletePrevChar: {
+            del(-1);
+        } break;
+        case TextInputType::DeleteNextChar: {
+            del(1);
+        } break;
+        case TextInputType::DeletePrevWord: {
+        } break;
+        case TextInputType::DeleteNextWord: {
+        } break;
+        case TextInputType::DeleteToStartOfLine: {
+            del(-qMax(d->engine->cursor.col, 1));
+        } break;
+        case TextInputType::DeleteToEndOfLine: {
+            const auto block  = d->engine->currentBlock();
+            const auto cursor = d->engine->cursor;
+            del(qMax(block->lengthOfLine(cursor.row) - cursor.col, 1));
+        } break;
+        case TextInputType::DeleteToStartOfBlock: {
+        } break;
+        case TextInputType::DeleteToEndOfBlock: {
+        } break;
+        case TextInputType::DeleteToStartOfDocument: {
+        } break;
+        case TextInputType::DeleteToEndOfDocument: {
+        } break;
+        case TextInputType::InsertBeforeBlock: {
+            d->engine->insertBlock(d->engine->active_block_index);
+            --d->engine->active_block_index;
+            d->engine->cursor.reset();
+            d->cursor_pos = d->engine->currentBlock()->text_pos;
+            postUpdateRequest();
+        } break;
+        case TextInputType::InsertAfterBlock: {
+            d->engine->insertBlock(d->engine->active_block_index + 1);
+            auto block = d->engine->currentBlock();
+            move(block->textLength() - d->engine->cursor.pos + 1);
+        } break;
     }
 
     e->accept();
