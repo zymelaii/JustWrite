@@ -24,7 +24,7 @@ public:
 
     QRect textArea() const;
 
-    void scroll(double delta);
+    void scroll(double delta, bool smooth);
     void scrollToStart();
     void scrollToEnd();
 

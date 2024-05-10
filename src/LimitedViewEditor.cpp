@@ -22,6 +22,7 @@ struct LimitedViewEditorPrivate {
     int                              min_text_line_chars;
     bool                             align_center;
     double                           scroll;
+    double                           expected_scroll;
     bool                             edit_op_happens;
     bool                             blink_cursor_should_paint;
     QTimer                           blink_timer;
@@ -37,6 +38,7 @@ struct LimitedViewEditorPrivate {
         cursor_pos                = 0;
         align_center              = false;
         scroll                    = 0.0;
+        expected_scroll           = scroll;
         edit_op_happens           = false;
         blink_cursor_should_paint = true;
         blink_timer.setInterval(500);
@@ -125,7 +127,7 @@ QRect LimitedViewEditor::textArea() const {
     return rect() - contentsMargins();
 }
 
-void LimitedViewEditor::scroll(double delta) {
+void LimitedViewEditor::scroll(double delta, bool smooth) {
     const auto e            = d->engine;
     const auto line_spacing = e->line_spacing_ratio * e->line_height;
     double     max_scroll   = line_spacing + e->block_spacing;
@@ -133,8 +135,9 @@ void LimitedViewEditor::scroll(double delta) {
     for (auto block : e->active_blocks) {
         min_scroll -= block->lines.size() * line_spacing + e->block_spacing;
     }
-    min_scroll += line_spacing + e->block_spacing;
-    d->scroll   = qBound<double>(min_scroll, d->scroll + delta, max_scroll);
+    min_scroll         += line_spacing + e->block_spacing;
+    d->expected_scroll  = qBound<double>(min_scroll, d->scroll + delta, max_scroll);
+    if (!smooth) { d->scroll = d->expected_scroll; }
     update();
 }
 
@@ -142,7 +145,8 @@ void LimitedViewEditor::scrollToStart() {
     const auto   e            = d->engine;
     const auto   line_spacing = e->line_spacing_ratio * e->line_height;
     const double max_scroll   = line_spacing + e->block_spacing;
-    d->scroll                 = max_scroll;
+    d->expected_scroll        = max_scroll;
+    d->scroll                 = d->expected_scroll;
     postUpdateRequest();
 }
 
@@ -153,8 +157,9 @@ void LimitedViewEditor::scrollToEnd() {
     for (auto block : e->active_blocks) {
         min_scroll -= block->lines.size() * line_spacing + e->block_spacing;
     }
-    min_scroll += line_spacing + e->block_spacing;
-    d->scroll   = min_scroll;
+    min_scroll         += line_spacing + e->block_spacing;
+    d->expected_scroll  = min_scroll;
+    d->scroll           = d->expected_scroll;
     postUpdateRequest();
 }
 
@@ -276,6 +281,14 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     auto engine = d->engine;
     engine->render();
 
+    //! smooth scroll
+    d->scroll = d->scroll * 0.45 + d->expected_scroll * 0.55;
+    if (qAbs(d->scroll - d->expected_scroll) > 1e-3) {
+        update();
+    } else {
+        d->scroll = d->expected_scroll;
+    }
+
     QPainter p(this);
     auto     pal = palette();
 
@@ -388,6 +401,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
     const auto action = d->input_manager->match(e);
 
     qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
+
     const auto &cursor = d->engine->cursor;
 
     switch (action) {
@@ -418,10 +432,10 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             paste();
         } break;
         case TextInputCommand::ScrollUp: {
-            scroll(d->engine->line_height * d->engine->line_spacing_ratio);
+            scroll(d->engine->line_height * d->engine->line_spacing_ratio, true);
         } break;
         case TextInputCommand::ScrollDown: {
-            scroll(-d->engine->line_height * d->engine->line_spacing_ratio);
+            scroll(-d->engine->line_height * d->engine->line_spacing_ratio, true);
         } break;
         case TextInputCommand::MoveToPrevChar: {
             move(-1);
@@ -497,10 +511,10 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             scrollToEnd();
         } break;
         case TextInputCommand::MoveToPrevPage: {
-            scroll(textArea().height() * 0.5);
+            scroll(textArea().height() * 0.5, true);
         } break;
         case TextInputCommand::MoveToNextPage: {
-            scroll(-textArea().height() * 0.5);
+            scroll(-textArea().height() * 0.5, true);
         } break;
         case TextInputCommand::MoveToPrevBlock: {
             if (d->engine->active_block_index > 0) {
@@ -669,7 +683,7 @@ void LimitedViewEditor::wheelEvent(QWheelEvent *e) {
     if (engine->isEmpty()) { return; }
     const double ratio = 1.0 / 180 * 3;
     const auto   delta = e->angleDelta().y() * engine->line_height * ratio;
-    scroll(delta);
+    scroll(delta, true);
 }
 
 void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
