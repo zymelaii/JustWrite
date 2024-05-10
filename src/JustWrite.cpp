@@ -11,6 +11,59 @@
 #include <QLabel>
 #include <QDateTime>
 #include <QTimer>
+#include <atomic>
+#include <random>
+
+#ifdef WIN32
+
+#include <windows.h>
+#include <QThread>
+
+std::atomic_bool develop_messy_mode{false};
+
+class DevelopModeMessyTest : public QThread {
+public:
+    explicit DevelopModeMessyTest(QObject *parent = nullptr)
+        : QThread(parent) {}
+
+protected:
+    void sendKey(int key) {
+        keybd_event(key, 0, 0, 0);
+        keybd_event(key, 0, KEYEVENTF_KEYUP, 0);
+    }
+
+    void run() override {
+        std::random_device{};
+        std::mt19937                       rng{std::random_device{}()};
+        std::uniform_int_distribution<int> type_dist{1, 12};
+        std::uniform_int_distribution<int> char_dist{'A', 'Z'};
+        std::uniform_int_distribution<int> nl_dist{0, 8};
+
+        while (true) {
+            if (!develop_messy_mode) { continue; }
+
+            const int type_times = type_dist(rng);
+            for (int j = 0; j < type_times; ++j) {
+                if (!develop_messy_mode) { break; }
+                const auto ch = char_dist(rng);
+                sendKey(ch);
+                Sleep(1);
+            }
+
+            if (!develop_messy_mode) { continue; }
+            sendKey(VK_SPACE);
+            Sleep(10);
+
+            if (nl_dist(rng) == 0) {
+                if (!develop_messy_mode) { continue; }
+                sendKey(VK_RETURN);
+                Sleep(10);
+            }
+        }
+    }
+};
+
+#endif
 
 namespace Ui {
 struct JustWrite {
@@ -110,6 +163,8 @@ JustWrite::JustWrite(QWidget *parent)
     });
 
     d->sec_timer.start();
+
+    (new DevelopModeMessyTest(this))->start();
 }
 
 JustWrite::~JustWrite() {
@@ -129,6 +184,13 @@ void JustWrite::openChapter(int index) {
     //! TODO: rt.
 }
 
+void JustWrite::focusOutEvent(QFocusEvent *e) {
+    QWidget::focusOutEvent(e);
+#ifdef WIN32
+    develop_messy_mode = false;
+#endif
+}
+
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto       e   = static_cast<QKeyEvent *>(event);
@@ -137,6 +199,11 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
             ui->editor->setAlignCenter(!ui->editor->alignCenter());
         } else if (key == d->shortcut.toggle_sidebar) {
             ui->sidebar->setVisible(!ui->sidebar->isVisible());
+#ifdef WIN32
+        } else if (e->key() == Qt::Key_F7) {
+            if (!develop_messy_mode) { ui->editor->setFocus(); }
+            develop_messy_mode = !develop_messy_mode;
+#endif
         } else {
             return false;
         }
