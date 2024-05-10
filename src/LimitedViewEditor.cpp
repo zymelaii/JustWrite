@@ -364,12 +364,13 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
         }
         cursor_y_pos += cursor.row * line_spacing;
         if (d->edit_op_happens) {
-            if (cursor_y_pos > text_area.bottom()) {
-                const double delta = cursor_y_pos + fm.height() - text_area.bottom();
-                scroll(-delta - d->engine->block_spacing);
-            } else if (cursor_y_pos + fm.height() < text_area.top()) {
-                const double delta = text_area.top() - cursor_y_pos;
-                scroll(delta + d->engine->block_spacing);
+            const double margin = engine->block_spacing * 0.75;
+            if (auto bottom = cursor_y_pos + fm.height() + margin; bottom > text_area.bottom()) {
+                const double delta = bottom - text_area.bottom();
+                scroll(-delta - d->engine->block_spacing, false);
+            } else if (auto top = cursor_y_pos - margin; top < text_area.top()) {
+                const double delta = text_area.top() - top;
+                scroll(delta + d->engine->block_spacing, false);
             }
         }
         p.drawLine(cursor_x_pos, cursor_y_pos, cursor_x_pos, cursor_y_pos + fm.height());
