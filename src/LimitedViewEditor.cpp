@@ -1,6 +1,6 @@
 #include "LimitedViewEditor.h"
 #include "TextViewEngine.h"
-#include "TextInputFilter.h"
+#include "TextInputCommand.h"
 #include <QResizeEvent>
 #include <QPaintEvent>
 #include <QFocusEvent>
@@ -16,18 +16,20 @@
 #include <QClipboard>
 #include <QTimer>
 #include <QMap>
+#include <magic_enum.hpp>
 
 struct LimitedViewEditorPrivate {
-    int                     min_text_line_chars;
-    bool                    align_center;
-    double                  scroll;
-    bool                    edit_op_happens;
-    bool                    blink_cursor_should_paint;
-    QTimer                  blink_timer;
-    int                     cursor_pos;
-    QString                 text;
-    QString                 preedit_text;
-    jwrite::TextViewEngine *engine;
+    int                              min_text_line_chars;
+    bool                             align_center;
+    double                           scroll;
+    bool                             edit_op_happens;
+    bool                             blink_cursor_should_paint;
+    QTimer                           blink_timer;
+    int                              cursor_pos;
+    QString                          text;
+    QString                          preedit_text;
+    jwrite::TextViewEngine          *engine;
+    jwrite::TextInputCommandManager *input_manager;
 
     LimitedViewEditorPrivate() {
         engine                    = nullptr;
@@ -43,6 +45,7 @@ struct LimitedViewEditorPrivate {
 
     ~LimitedViewEditorPrivate() {
         Q_ASSERT(engine);
+        delete input_manager;
         delete engine;
     }
 };
@@ -65,7 +68,9 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
 
     setAlignCenter(true);
 
-    d->engine = new jwrite::TextViewEngine(fontMetrics(), textArea().width());
+    d->engine        = new jwrite::TextViewEngine(fontMetrics(), textArea().width());
+    d->input_manager = new jwrite::TextInputCommandManager(*d->engine);
+    d->input_manager->loadDefaultMappings();
 
     scrollToStart();
 
@@ -378,48 +383,57 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
 }
 
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
-    const auto  action = textInputFilter(e);
+    if (!d->engine->isCursorAvailable()) { return; }
+
+    const auto action = d->input_manager->match(e);
+
+    qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
     const auto &cursor = d->engine->cursor;
 
     switch (action) {
-        case TextInputType::Reject: {
+        case TextInputCommand::Reject: {
             return;
         } break;
-        case TextInputType::Printable: {
-            const auto text = translatePrintableChar(e);
-            if (text == '\t') { return; }
-            if (text == '\n') {
-                splitIntoNewLine();
-            } else {
-                insert(text);
-            }
+        case TextInputCommand::InsertPrintable: {
+            insert(d->input_manager->translatePrintableChar(e));
         } break;
-        case TextInputType::Copy: {
+        case TextInputCommand::InsertTab: {
+        } break;
+        case TextInputCommand::InsertNewLine: {
+            splitIntoNewLine();
+        } break;
+        case TextInputCommand::Cancel: {
+        } break;
+        case TextInputCommand::Undo: {
+        } break;
+        case TextInputCommand::Redo: {
+        } break;
+        case TextInputCommand::Copy: {
             copy();
         } break;
-        case TextInputType::Cut: {
+        case TextInputCommand::Cut: {
             cut();
         } break;
-        case TextInputType::Paste: {
+        case TextInputCommand::Paste: {
             paste();
         } break;
-        case TextInputType::ScrollUp: {
+        case TextInputCommand::ScrollUp: {
             scroll(d->engine->line_height * d->engine->line_spacing_ratio);
         } break;
-        case TextInputType::ScrollDown: {
+        case TextInputCommand::ScrollDown: {
             scroll(-d->engine->line_height * d->engine->line_spacing_ratio);
         } break;
-        case TextInputType::MoveToPrevChar: {
+        case TextInputCommand::MoveToPrevChar: {
             move(-1);
         } break;
-        case TextInputType::MoveToNextChar: {
+        case TextInputCommand::MoveToNextChar: {
             move(1);
         } break;
-        case TextInputType::MoveToPrevWord: {
+        case TextInputCommand::MoveToPrevWord: {
         } break;
-        case TextInputType::MoveToNextWord: {
+        case TextInputCommand::MoveToNextWord: {
         } break;
-        case TextInputType::MoveToPrevLine: {
+        case TextInputCommand::MoveToPrevLine: {
             auto block = d->engine->currentBlock();
             if (d->engine->active_block_index == 0 && cursor.row == 0) {
                 move(-cursor.pos);
@@ -436,7 +450,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
                 move(pos - cursor.pos);
             }
         } break;
-        case TextInputType::MoveToNextLine: {
+        case TextInputCommand::MoveToNextLine: {
             const auto &cursor = d->engine->cursor;
             auto        block  = d->engine->currentBlock();
             if (d->engine->active_block_index + 1 == d->engine->active_blocks.size()
@@ -454,31 +468,25 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
                 move(pos - cursor.pos);
             }
         } break;
-        case TextInputType::MoveToStartOfLine: {
-            const int offset = cursor.col == 0 ? cursor.pos : cursor.col;
-            move(-offset);
+        case TextInputCommand::MoveToStartOfLine: {
+            move(-cursor.col);
         } break;
-        case TextInputType::MoveToEndOfLine: {
-            const auto block = d->engine->currentBlock();
-            auto       len   = block->lengthOfLine(cursor.row);
-            const int  offset =
-                cursor.col == len ? block->textLength() - cursor.pos : len - cursor.col;
-            move(offset);
+        case TextInputCommand::MoveToEndOfLine: {
+            move(d->engine->currentBlock()->lengthOfLine(cursor.row) - cursor.col);
         } break;
-        case TextInputType::MoveToStartOfBlock: {
+        case TextInputCommand::MoveToStartOfBlock: {
+            move(-cursor.pos);
         } break;
-        case TextInputType::MoveToEndOfBlock: {
+        case TextInputCommand::MoveToEndOfBlock: {
+            move(d->engine->currentBlock()->textLength() - cursor.pos);
         } break;
-        case TextInputType::MoveToStartOfDocument: {
-            auto &cursor                  = d->engine->cursor;
+        case TextInputCommand::MoveToStartOfDocument: {
             d->engine->active_block_index = 0;
-            cursor.pos                    = 0;
-            cursor.row                    = 0;
-            cursor.col                    = 0;
-            d->cursor_pos                 = 0;
+            d->engine->cursor.reset();
+            d->cursor_pos = 0;
             scrollToStart();
         } break;
-        case TextInputType::MoveToEndOfDocument: {
+        case TextInputCommand::MoveToEndOfDocument: {
             auto &cursor                  = d->engine->cursor;
             d->engine->active_block_index = d->engine->active_blocks.size() - 1;
             auto block                    = d->engine->currentBlock();
@@ -488,13 +496,13 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             d->cursor_pos                 = d->text.size();
             scrollToEnd();
         } break;
-        case TextInputType::MoveToPrevPage: {
+        case TextInputCommand::MoveToPrevPage: {
             scroll(textArea().height() * 0.5);
         } break;
-        case TextInputType::MoveToNextPage: {
+        case TextInputCommand::MoveToNextPage: {
             scroll(-textArea().height() * 0.5);
         } break;
-        case TextInputType::MoveToPrevBlock: {
+        case TextInputCommand::MoveToPrevBlock: {
             if (d->engine->active_block_index > 0) {
                 --d->engine->active_block_index;
                 d->engine->cursor.reset();
@@ -502,7 +510,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
                 postUpdateRequest();
             }
         } break;
-        case TextInputType::MoveToNextBlock: {
+        case TextInputCommand::MoveToNextBlock: {
             if (d->engine->active_block_index + 1 < d->engine->active_blocks.size()) {
                 ++d->engine->active_block_index;
                 d->engine->cursor.reset();
@@ -510,40 +518,68 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
                 postUpdateRequest();
             }
         } break;
-        case TextInputType::DeletePrevChar: {
+        case TextInputCommand::DeletePrevChar: {
             del(-1);
         } break;
-        case TextInputType::DeleteNextChar: {
+        case TextInputCommand::DeleteNextChar: {
             del(1);
         } break;
-        case TextInputType::DeletePrevWord: {
+        case TextInputCommand::DeletePrevWord: {
         } break;
-        case TextInputType::DeleteNextWord: {
+        case TextInputCommand::DeleteNextWord: {
         } break;
-        case TextInputType::DeleteToStartOfLine: {
+        case TextInputCommand::DeleteToStartOfLine: {
             del(-qMax(d->engine->cursor.col, 1));
         } break;
-        case TextInputType::DeleteToEndOfLine: {
+        case TextInputCommand::DeleteToEndOfLine: {
             const auto block  = d->engine->currentBlock();
             const auto cursor = d->engine->cursor;
             del(qMax(block->lengthOfLine(cursor.row) - cursor.col, 1));
         } break;
-        case TextInputType::DeleteToStartOfBlock: {
+        case TextInputCommand::DeleteToStartOfBlock: {
         } break;
-        case TextInputType::DeleteToEndOfBlock: {
+        case TextInputCommand::DeleteToEndOfBlock: {
         } break;
-        case TextInputType::DeleteToStartOfDocument: {
+        case TextInputCommand::DeleteToStartOfDocument: {
         } break;
-        case TextInputType::DeleteToEndOfDocument: {
+        case TextInputCommand::DeleteToEndOfDocument: {
         } break;
-        case TextInputType::InsertBeforeBlock: {
+        case TextInputCommand::SelectPrevChar: {
+        } break;
+        case TextInputCommand::SelectNextChar: {
+        } break;
+        case TextInputCommand::SelectPrevWord: {
+        } break;
+        case TextInputCommand::SelectNextWord: {
+        } break;
+        case TextInputCommand::SelectToStartOfLine: {
+        } break;
+        case TextInputCommand::SelectToEndOfLine: {
+        } break;
+        case TextInputCommand::SelectToStartOfBlock: {
+        } break;
+        case TextInputCommand::SelectToEndOfBlock: {
+        } break;
+        case TextInputCommand::SelectBlock: {
+        } break;
+        case TextInputCommand::SelectPrevPage: {
+        } break;
+        case TextInputCommand::SelectNextPage: {
+        } break;
+        case TextInputCommand::SelectToStartOfDoc: {
+        } break;
+        case TextInputCommand::SelectToEndOfDoc: {
+        } break;
+        case TextInputCommand::SelectAll: {
+        } break;
+        case TextInputCommand::InsertBeforeBlock: {
             d->engine->insertBlock(d->engine->active_block_index);
             --d->engine->active_block_index;
             d->engine->cursor.reset();
             d->cursor_pos = d->engine->currentBlock()->text_pos;
             postUpdateRequest();
         } break;
-        case TextInputType::InsertAfterBlock: {
+        case TextInputCommand::InsertAfterBlock: {
             d->engine->insertBlock(d->engine->active_block_index + 1);
             auto block = d->engine->currentBlock();
             move(block->textLength() - d->engine->cursor.pos + 1);
