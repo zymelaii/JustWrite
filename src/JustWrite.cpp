@@ -2,6 +2,7 @@
 #include "LimitedViewEditor.h"
 #include "JustWriteSidebar.h"
 #include "StatusBar.h"
+#include "TextInputCommand.h"
 #include "KeyShortcut.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -191,8 +192,18 @@ void JustWrite::openChapter(int index) {
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
-        auto       e   = static_cast<QKeyEvent *>(event);
-        const auto key = QKeySequence(e->key() | e->modifiers());
+        auto e   = static_cast<QKeyEvent *>(event);
+        auto key = QKeySequence(e->key() | e->modifiers());
+
+#ifdef WIN32
+        //! NOTE: block special keys in messy input mode to avoid unexpceted behavior
+        //! ATTENTION: this can not block global shortcut keys
+        if (!TextInputCommandManager::isPrintableChar(QKeyCombination(key[0]))
+            && develop_messy_mode) {
+            return true;
+        }
+#endif
+
         if (key == d->shortcut.toggle_align_center) {
             ui->editor->setAlignCenter(!ui->editor->alignCenter());
         } else if (key == d->shortcut.toggle_sidebar) {
