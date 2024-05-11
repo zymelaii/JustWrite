@@ -479,6 +479,7 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
     d->blink_timer.stop();
     d->engine->active_block_index = -1;
+    emit focusLost();
 }
 
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {

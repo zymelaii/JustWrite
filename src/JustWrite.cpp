@@ -164,7 +164,12 @@ JustWrite::JustWrite(QWidget *parent)
 
     d->sec_timer.start();
 
+#ifdef WIN32
+    connect(ui->editor, &LimitedViewEditor::focusLost, this, [] {
+        develop_messy_mode = false;
+    });
     (new DevelopModeMessyTest(this))->start();
+#endif
 }
 
 JustWrite::~JustWrite() {
@@ -184,13 +189,6 @@ void JustWrite::openChapter(int index) {
     //! TODO: rt.
 }
 
-void JustWrite::focusOutEvent(QFocusEvent *e) {
-    QWidget::focusOutEvent(e);
-#ifdef WIN32
-    develop_messy_mode = false;
-#endif
-}
-
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto       e   = static_cast<QKeyEvent *>(event);
@@ -201,8 +199,8 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
             ui->sidebar->setVisible(!ui->sidebar->isVisible());
 #ifdef WIN32
         } else if (e->key() == Qt::Key_F7) {
-            if (!develop_messy_mode) { ui->editor->setFocus(); }
-            develop_messy_mode = !develop_messy_mode;
+            ui->editor->setFocus();
+            develop_messy_mode = true;
 #endif
         } else {
             return false;

@@ -20,7 +20,6 @@ public:
     void openChapter(int index);
 
 protected:
-    void focusOutEvent(QFocusEvent *e) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:

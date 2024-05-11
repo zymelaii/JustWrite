@@ -17,6 +17,7 @@ public:
 signals:
     void textAreaChanged(QRect area);
     void textChanged(const QString &text);
+    void focusLost();
 
 public:
     bool alignCenter() const;
