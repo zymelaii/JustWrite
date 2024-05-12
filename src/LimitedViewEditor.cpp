@@ -28,6 +28,9 @@
 
 ON_DEBUG(enum class ProfileTarget{
     IME2UpdateDelay,
+    FrameRenderCost,
+    TextEngineRenderCost,
+    GeneralTextEdit,
 };)
 
 ON_DEBUG(struct {
@@ -361,8 +364,12 @@ void LimitedViewEditor::resizeEvent(QResizeEvent *e) {
 }
 
 void LimitedViewEditor::paintEvent(QPaintEvent *e) {
+    ON_DEBUG(Profiler.start(ProfileTarget::FrameRenderCost));
+
+    ON_DEBUG(Profiler.start(ProfileTarget::TextEngineRenderCost));
     auto engine = d->engine;
     engine->render();
+    ON_DEBUG(Profiler.record(ProfileTarget::TextEngineRenderCost));
 
     //! smooth scroll
     d->scroll = d->scroll * 0.45 + d->expected_scroll * 0.55;
@@ -462,6 +469,7 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     d->edit_op_happens = false;
 
     ON_DEBUG(Profiler.record(ProfileTarget::IME2UpdateDelay));
+    ON_DEBUG(Profiler.record(ProfileTarget::FrameRenderCost));
 }
 
 void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
@@ -490,9 +498,10 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 
     const auto &cursor = d->engine->cursor;
 
+    ON_DEBUG(Profiler.start(ProfileTarget::GeneralTextEdit));
+
     switch (action) {
         case TextInputCommand::Reject: {
-            return;
         } break;
         case TextInputCommand::InsertPrintable: {
             insert(d->input_manager->translatePrintableChar(e));
@@ -685,6 +694,8 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             move(block->textLength() - d->engine->cursor.pos + 1);
         } break;
     }
+
+    ON_DEBUG(Profiler.record(ProfileTarget::GeneralTextEdit));
 
     e->accept();
 }
