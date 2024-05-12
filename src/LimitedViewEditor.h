@@ -2,6 +2,14 @@
 
 #include <QWidget>
 
+struct EditorTextLoc {
+    int block_index;
+    //! NOTE: only one of the {row, col}/{pos} is valid
+    int row;
+    int col;
+    int pos;
+};
+
 struct LimitedViewEditorPrivate;
 
 class LimitedViewEditor : public QWidget {
@@ -18,12 +26,20 @@ signals:
     void textAreaChanged(QRect area);
     void textChanged(const QString &text);
     void focusLost();
+    void requireEmptyChapter();
 
 public:
     bool alignCenter() const;
     void setAlignCenter(bool value);
 
     QRect textArea() const;
+
+    EditorTextLoc textLoc() const;
+    void          setTextLoc(EditorTextLoc loc);
+
+    void reset(QString &text, bool swap);
+    void cancelPreedit();
+    void scrollToCursor();
 
     void scroll(double delta, bool smooth);
     void scrollToStart();
@@ -41,14 +57,8 @@ public:
     void splitIntoNewLine();
 
 protected:
-    struct TextLoc {
-        int block_index;
-        int row;
-        int col;
-    };
-
-    TextLoc getTextLocAtPos(const QPoint &pos);
-    void    postUpdateRequest();
+    EditorTextLoc getTextLocAtPos(const QPoint &pos);
+    void          postUpdateRequest();
 
 protected:
     void resizeEvent(QResizeEvent *e) override;

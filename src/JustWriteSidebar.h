@@ -13,9 +13,13 @@ public:
     explicit JustWriteSidebar(QWidget *parent = nullptr);
     virtual ~JustWriteSidebar();
 
+public slots:
+    void newVolume(int index, const QString &title);
+    void newChapter(int volume_index, const QString &title);
+    void openEmptyChapter();
+
 signals:
-    void requestNewVolume();
-    void requestNewChapter();
+    void chapterOpened(int cid);
 
 private:
     Ui::JustWriteSidebar *ui;

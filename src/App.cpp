@@ -1,4 +1,5 @@
 #include "JustWrite.h"
+#include "ProfileUtils.h"
 #include <QGuiApplication>
 #include <QApplication>
 #include <QScreen>
@@ -27,6 +28,8 @@ int main(int argc, char *argv[]) {
 
     auto       screen     = getCurrentScreen();
     const auto screen_geo = screen->geometry();
+
+    ON_DEBUG(JwriteProfiler.setup());
 
     JustWrite client;
     client.setGeometry(getPreferredGeometry(screen_geo));

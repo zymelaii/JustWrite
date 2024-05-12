@@ -4,6 +4,7 @@
 #include "StatusBar.h"
 #include "TextInputCommand.h"
 #include "KeyShortcut.h"
+#include "ProfileUtils.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -14,6 +15,7 @@
 #include <QTimer>
 #include <atomic>
 #include <random>
+#include <QMap>
 
 #ifdef WIN32
 
@@ -63,6 +65,8 @@ protected:
         }
     }
 };
+
+DevelopModeMessyTest *messy_input_thread = nullptr;
 
 #endif
 
@@ -135,13 +139,18 @@ struct JustWrite {
 } // namespace Ui
 
 struct JustWritePrivate {
-    KeyShortcut shortcut;
-    QTimer      sec_timer;
+    KeyShortcut              shortcut;
+    QTimer                   sec_timer;
+    int                      current_cid;
+    QMap<int, QString>       chapters;
+    QMap<int, EditorTextLoc> chapter_locs;
 
     JustWritePrivate() {
         shortcut.loadDefaultShortcuts();
         sec_timer.setInterval(1000);
         sec_timer.setSingleShot(false);
+
+        current_cid = -1;
     }
 };
 
@@ -152,13 +161,15 @@ JustWrite::JustWrite(QWidget *parent)
     ui->editor->installEventFilter(this);
     ui->editor->setFocus();
 
-    connect(ui->sidebar, &JustWriteSidebar::requestNewVolume, this, &JustWrite::newVolume);
-    connect(ui->sidebar, &JustWriteSidebar::requestNewChapter, this, [this] {
-        newChapter("");
-    });
+    connect(
+        ui->editor,
+        &LimitedViewEditor::requireEmptyChapter,
+        ui->sidebar,
+        &JustWriteSidebar::openEmptyChapter);
     connect(ui->editor, &LimitedViewEditor::textChanged, this, [this](const QString &text) {
         ui->total_words->setText(QString("全本共 %1 字").arg(text.length()));
     });
+    connect(ui->sidebar, &JustWriteSidebar::chapterOpened, this, &JustWrite::openChapter);
     connect(&d->sec_timer, &QTimer::timeout, this, [this] {
         ui->datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
     });
@@ -169,25 +180,57 @@ JustWrite::JustWrite(QWidget *parent)
     connect(ui->editor, &LimitedViewEditor::focusLost, this, [] {
         develop_messy_mode = false;
     });
-    (new DevelopModeMessyTest(this))->start();
+    messy_input_thread = new DevelopModeMessyTest(this);
+    messy_input_thread->start();
 #endif
 }
 
 JustWrite::~JustWrite() {
+#ifdef WIN32
+    messy_input_thread->terminate();
+    messy_input_thread->wait();
+#endif
+
     delete d;
     delete ui;
 }
 
-void JustWrite::newVolume() {
-    //! TODO: rt.
-}
+void JustWrite::openChapter(int cid) {
+#ifdef WIN32
+    if (develop_messy_mode) { return; }
+#endif
+    if (cid == d->current_cid) { return; }
 
-void JustWrite::newChapter(const QString &name) {
-    //! TODO: rt.
-}
+    ON_DEBUG(JwriteProfiler.start(ProfileTarget::SwitchChapter));
 
-void JustWrite::openChapter(int index) {
-    //! TODO: rt.
+    QString  tmp{};
+    QString &text = d->chapters.contains(cid) ? d->chapters[cid] : tmp;
+
+    if (d->current_cid != -1) {
+        qDebug().noquote() << QStringLiteral("COMMAND CloseChapter(%1)").arg(d->current_cid);
+        const auto loc = ui->editor->textLoc();
+        if (loc.block_index != -1) {
+            d->chapter_locs[d->current_cid] = loc;
+            qDebug().noquote() << QStringLiteral("COMMAND SaveEditorTextLoc(%1, %2)")
+                                      .arg(loc.block_index)
+                                      .arg(loc.pos);
+        }
+    }
+
+    ui->editor->reset(text, true);
+    d->chapters[d->current_cid] = text;
+    d->current_cid              = cid;
+
+    qDebug().noquote() << QStringLiteral("COMMAND OpenChapter(%1)").arg(d->current_cid);
+    if (d->chapter_locs.contains(cid)) {
+        const auto loc = d->chapter_locs[cid];
+        ui->editor->setTextLoc(loc);
+        qDebug().noquote() << QStringLiteral("COMMAND RestoreEditorTextLoc(%1, %2)")
+                                  .arg(loc.block_index)
+                                  .arg(loc.pos);
+    }
+
+    ON_DEBUG(JwriteProfiler.record(ProfileTarget::SwitchChapter));
 }
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {

@@ -1,6 +1,7 @@
 #include "LimitedViewEditor.h"
 #include "TextViewEngine.h"
 #include "TextInputCommand.h"
+#include "ProfileUtils.h"
 #include <QResizeEvent>
 #include <QPaintEvent>
 #include <QFocusEvent>
@@ -17,90 +18,6 @@
 #include <QTimer>
 #include <QMap>
 #include <magic_enum.hpp>
-#include <chrono>
-#include <array>
-
-#ifndef NDEBUG
-#define ON_DEBUG(...) __VA_ARGS__
-#else
-#define ON_DEBUG(...)
-#endif
-
-ON_DEBUG(enum class ProfileTarget{
-    IME2UpdateDelay,
-    FrameRenderCost,
-    TextEngineRenderCost,
-    GeneralTextEdit,
-};)
-
-ON_DEBUG(struct {
-    using timestamp_t     = decltype(std::chrono::system_clock::now());
-    using duration_t      = std::chrono::milliseconds;
-    using duration_list_t = QVector<duration_t>;
-    using start_record_t  = std::array<timestamp_t, magic_enum::enum_count<ProfileTarget>()>;
-    using profile_data_t  = std::array<duration_list_t, magic_enum::enum_count<ProfileTarget>()>;
-
-    start_record_t start_record;
-    profile_data_t profile_data;
-    QTimer        *timer = nullptr;
-
-    int indexof(ProfileTarget target) {
-        return *magic_enum::enum_index(target);
-    }
-
-    void start(ProfileTarget target) {
-        auto &rec = start_record[indexof(target)];
-        if (rec.time_since_epoch().count() == 0) { rec = std::chrono::system_clock::now(); }
-    }
-
-    void record(ProfileTarget target) {
-        const auto index = indexof(target);
-        auto      &rec   = start_record[index];
-        if (rec.time_since_epoch().count() != 0) {
-            auto now = std::chrono::system_clock::now();
-            profile_data[index].push_back(std::chrono::duration_cast<duration_t>(now - rec));
-            rec = timestamp_t{};
-        }
-    }
-
-    int total_valid() {
-        int count = 0;
-        for (auto data : profile_data) {
-            if (!data.empty()) { ++count; }
-        }
-        return count;
-    }
-
-    float averageof(ProfileTarget target) {
-        const auto &data = profile_data[indexof(target)];
-        float       sum  = 0;
-        for (auto dur : data) { sum += dur.count(); }
-        return sum / data.size();
-    }
-
-    void clear(ProfileTarget target) {
-        profile_data[indexof(target)].clear();
-    }
-
-    void setup(QObject * parent) {
-        timer = new QTimer(parent);
-        timer->setInterval(10000);
-        timer->setSingleShot(false);
-        timer->start();
-        QObject::connect(timer, &QTimer::timeout, parent, [this]() {
-            if (total_valid() == 0) { return; }
-            qDebug().nospace() << "PROFILE RECORD";
-            for (auto target : magic_enum::enum_values<ProfileTarget>()) {
-                const auto &data = profile_data[indexof(target)];
-                if (data.empty()) { continue; }
-                qDebug().noquote() << QStringLiteral("  %1 %2ms")
-                                          .arg(magic_enum::enum_name(target).data())
-                                          .arg(averageof(target));
-                clear(target);
-            }
-        });
-    }
-} Profiler;)
 
 struct LimitedViewEditorPrivate {
     int                              min_text_line_chars;
@@ -168,8 +85,6 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
         d->blink_cursor_should_paint = !d->blink_cursor_should_paint;
         update();
     });
-
-    ON_DEBUG(Profiler.setup(this));
 }
 
 LimitedViewEditor::~LimitedViewEditor() {
@@ -211,6 +126,62 @@ void LimitedViewEditor::setAlignCenter(bool value) {
 
 QRect LimitedViewEditor::textArea() const {
     return rect() - contentsMargins();
+}
+
+EditorTextLoc LimitedViewEditor::textLoc() const {
+    EditorTextLoc loc{};
+    loc.block_index = d->engine->active_block_index;
+    loc.pos         = d->engine->cursor.pos;
+    return loc;
+}
+
+void LimitedViewEditor::setTextLoc(EditorTextLoc loc) {
+    const auto e = d->engine;
+    if (!(loc.block_index >= 0 && loc.block_index < e->active_blocks.size())) { return; }
+    e->active_block_index = loc.block_index;
+    e->cursor.pos         = loc.pos;
+    d->cursor_pos         = e->currentBlock()->text_pos + e->cursor.pos;
+    e->syncCursorRowCol();
+    scrollToCursor();
+}
+
+void LimitedViewEditor::reset(QString &text, bool swap) {
+    if (d->engine->preedit) { cancelPreedit(); }
+
+    QStringList blocks{};
+    for (auto block : d->engine->active_blocks) { blocks << block->text().toString(); }
+    auto text_out = blocks.join("\n");
+    d->text.clear();
+
+    d->engine->clearAll();
+    d->engine->insertBlock(0);
+    d->engine->active_block_index = 0;
+    d->cursor_pos                 = 0;
+    d->engine->cursor.reset();
+    insertDirtyText(text);
+
+    d->engine->active_block_index = 0;
+    d->cursor_pos                 = 0;
+    d->engine->cursor.reset();
+
+    if (swap) { text.swap(text_out); }
+
+    postUpdateRequest();
+}
+
+void LimitedViewEditor::cancelPreedit() {
+    Q_ASSERT(d->engine->preedit);
+    const auto &cursor                = d->engine->cursor;
+    const auto &saved_cursor          = d->engine->saved_cursor;
+    const auto  last_preedit_text_len = cursor.pos - saved_cursor.pos;
+    d->preedit_text.remove(saved_cursor.pos, last_preedit_text_len);
+    d->engine->updatePreEditText(0);
+    d->engine->commitPreEdit();
+}
+
+void LimitedViewEditor::scrollToCursor() {
+    d->edit_op_happens = true;
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::scroll(double delta, bool smooth) {
@@ -255,7 +226,7 @@ void LimitedViewEditor::insertDirtyText(const QString &text) {
         auto text = text_list[i].trimmed();
         if (text.isEmpty()) { continue; }
         insert(text);
-        splitIntoNewLine();
+        if (i + 1 < text_list.size()) { splitIntoNewLine(); }
     }
 }
 
@@ -349,8 +320,8 @@ void LimitedViewEditor::splitIntoNewLine() {
     postUpdateRequest();
 }
 
-LimitedViewEditor::TextLoc LimitedViewEditor::getTextLocAtPos(const QPoint &pos) {
-    TextLoc loc{.block_index = -1, .row = 0, .col = 0};
+EditorTextLoc LimitedViewEditor::getTextLocAtPos(const QPoint &pos) {
+    EditorTextLoc loc{.block_index = -1, .row = 0, .col = 0};
 
     const auto &area = textArea();
     if (!area.contains(pos)) { return loc; }
@@ -412,12 +383,12 @@ void LimitedViewEditor::resizeEvent(QResizeEvent *e) {
 }
 
 void LimitedViewEditor::paintEvent(QPaintEvent *e) {
-    ON_DEBUG(Profiler.start(ProfileTarget::FrameRenderCost));
+    ON_DEBUG(JwriteProfiler.start(ProfileTarget::FrameRenderCost));
 
-    ON_DEBUG(Profiler.start(ProfileTarget::TextEngineRenderCost));
+    ON_DEBUG(JwriteProfiler.start(ProfileTarget::TextEngineRenderCost));
     auto engine = d->engine;
     engine->render();
-    ON_DEBUG(Profiler.record(ProfileTarget::TextEngineRenderCost));
+    ON_DEBUG(JwriteProfiler.record(ProfileTarget::TextEngineRenderCost));
 
     //! smooth scroll
     d->scroll = d->scroll * 0.45 + d->expected_scroll * 0.55;
@@ -516,8 +487,8 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
 
     d->edit_op_happens = false;
 
-    ON_DEBUG(Profiler.record(ProfileTarget::IME2UpdateDelay));
-    ON_DEBUG(Profiler.record(ProfileTarget::FrameRenderCost));
+    ON_DEBUG(JwriteProfiler.record(ProfileTarget::IME2UpdateDelay));
+    ON_DEBUG(JwriteProfiler.record(ProfileTarget::FrameRenderCost));
 }
 
 void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
@@ -527,6 +498,7 @@ void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
         e->insertBlock(0);
         //! TODO: move it into a safe method
         e->active_block_index = 0;
+        emit requireEmptyChapter();
     }
     postUpdateRequest();
 }
@@ -546,7 +518,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 
     const auto &cursor = d->engine->cursor;
 
-    ON_DEBUG(Profiler.start(ProfileTarget::GeneralTextEdit));
+    ON_DEBUG(JwriteProfiler.start(ProfileTarget::GeneralTextEdit));
 
     switch (action) {
         case TextInputCommand::Reject: {
@@ -743,7 +715,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         } break;
     }
 
-    ON_DEBUG(Profiler.record(ProfileTarget::GeneralTextEdit));
+    ON_DEBUG(JwriteProfiler.record(ProfileTarget::GeneralTextEdit));
 
     e->accept();
 }
@@ -817,7 +789,7 @@ void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
         d->preedit_text.insert(saved_cursor.pos, preedit_text);
         d->engine->updatePreEditText(preedit_text.length());
         postUpdateRequest();
-        ON_DEBUG(Profiler.start(ProfileTarget::IME2UpdateDelay));
+        ON_DEBUG(JwriteProfiler.start(ProfileTarget::IME2UpdateDelay));
     } else {
         if (d->engine->preedit) { d->engine->commitPreEdit(); }
         insert(e->commitString());

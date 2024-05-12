@@ -255,6 +255,14 @@ void TextViewEngine::setTextRefUnsafe(const QString *ref, int ref_origin) {
     preedit_text_ref = nullptr;
 }
 
+void TextViewEngine::clearAll() {
+    active_blocks.clear();
+    active_block_index = -1;
+    cursor.reset();
+    preedit = false;
+    markAsDirty();
+}
+
 void TextViewEngine::insertBlock(int index) {
     Q_ASSERT(text_ref);
     Q_ASSERT(index >= 0 && index <= active_blocks.size());

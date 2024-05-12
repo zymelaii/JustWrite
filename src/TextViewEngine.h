@@ -107,6 +107,7 @@ struct TextViewEngine {
 
     //! TODO: promote unsafe method into the safe one
     void setTextRefUnsafe(const QString *ref, int ref_origin);
+    void clearAll();
     void insertBlock(int index);
     void breakBlockAtCursorPos();
     void commitInsertion(int text_length);
