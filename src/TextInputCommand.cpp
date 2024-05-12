@@ -153,16 +153,18 @@ void TextInputCommandManager::clear() {
 }
 
 TextInputCommand TextInputCommandManager::match(QKeyEvent *e) const {
-    const auto key = e->keyCombination();
+    const auto modifiers = e->modifiers() & ~Qt::KeypadModifier;
+    const auto key       = QKeyCombination::fromCombined(modifiers | e->key());
     if (key_to_cmd_.contains(key)) { return key_to_cmd_[key]; }
     if (isPrintableChar(key)) { return TextInputCommand::InsertPrintable; }
     return TextInputCommand::Reject;
 }
 
 bool TextInputCommandManager::isPrintableChar(QKeyCombination key) {
-    if (key.keyboardModifiers() & ~Qt::ShiftModifier) { return false; }
+    const auto modifiers = key.keyboardModifiers() & ~Qt::KeypadModifier;
+    if (modifiers & ~Qt::ShiftModifier) { return false; }
     if (key.key() >= Qt::Key_Space && key.key() <= Qt::Key_AsciiTilde) { return true; }
-    const auto code = key.toCombined();
+    const auto code = modifiers | static_cast<int>(key.key());
     if (code == Qt::Key_Tab) { return true; }
     if (code == Qt::Key_Enter || code == Qt::Key_Return) { return true; }
     return false;
