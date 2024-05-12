@@ -349,6 +349,54 @@ void LimitedViewEditor::splitIntoNewLine() {
     postUpdateRequest();
 }
 
+LimitedViewEditor::TextLoc LimitedViewEditor::getTextLocAtPos(const QPoint &pos) {
+    TextLoc loc{.block_index = -1, .row = 0, .col = 0};
+
+    const auto &area = textArea();
+    if (!area.contains(pos)) { return loc; }
+
+    //! TODO: cache block bounds to accelerate location query
+
+    QPointF      real_pos      = pos - area.topLeft() - QPointF(0, d->scroll);
+    const double line_spacing  = d->engine->line_height * d->engine->line_spacing_ratio;
+    const double block_spacing = d->engine->block_spacing;
+
+    int    block_index = 0;
+    double y_pos       = 0.0;
+    double y_limit     = y_pos;
+    while (block_index < d->engine->active_blocks.size()) {
+        auto block = d->engine->active_blocks[block_index];
+        y_limit    = y_pos + block->lines.size() * line_spacing + block_spacing;
+        if (real_pos.y() < y_limit) { break; }
+        if (block_index + 1 == d->engine->active_blocks.size()) { break; }
+        y_pos = y_limit;
+        ++block_index;
+    }
+
+    auto      block = d->engine->active_blocks[block_index];
+    const int row = qBound<int>(0, (real_pos.y() - y_pos) / line_spacing, block->lines.size() - 1);
+    const auto &line   = block->lines[row];
+    const auto  text   = line.text();
+    const auto  incr   = line.charSpacing();
+    const auto  offset = line.isFirstLine() ? d->engine->standard_char_width * 2 : 0;
+
+    double      x_pos = offset;
+    int         col   = 0;
+    const auto &fm    = d->engine->fm;
+    while (col < text.length()) {
+        const double char_width = fm.horizontalAdvance(text[col]) + incr;
+        if (real_pos.x() < x_pos + 0.5 * char_width) { break; }
+        x_pos += char_width;
+        ++col;
+    }
+
+    loc.block_index = block_index;
+    loc.row         = row;
+    loc.col         = col;
+
+    return loc;
+}
+
 void LimitedViewEditor::postUpdateRequest() {
     d->blink_cursor_should_paint = true;
     d->edit_op_happens           = true;
@@ -706,52 +754,19 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     if (const auto e = d->engine; e->isEmpty() || e->isDirty()) { return; }
     if (d->engine->preedit) { return; }
 
-    const auto &area = textArea();
-    if (!area.contains(e->pos())) { return; }
-
-    //! TODO: cache block bounds to accelerate location query
-
-    QPointF      pos           = e->pos() - area.topLeft() - QPointF(0, d->scroll);
-    const double line_spacing  = d->engine->line_height * d->engine->line_spacing_ratio;
-    const double block_spacing = d->engine->block_spacing;
-
-    int    block_index = 0;
-    double y_pos       = 0.0;
-    double y_limit     = y_pos;
-    while (block_index < d->engine->active_blocks.size()) {
-        auto block = d->engine->active_blocks[block_index];
-        y_limit    = y_pos + block->lines.size() * line_spacing + block_spacing;
-        if (pos.y() < y_limit) { break; }
-        if (block_index + 1 == d->engine->active_blocks.size()) { break; }
-        y_pos = y_limit;
-        ++block_index;
-    }
-
-    auto        block  = d->engine->active_blocks[block_index];
-    const int   row    = qBound<int>(0, (pos.y() - y_pos) / line_spacing, block->lines.size() - 1);
-    const auto &line   = block->lines[row];
-    const auto  text   = line.text();
-    const auto  incr   = line.charSpacing();
-    const auto  offset = line.isFirstLine() ? d->engine->standard_char_width * 2 : 0;
-
-    double      x_pos = offset;
-    int         col   = 0;
-    const auto &fm    = d->engine->fm;
-    while (col < text.length()) {
-        const double char_width = fm.horizontalAdvance(text[col]) + incr;
-        if (pos.x() < x_pos + 0.5 * char_width) { break; }
-        x_pos += char_width;
-        ++col;
-    }
+    const auto loc = getTextLocAtPos(e->pos());
+    if (loc.block_index == -1) { return; }
 
     auto &active_block_index = d->engine->active_block_index;
     auto &cursor             = d->engine->cursor;
-    if (active_block_index == block_index && cursor.row == row && cursor.col == col) { return; }
+    if (active_block_index == loc.block_index && cursor.row == loc.row && cursor.col == loc.col) {
+        return;
+    }
 
-    active_block_index = block_index;
-    cursor.pos         = line.textOffset() + col;
-    cursor.row         = row;
-    cursor.col         = col;
+    active_block_index = loc.block_index;
+    cursor.row         = loc.row;
+    cursor.col         = loc.col;
+    cursor.pos         = d->engine->currentLine().textOffset() + cursor.col;
     d->cursor_pos      = d->engine->currentBlock()->text_pos + cursor.pos;
 
     postUpdateRequest();

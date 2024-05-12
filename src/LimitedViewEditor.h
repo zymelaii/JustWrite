@@ -41,7 +41,14 @@ public:
     void splitIntoNewLine();
 
 protected:
-    void postUpdateRequest();
+    struct TextLoc {
+        int block_index;
+        int row;
+        int col;
+    };
+
+    TextLoc getTextLocAtPos(const QPoint &pos);
+    void    postUpdateRequest();
 
 protected:
     void resizeEvent(QResizeEvent *e) override;
