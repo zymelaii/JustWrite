@@ -765,9 +765,9 @@ void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
 void LimitedViewEditor::wheelEvent(QWheelEvent *e) {
     const auto engine = d->engine;
     if (engine->isEmpty()) { return; }
-    const double ratio = 1.0 / 180 * 3;
-    const auto   delta = e->angleDelta().y() * engine->line_height * ratio;
-    scroll(delta, true);
+    const auto ratio = 1.0 / 180 * 3;
+    auto       delta = e->angleDelta().y() * engine->line_height * ratio;
+    scroll((e->modifiers() & Qt::ControlModifier) ? delta * 8 : delta, true);
 }
 
 void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
