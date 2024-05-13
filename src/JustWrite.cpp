@@ -2,8 +2,8 @@
 #include "LimitedViewEditor.h"
 #include "JustWriteSidebar.h"
 #include "StatusBar.h"
+#include "GlobalCommand.h"
 #include "TextInputCommand.h"
-#include "KeyShortcut.h"
 #include "ProfileUtils.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -139,14 +139,14 @@ struct JustWrite {
 } // namespace Ui
 
 struct JustWritePrivate {
-    KeyShortcut              shortcut;
+    GlobalCommandManager     command_manager;
     QTimer                   sec_timer;
     int                      current_cid;
     QMap<int, QString>       chapters;
     QMap<int, EditorTextLoc> chapter_locs;
 
     JustWritePrivate() {
-        shortcut.loadDefaultShortcuts();
+        command_manager.loadDefaultMappings();
         sec_timer.setInterval(1000);
         sec_timer.setSingleShot(false);
 
@@ -207,27 +207,17 @@ void JustWrite::openChapter(int cid) {
     QString &text = d->chapters.contains(cid) ? d->chapters[cid] : tmp;
 
     if (d->current_cid != -1) {
-        qDebug().noquote() << QStringLiteral("COMMAND CloseChapter(%1)").arg(d->current_cid);
         const auto loc = ui->editor->textLoc();
-        if (loc.block_index != -1) {
-            d->chapter_locs[d->current_cid] = loc;
-            qDebug().noquote() << QStringLiteral("COMMAND SaveEditorTextLoc(%1, %2)")
-                                      .arg(loc.block_index)
-                                      .arg(loc.pos);
-        }
+        if (loc.block_index != -1) { d->chapter_locs[d->current_cid] = loc; }
     }
 
     ui->editor->reset(text, true);
     d->chapters[d->current_cid] = text;
     d->current_cid              = cid;
 
-    qDebug().noquote() << QStringLiteral("COMMAND OpenChapter(%1)").arg(d->current_cid);
     if (d->chapter_locs.contains(cid)) {
         const auto loc = d->chapter_locs[cid];
         ui->editor->setTextLoc(loc);
-        qDebug().noquote() << QStringLiteral("COMMAND RestoreEditorTextLoc(%1, %2)")
-                                  .arg(loc.block_index)
-                                  .arg(loc.pos);
     }
 
     JwriteProfilerRecord(SwitchChapter);
@@ -235,31 +225,38 @@ void JustWrite::openChapter(int cid) {
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
-        auto e   = static_cast<QKeyEvent *>(event);
-        auto key = QKeySequence(e->key() | e->modifiers());
+        auto e = static_cast<QKeyEvent *>(event);
 
 #ifdef WIN32
         //! NOTE: block special keys in messy input mode to avoid unexpceted behavior
         //! ATTENTION: this can not block global shortcut keys
-        if (!TextInputCommandManager::isPrintableChar(QKeyCombination(key[0]))
-            && develop_messy_mode) {
+        if (const auto key = QKeyCombination::fromCombined(e->key() | e->modifiers());
+            !TextInputCommandManager::isPrintableChar(key) && develop_messy_mode) {
             return true;
         }
 #endif
 
-        if (key == d->shortcut.toggle_align_center) {
-            ui->editor->setAlignCenter(!ui->editor->alignCenter());
-        } else if (key == d->shortcut.toggle_sidebar) {
-            ui->sidebar->setVisible(!ui->sidebar->isVisible());
+        if (auto opt = d->command_manager.match(e)) {
+            const auto action = *opt;
+            qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
+
+            switch (action) {
+                case GlobalCommand::ToggleSidebar: {
+                    ui->sidebar->setVisible(!ui->sidebar->isVisible());
+                } break;
+                case GlobalCommand::ToggleSoftCenterMode: {
+                    ui->editor->setAlignCenter(!ui->editor->alignCenter());
+                } break;
+                case GlobalCommand::DEV_EnableMessyInput: {
 #ifdef WIN32
-        } else if (e->key() == Qt::Key_F7) {
-            ui->editor->setFocus();
-            develop_messy_mode = true;
+                    ui->editor->setFocus();
+                    develop_messy_mode = true;
 #endif
-        } else {
-            return false;
+                } break;
+            }
+            return true;
         }
-        return true;
     }
+
     return false;
 }

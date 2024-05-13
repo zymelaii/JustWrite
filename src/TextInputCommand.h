@@ -2,7 +2,6 @@
 
 #include <QKeyEvent>
 #include <QMap>
-#include <stdint.h>
 #include <optional>
 #include "TextViewEngine.h"
 
