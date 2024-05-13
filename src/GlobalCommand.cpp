@@ -8,7 +8,7 @@ void GlobalCommandManager::loadDefaultMappings() {
 
     KEYBINDING(ToggleSidebar, "Ctrl+Alt+B");
     KEYBINDING(ToggleSoftCenterMode, "Ctrl+E");
-    KEYBINDING(DEV_EnableMessyInput, "Ctrl+F12");
+    KEYBINDING(DEV_EnableMessyInput, "F12");
 
 #undef KEYBINDING
 }
