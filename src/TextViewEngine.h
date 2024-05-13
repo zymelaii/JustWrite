@@ -112,7 +112,7 @@ struct TextViewEngine {
     void breakBlockAtCursorPos();
     void commitInsertion(int text_length);
     int  commitDeletion(int times, int &deleted);
-    int  commitMovement(int offset, bool *moved);
+    int  commitMovement(int offset, bool *moved, bool hard_move);
     void beginPreEdit(QString &ref);
     void updatePreEditText(int text_length);
     void commitPreEdit();

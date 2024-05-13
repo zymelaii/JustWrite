@@ -274,7 +274,7 @@ bool LimitedViewEditor::insertedPairFilter(const QString &text) {
     if (QUOTE_PAIRS.count(text)) {
         auto matched = QUOTE_PAIRS[text];
         insert(text + matched);
-        move(-1);
+        move(-1, false);
         return true;
     }
 
@@ -287,15 +287,37 @@ bool LimitedViewEditor::insertedPairFilter(const QString &text) {
     return false;
 }
 
-void LimitedViewEditor::move(int offset) {
-    if (hasSelection()) {
-        //! TODO: handle selection
-        unsetSelection();
+void LimitedViewEditor::move(int offset, bool extend_sel) {
+    bool cursor_moved = false;
+    bool hard_move    = false;
+
+    //! FIXME: cursor within selected region
+    if (hasSelection() && !extend_sel) {
+        const int sel_from = qMin(d->selected_from, d->selected_to);
+        const int sel_to   = qMax(d->selected_from, d->selected_to);
+        if (offset > 0) {
+            offset += sel_to - d->cursor_pos;
+        } else {
+            offset -= d->cursor_pos - sel_from;
+        }
+        hard_move = true;
     }
 
-    bool      cursor_moved  = false;
-    const int text_offset   = d->engine->commitMovement(offset, &cursor_moved);
-    d->cursor_pos          += text_offset;
+    const int text_offset = d->engine->commitMovement(offset, &cursor_moved, hard_move);
+
+    if (!extend_sel) {
+        unsetSelection();
+    } else if (hasSelection()) {
+        Q_ASSERT(
+            d->cursor_pos >= d->selected_from && d->cursor_pos <= d->selected_to
+            || d->cursor_pos >= d->selected_to && d->cursor_pos <= d->selected_from);
+        d->selected_to += text_offset;
+    } else {
+        d->selected_from = d->cursor_pos;
+        d->selected_to   = d->cursor_pos + text_offset;
+    }
+
+    d->cursor_pos += text_offset;
     if (cursor_moved) { postUpdateRequest(); }
 }
 
@@ -334,7 +356,7 @@ void LimitedViewEditor::copy() {
 
 void LimitedViewEditor::cut() {
     copy();
-    move(-d->engine->cursor.pos);
+    move(-d->engine->cursor.pos, false);
     del(d->engine->currentBlock()->textLength());
 }
 
@@ -362,15 +384,6 @@ void LimitedViewEditor::select(int from, int to) {
     d->selected_from   = qBound(0, from, max_sel);
     d->selected_to     = qBound(0, to, max_sel);
     postUpdateRequest();
-}
-
-void LimitedViewEditor::expandSelection(int offset) {
-    if (d->selected_from == -1) {
-        d->selected_from = d->cursor_pos;
-        d->selected_to   = d->selected_from;
-    }
-    d->selected_to += offset;
-    select(d->selected_from, d->selected_to);
 }
 
 void LimitedViewEditor::expandSelectionTo(int pos) {
@@ -730,10 +743,10 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             scroll(-d->engine->line_height * d->engine->line_spacing_ratio, true);
         } break;
         case TextInputCommand::MoveToPrevChar: {
-            move(-1);
+            move(-1, false);
         } break;
         case TextInputCommand::MoveToNextChar: {
-            move(1);
+            move(1, false);
         } break;
         case TextInputCommand::MoveToPrevWord: {
         } break;
@@ -742,18 +755,18 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::MoveToPrevLine: {
             auto block = d->engine->currentBlock();
             if (d->engine->active_block_index == 0 && cursor.row == 0) {
-                move(-cursor.pos);
+                move(-cursor.pos, false);
             } else if (cursor.row == 0) {
                 const auto prev_block = d->engine->active_blocks[d->engine->active_block_index - 1];
                 const int  equiv_col  = prev_block->lines.size() == 1 ? cursor.col : cursor.col + 2;
                 const int  line_length = prev_block->lengthOfLine(prev_block->lines.size() - 1);
                 const int  col         = qMin(equiv_col, line_length);
-                move(-(cursor.pos + (line_length - col) + 1));
+                move(-(cursor.pos + (line_length - col) + 1), false);
             } else {
                 const int equiv_col = cursor.row - 1 == 0 ? cursor.col - 2 : cursor.col;
                 const int col       = qBound(0, equiv_col, block->lengthOfLine(cursor.row - 1));
                 const int pos       = block->offsetOfLine(cursor.row - 1) + col;
-                move(pos - cursor.pos);
+                move(pos - cursor.pos, false);
             }
         } break;
         case TextInputCommand::MoveToNextLine: {
@@ -761,30 +774,30 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             auto        block  = d->engine->currentBlock();
             if (d->engine->active_block_index + 1 == d->engine->active_blocks.size()
                 && cursor.row + 1 == block->lines.size()) {
-                move(block->textLength() - cursor.pos);
+                move(block->textLength() - cursor.pos, false);
             } else if (cursor.row + 1 == block->lines.size()) {
                 const auto next_block = d->engine->active_blocks[d->engine->active_block_index + 1];
                 const int  equiv_col  = cursor.row == 0 ? cursor.col : cursor.col - 2;
                 const int  col        = qBound(0, equiv_col, next_block->lengthOfLine(0));
-                move(block->textLength() - cursor.pos + col + 1);
+                move(block->textLength() - cursor.pos + col + 1, false);
             } else {
                 const int equiv_col = cursor.row == 0 ? cursor.col + 2 : cursor.col;
                 const int col       = qMin(equiv_col, block->lengthOfLine(cursor.row + 1));
                 const int pos       = block->offsetOfLine(cursor.row + 1) + col;
-                move(pos - cursor.pos);
+                move(pos - cursor.pos, false);
             }
         } break;
         case TextInputCommand::MoveToStartOfLine: {
-            move(-cursor.col);
+            move(-cursor.col, false);
         } break;
         case TextInputCommand::MoveToEndOfLine: {
-            move(d->engine->currentBlock()->lengthOfLine(cursor.row) - cursor.col);
+            move(d->engine->currentBlock()->lengthOfLine(cursor.row) - cursor.col, false);
         } break;
         case TextInputCommand::MoveToStartOfBlock: {
-            move(-cursor.pos);
+            move(-cursor.pos, false);
         } break;
         case TextInputCommand::MoveToEndOfBlock: {
-            move(d->engine->currentBlock()->textLength() - cursor.pos);
+            move(d->engine->currentBlock()->textLength() - cursor.pos, false);
         } break;
         case TextInputCommand::MoveToStartOfDocument: {
             d->engine->active_block_index = 0;
@@ -851,31 +864,26 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::DeleteToEndOfDocument: {
         } break;
         case TextInputCommand::SelectPrevChar: {
-            expandSelection(-1);
+            move(-1, true);
         } break;
         case TextInputCommand::SelectNextChar: {
-            expandSelection(1);
+            move(1, true);
         } break;
         case TextInputCommand::SelectPrevWord: {
         } break;
         case TextInputCommand::SelectNextWord: {
         } break;
         case TextInputCommand::SelectToStartOfLine: {
-            const auto block = d->engine->currentBlock();
-            const auto line  = block->currentLine();
-            expandSelectionTo(block->text_pos + line.textOffset());
+            move(-cursor.col, true);
         } break;
         case TextInputCommand::SelectToEndOfLine: {
-            const auto block = d->engine->currentBlock();
-            const auto line  = block->currentLine();
-            expandSelectionTo(block->text_pos + line.endp_offset);
+            move(d->engine->currentBlock()->lengthOfLine(cursor.row) - cursor.col, true);
         } break;
         case TextInputCommand::SelectToStartOfBlock: {
-            expandSelectionTo(d->engine->currentBlock()->text_pos);
+            move(-cursor.pos, true);
         } break;
         case TextInputCommand::SelectToEndOfBlock: {
-            auto block = d->engine->currentBlock();
-            expandSelectionTo(block->text_pos + block->textLength());
+            move(d->engine->currentBlock()->textLength() - cursor.pos, true);
         } break;
         case TextInputCommand::SelectBlock: {
             auto block = d->engine->currentBlock();
@@ -886,10 +894,13 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::SelectNextPage: {
         } break;
         case TextInputCommand::SelectToStartOfDoc: {
-            expandSelection(0);
+            const int offset = d->cursor_pos + d->engine->active_block_index;
+            move(-offset, true);
         } break;
         case TextInputCommand::SelectToEndOfDoc: {
-            expandSelection(d->engine->text_ref->length());
+            const int offset = d->engine->text_ref->length() - d->cursor_pos
+                             + d->engine->active_blocks.size() - d->engine->active_block_index - 1;
+            move(offset, true);
         } break;
         case TextInputCommand::SelectAll: {
             select(0, d->engine->text_ref->length());
@@ -904,7 +915,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::InsertAfterBlock: {
             d->engine->insertBlock(d->engine->active_block_index + 1);
             auto block = d->engine->currentBlock();
-            move(block->textLength() - d->engine->cursor.pos + 1);
+            move(block->textLength() - d->engine->cursor.pos + 1, false);
         } break;
     }
 
@@ -951,15 +962,25 @@ void LimitedViewEditor::mouseDoubleClickEvent(QMouseEvent *e) {
 void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
     QWidget::mouseMoveEvent(e);
 
-    if (e->buttons() & Qt::LeftButton && d->engine->isCursorAvailable()) {
-        const auto loc = getTextLocAtPos(e->pos());
-        if (loc.block_index != -1) {
-            const auto block = d->engine->active_blocks[loc.block_index];
-            const auto line  = block->lines[loc.row];
-            const auto pos   = block->text_pos + line.textOffset() + loc.col;
-            expandSelectionTo(pos);
+    if (e->buttons() & Qt::LeftButton) {
+        do {
+            if (!d->engine->isCursorAvailable()) { break; }
+            if (d->engine->preedit) { break; }
+            const auto loc = getTextLocAtPos(e->pos());
+            if (loc.block_index == -1) { break; }
+            auto &active_block_index = d->engine->active_block_index;
+            auto &cursor             = d->engine->cursor;
+            active_block_index       = loc.block_index;
+            cursor.row               = loc.row;
+            cursor.col               = loc.col;
+            const auto block         = d->engine->currentBlock();
+            const auto line          = block->currentLine();
+            cursor.pos               = line.textOffset() + cursor.col;
+            if (!hasSelection()) { d->selected_from = d->cursor_pos; }
+            d->cursor_pos  = block->text_pos + cursor.pos;
+            d->selected_to = d->cursor_pos;
             postUpdateRequest();
-        }
+        } while (0);
     }
 
     const auto &area = textArea();

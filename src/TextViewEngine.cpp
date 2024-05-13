@@ -332,7 +332,7 @@ int TextViewEngine::commitDeletion(int times, int &deleted) {
     Q_ASSERT(!preedit);
 
     bool      cursor_moved = false;
-    const int text_offset  = times < 0 ? commitMovement(times, &cursor_moved) : 0;
+    const int text_offset  = times < 0 ? commitMovement(times, &cursor_moved, false) : 0;
     if (times < 0 && !cursor_moved) {
         deleted = 0;
         return 0;
@@ -390,7 +390,7 @@ int TextViewEngine::commitDeletion(int times, int &deleted) {
     return text_offset;
 }
 
-int TextViewEngine::commitMovement(int offset, bool *moved) {
+int TextViewEngine::commitMovement(int offset, bool *moved, bool hard_move) {
     Q_ASSERT(isCursorAvailable());
     Q_ASSERT(!preedit);
 
@@ -405,12 +405,12 @@ int TextViewEngine::commitMovement(int offset, bool *moved) {
         const auto len = currentBlock()->textLength();
         if (cursor.pos < 0 && active_block_index > 0) {
             cursor.pos += active_blocks[--active_block_index]->textLength() + 1;
-            ++offset;
+            if (!hard_move) { ++offset; }
             continue;
         }
         if (cursor.pos > len && active_block_index + 1 < active_blocks.size()) {
             cursor.pos -= active_blocks[active_block_index++]->textLength() + 1;
-            --offset;
+            if (!hard_move) { --offset; }
             continue;
         }
         const int old_pos  = cursor.pos;

@@ -49,7 +49,7 @@ public:
     void insertDirtyText(const QString &text);
     bool insertedPairFilter(const QString &text);
 
-    void move(int offset);
+    void move(int offset, bool extend_sel);
     void insert(const QString &text);
     void del(int times);
     void copy();
