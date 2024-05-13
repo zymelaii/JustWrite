@@ -513,6 +513,13 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
     if (!d->engine->isCursorAvailable()) { return; }
 
+    //! ATTENTION: normally this branch is unreachable, but when IME events are too frequent and the
+    //! system latency is too high, an IME preedit interrupt may occur and the key is forwarded to
+    //! the keyPress event. in this case, we should reject the event or submit the raw preedit text.
+    //! the first solution is taken here.
+    //! FIXME: the solution is not fully tested to be safe and correct
+    if (d->engine->preedit) { return; }
+
     const auto action = d->input_manager->match(e);
     qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
 
