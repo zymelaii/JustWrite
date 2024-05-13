@@ -40,7 +40,7 @@ protected:
         std::mt19937                       rng{std::random_device{}()};
         std::uniform_int_distribution<int> type_dist{1, 12};
         std::uniform_int_distribution<int> char_dist{'A', 'Z'};
-        std::uniform_int_distribution<int> nl_dist{0, 8};
+        std::uniform_int_distribution<int> nl_dist{0, 4};
 
         while (true) {
             if (!develop_messy_mode) { continue; }
