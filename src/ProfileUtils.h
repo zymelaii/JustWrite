@@ -12,12 +12,21 @@
 #define ON_DEBUG(...)
 #endif
 
+#define SetupJwriteProfiler()        ON_DEBUG(JwriteProfiler.setup())
+#define JwriteProfilerStart(target)  ON_DEBUG(JwriteProfiler.start(ProfileTarget::target))
+#define JwriteProfilerRecord(target) ON_DEBUG(JwriteProfiler.record(ProfileTarget::target))
+
 #ifndef NDEBUG
 
 enum class ProfileTarget {
     IME2UpdateDelay,
     FrameRenderCost,
+    PrepareRenderData,
     TextEngineRenderCost,
+    TextBodyRenderCost,
+    SelectionAreaRenderCost,
+    CursorRenderCost,
+    GetLocationAtPos,
     GeneralTextEdit,
     SwitchChapter,
 };

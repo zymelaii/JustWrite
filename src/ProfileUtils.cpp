@@ -5,7 +5,7 @@
 
 void Profiler::setup() {
     timer_ = new QTimer(this);
-    timer_->setInterval(10000);
+    timer_->setInterval(30000);
     timer_->setSingleShot(false);
     timer_->start();
     QObject::connect(timer_, &QTimer::timeout, this, [this]() {

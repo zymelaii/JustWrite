@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     auto       screen     = getCurrentScreen();
     const auto screen_geo = screen->geometry();
 
-    ON_DEBUG(JwriteProfiler.setup());
+    SetupJwriteProfiler();
 
     JustWrite client;
     client.setGeometry(getPreferredGeometry(screen_geo));

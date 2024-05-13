@@ -201,7 +201,7 @@ void JustWrite::openChapter(int cid) {
 #endif
     if (cid == d->current_cid) { return; }
 
-    ON_DEBUG(JwriteProfiler.start(ProfileTarget::SwitchChapter));
+    JwriteProfilerStart(SwitchChapter);
 
     QString  tmp{};
     QString &text = d->chapters.contains(cid) ? d->chapters[cid] : tmp;
@@ -230,7 +230,7 @@ void JustWrite::openChapter(int cid) {
                                   .arg(loc.pos);
     }
 
-    ON_DEBUG(JwriteProfiler.record(ProfileTarget::SwitchChapter));
+    JwriteProfilerRecord(SwitchChapter);
 }
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {

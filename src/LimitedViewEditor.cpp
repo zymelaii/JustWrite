@@ -405,6 +405,8 @@ EditorTextLoc LimitedViewEditor::getTextLocAtPos(const QPoint &pos) {
 
     //! TODO: cache block bounds to accelerate location query
 
+    JwriteProfilerStart(GetLocationAtPos);
+
     QPointF      real_pos      = pos - area.topLeft() - QPointF(0, d->scroll);
     const double line_spacing  = d->engine->line_height * d->engine->line_spacing_ratio;
     const double block_spacing = d->engine->block_spacing;
@@ -442,6 +444,8 @@ EditorTextLoc LimitedViewEditor::getTextLocAtPos(const QPoint &pos) {
     loc.row         = row;
     loc.col         = col;
 
+    JwriteProfilerRecord(GetLocationAtPos);
+
     return loc;
 }
 
@@ -460,12 +464,12 @@ void LimitedViewEditor::resizeEvent(QResizeEvent *e) {
 }
 
 void LimitedViewEditor::paintEvent(QPaintEvent *e) {
-    ON_DEBUG(JwriteProfiler.start(ProfileTarget::FrameRenderCost));
+    JwriteProfilerStart(FrameRenderCost);
 
-    ON_DEBUG(JwriteProfiler.start(ProfileTarget::TextEngineRenderCost));
+    JwriteProfilerStart(TextEngineRenderCost);
     auto engine = d->engine;
     engine->render();
-    ON_DEBUG(JwriteProfiler.record(ProfileTarget::TextEngineRenderCost));
+    JwriteProfilerRecord(TextEngineRenderCost);
 
     QPainter p(this);
     auto     pal = palette();
@@ -484,6 +488,8 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     }
 
     //! prepare render data
+    JwriteProfilerStart(PrepareRenderData);
+
     const auto  &fm           = engine->fm;
     const double line_spacing = engine->line_height * engine->line_spacing_ratio;
     const auto   text_area    = textArea();
@@ -530,8 +536,12 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
         y_pos += engine->block_spacing;
     }
 
+    JwriteProfilerRecord(PrepareRenderData);
+
     //! draw selection
     if (hasSelection()) {
+        JwriteProfilerStart(SelectionAreaRenderCost);
+
         auto loc_from = textLocAtPos(d->selected_from);
         auto loc_to   = textLocAtPos(d->selected_to);
         if (d->selected_from > d->selected_to) { std::swap(loc_from, loc_to); }
@@ -588,6 +598,8 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
             }
             y_pos += block_stride;
         }
+
+        JwriteProfilerRecord(SelectionAreaRenderCost);
     }
 
     //! draw highlight text block
@@ -607,6 +619,7 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
 
     //! draw text area
     if (context.found_non_clip_block) {
+        JwriteProfilerStart(TextBodyRenderCost);
         p.save();
         p.setPen(pal.text().color());
         const auto flags = Qt::AlignBaseline | Qt::TextDontClip;
@@ -632,10 +645,12 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
             y_pos += engine->block_spacing;
         }
         p.restore();
+        JwriteProfilerRecord(TextBodyRenderCost);
     }
 
     //! draw cursor
     if (engine->isCursorAvailable() && d->blink_cursor_should_paint) {
+        JwriteProfilerStart(CursorRenderCost);
         const auto &line         = engine->currentLine();
         const auto &cursor       = engine->cursor;
         const auto  offset       = line.isFirstLine() ? engine->standard_char_width * 2 : 0;
@@ -664,12 +679,13 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
             }
         }
         p.drawLine(cursor_x_pos, cursor_y_pos, cursor_x_pos, cursor_y_pos + fm.height());
+        JwriteProfilerRecord(CursorRenderCost);
     }
 
     d->edit_op_happens = false;
 
-    ON_DEBUG(JwriteProfiler.record(ProfileTarget::IME2UpdateDelay));
-    ON_DEBUG(JwriteProfiler.record(ProfileTarget::FrameRenderCost));
+    JwriteProfilerRecord(IME2UpdateDelay);
+    JwriteProfilerRecord(FrameRenderCost);
 }
 
 void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
@@ -707,7 +723,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 
     const auto &cursor = d->engine->cursor;
 
-    ON_DEBUG(JwriteProfiler.start(ProfileTarget::GeneralTextEdit));
+    JwriteProfilerStart(GeneralTextEdit);
 
     switch (action) {
         case TextInputCommand::Reject: {
@@ -919,7 +935,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         } break;
     }
 
-    ON_DEBUG(JwriteProfiler.record(ProfileTarget::GeneralTextEdit));
+    JwriteProfilerRecord(GeneralTextEdit);
 
     e->accept();
 }
@@ -1018,7 +1034,7 @@ void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
         d->preedit_text.insert(saved_cursor.pos, preedit_text);
         d->engine->updatePreEditText(preedit_text.length());
         postUpdateRequest();
-        ON_DEBUG(JwriteProfiler.start(ProfileTarget::IME2UpdateDelay));
+        JwriteProfilerStart(IME2UpdateDelay);
     } else {
         if (d->engine->preedit) { d->engine->commitPreEdit(); }
         insert(e->commitString());
