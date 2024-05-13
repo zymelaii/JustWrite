@@ -30,6 +30,8 @@ struct LimitedViewEditorPrivate {
     int                              cursor_pos;
     QString                          text;
     QString                          preedit_text;
+    int                              selected_from;
+    int                              selected_to;
     jwrite::TextViewEngine          *engine;
     jwrite::TextInputCommandManager *input_manager;
 
@@ -42,6 +44,8 @@ struct LimitedViewEditorPrivate {
         expected_scroll           = scroll;
         edit_op_happens           = false;
         blink_cursor_should_paint = true;
+        selected_from             = -1;
+        selected_to               = -1;
         blink_timer.setInterval(500);
         blink_timer.setSingleShot(false);
     }
@@ -132,6 +136,27 @@ EditorTextLoc LimitedViewEditor::textLoc() const {
     EditorTextLoc loc{};
     loc.block_index = d->engine->active_block_index;
     loc.pos         = d->engine->cursor.pos;
+    return loc;
+}
+
+EditorTextLoc LimitedViewEditor::textLocAtPos(int pos) const {
+    EditorTextLoc loc{};
+    loc.block_index = -1;
+    for (int i = 0; i < d->engine->active_blocks.size(); ++i) {
+        auto block = d->engine->active_blocks[i];
+        if (pos < block->text_pos) { continue; }
+        if (pos > block->text_pos + block->textLength()) { continue; }
+        int relpos = pos - block->text_pos;
+        for (int j = 0; j < block->lines.size(); ++j) {
+            auto line = block->lines[j];
+            if (relpos > line.textOffset() + line.text().length()) { continue; }
+            loc.block_index = i;
+            loc.pos         = relpos;
+            loc.row         = j;
+            loc.col         = relpos - line.textOffset();
+            return loc;
+        }
+    }
     return loc;
 }
 
@@ -263,6 +288,11 @@ bool LimitedViewEditor::insertedPairFilter(const QString &text) {
 }
 
 void LimitedViewEditor::move(int offset) {
+    if (hasSelection()) {
+        //! TODO: handle selection
+        unsetSelection();
+    }
+
     bool      cursor_moved  = false;
     const int text_offset   = d->engine->commitMovement(offset, &cursor_moved);
     d->cursor_pos          += text_offset;
@@ -313,6 +343,40 @@ void LimitedViewEditor::paste() {
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
     insertDirtyText(clipboard->text());
+}
+
+bool LimitedViewEditor::hasSelection() const {
+    return d->selected_from != -1 && d->selected_to != -1 && d->selected_from != d->selected_to;
+}
+
+void LimitedViewEditor::unsetSelection() {
+    if (hasSelection()) {
+        d->selected_from = -1;
+        d->selected_to   = -1;
+        postUpdateRequest();
+    }
+}
+
+void LimitedViewEditor::select(int from, int to) {
+    const auto max_sel = d->engine->text_ref->length();
+    d->selected_from   = qBound(0, from, max_sel);
+    d->selected_to     = qBound(0, to, max_sel);
+    postUpdateRequest();
+}
+
+void LimitedViewEditor::expandSelection(int offset) {
+    if (d->selected_from == -1) {
+        d->selected_from = d->cursor_pos;
+        d->selected_to   = d->selected_from;
+    }
+    d->selected_to += offset;
+    select(d->selected_from, d->selected_to);
+}
+
+void LimitedViewEditor::expandSelectionTo(int pos) {
+    if (d->selected_from == -1) { d->selected_from = d->cursor_pos; }
+    d->selected_to = pos;
+    select(d->selected_from, d->selected_to);
 }
 
 void LimitedViewEditor::splitIntoNewLine() {
@@ -390,6 +454,14 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     engine->render();
     ON_DEBUG(JwriteProfiler.record(ProfileTarget::TextEngineRenderCost));
 
+    QPainter p(this);
+    auto     pal = palette();
+
+    struct {
+        const QColor Selection = QColor(60, 60, 255, 80);
+        const QColor Highlight = QColor(255, 255, 255, 10);
+    } Palette;
+
     //! smooth scroll
     d->scroll = d->scroll * 0.45 + d->expected_scroll * 0.55;
     if (qAbs(d->scroll - d->expected_scroll) > 1e-3) {
@@ -398,58 +470,154 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
         d->scroll = d->expected_scroll;
     }
 
-    QPainter p(this);
-    auto     pal = palette();
-
-    //! draw text area
-    p.setPen(pal.text().color());
-
+    //! prepare render data
     const auto  &fm           = engine->fm;
     const double line_spacing = engine->line_height * engine->line_spacing_ratio;
-    const double y_offset     = 0.0;
+    const auto   text_area    = textArea();
+    double       y_pos        = text_area.top() + d->scroll;
 
-    const auto flags     = Qt::AlignBaseline | Qt::TextDontClip;
-    const auto text_area = textArea();
-    double     y_pos     = text_area.top() + d->scroll;
+    struct {
+        struct {
+            double first_non_clip_block;
+            double active_block_begin;
+            double active_block_end;
+        } named_y_pos;
 
-    double active_block_y0 = 0.0;
-    double active_block_y1 = 0.0;
+        struct BlockRange {
+            int first;
+            int last;
+        };
 
-    for (int i = 0; i < engine->active_blocks.size(); ++i) {
-        const auto block        = engine->active_blocks[i];
+        BlockRange visible_range;
+        BlockRange select_range;
+
+        bool found_non_clip_block;
+    } context;
+
+    context.visible_range        = {-1, -1};
+    context.found_non_clip_block = false;
+
+    for (int index = 0; index < engine->active_blocks.size(); ++index) {
+        const auto block        = engine->active_blocks[index];
         const auto block_stride = block->lines.size() * engine->line_height + engine->block_spacing;
-        if (y_pos + block_stride < text_area.top() || y_pos > text_area.bottom()) {
+        if (y_pos + block_stride < text_area.top()) {
             y_pos += block_stride;
             continue;
+        } else if (y_pos > text_area.bottom()) {
+            break;
+        } else if (!context.found_non_clip_block) {
+            context.named_y_pos.first_non_clip_block = y_pos;
+            context.found_non_clip_block             = true;
         }
-        if (i == engine->active_block_index) { active_block_y0 = y_pos; }
-        for (const auto &line : block->lines) {
-            const auto text   = line.text();
-            const auto incr   = line.charSpacing();
-            const auto offset = line.isFirstLine() ? engine->standard_char_width * 2 : 0;
-            QRectF     bb(
-                text_area.left() + offset, y_pos, engine->max_width - offset, engine->line_height);
-            for (auto &c : text) {
-                p.drawText(bb, flags, c);
-                bb.setLeft(bb.left() + incr + fm.horizontalAdvance(c));
-            }
-            y_pos += line_spacing;
-        }
-        if (i == engine->active_block_index) { active_block_y1 = y_pos; }
+        if (context.visible_range.first == -1) { context.visible_range.first = index; }
+        context.visible_range.last = index;
+        if (index == engine->active_block_index) { context.named_y_pos.active_block_begin = y_pos; }
+        y_pos += line_spacing * block->lines.size();
+        if (index == engine->active_block_index) { context.named_y_pos.active_block_end = y_pos; }
         y_pos += engine->block_spacing;
     }
 
+    //! draw selection
+    if (hasSelection()) {
+        auto loc_from = textLocAtPos(d->selected_from);
+        auto loc_to   = textLocAtPos(d->selected_to);
+        if (d->selected_from > d->selected_to) { std::swap(loc_from, loc_to); }
+
+        context.select_range.first = qMax(loc_from.block_index, context.visible_range.first);
+        context.select_range.last  = qMin(loc_to.block_index, context.visible_range.last);
+
+        //! add the minus part to make the selection area align center
+        double y_pos = context.named_y_pos.first_non_clip_block - fm.descent() * 0.5;
+        for (int index = context.visible_range.first; index < context.select_range.first; ++index) {
+            const auto block = engine->active_blocks[index];
+            const auto block_stride =
+                block->lines.size() * engine->line_height + engine->block_spacing;
+            y_pos += block_stride;
+        }
+
+        for (int index = context.select_range.first; index <= context.select_range.last; ++index) {
+            const auto block = engine->active_blocks[index];
+            const auto block_stride =
+                block->lines.size() * engine->line_height + engine->block_spacing;
+            if (index < context.select_range.first) {
+                y_pos += block_stride;
+                continue;
+            }
+            if (index > context.select_range.last) { break; }
+            const int line_nr_begin = index == loc_from.block_index ? loc_from.row : 0;
+            const int line_nr_end   = index == loc_to.block_index
+                                        ? loc_to.row
+                                        : engine->active_blocks[index]->lines.size() - 1;
+            auto      sel_y_pos     = y_pos + line_nr_begin * engine->line_height;
+            for (int line_nr = line_nr_begin; line_nr <= line_nr_end; ++line_nr) {
+                const auto line         = block->lines[line_nr];
+                const auto offset       = line.isFirstLine() ? engine->standard_char_width * 2 : 0;
+                const auto sel_x_origin = text_area.left() + offset;
+                double     sel_x_pos    = sel_x_origin;
+                if (index == loc_from.block_index && line_nr == loc_from.row) {
+                    sel_x_pos += line.charSpacing() * loc_from.col;
+                    for (const auto &c : line.text().mid(0, loc_from.col)) {
+                        sel_x_pos += fm.horizontalAdvance(c);
+                    }
+                }
+                double sel_x_width = line.cached_text_width
+                                   + (line.text().length() - 1) * line.charSpacing()
+                                   - (sel_x_pos - sel_x_origin);
+                if (index == loc_to.block_index && line_nr == loc_to.row) {
+                    sel_x_width -= line.charSpacing() * (line.text().length() - loc_to.col);
+                    for (const auto &c : line.text().mid(loc_to.col)) {
+                        sel_x_width -= fm.horizontalAdvance(c);
+                    }
+                }
+                QRectF bb(sel_x_pos, sel_y_pos, sel_x_width, engine->line_height);
+                p.fillRect(bb, Palette.Selection);
+                sel_y_pos += engine->line_height;
+            }
+            y_pos += block_stride;
+        }
+    }
+
     //! draw highlight text block
-    if (engine->isCursorAvailable()) {
+    if (engine->isCursorAvailable() && !hasSelection()) {
         QRect highlight_rect(
             text_area.left() - 8,
-            active_block_y0 - engine->block_spacing,
+            context.named_y_pos.active_block_begin - engine->block_spacing,
             text_area.width() + 16,
-            active_block_y1 - active_block_y0 + engine->block_spacing * 1.5);
+            context.named_y_pos.active_block_end - context.named_y_pos.active_block_begin
+                + engine->block_spacing * 1.5);
         p.save();
-        p.setBrush(QColor(255, 255, 255, 10));
+        p.setBrush(Palette.Highlight);
         p.setPen(Qt::transparent);
         p.drawRoundedRect(highlight_rect, 4, 4);
+        p.restore();
+    }
+
+    //! draw text area
+    if (context.found_non_clip_block) {
+        p.save();
+        p.setPen(pal.text().color());
+        const auto flags = Qt::AlignBaseline | Qt::TextDontClip;
+        double     y_pos = context.named_y_pos.first_non_clip_block;
+        for (int index = context.visible_range.first; index <= context.visible_range.last;
+             ++index) {
+            const auto block = engine->active_blocks[index];
+            for (const auto &line : block->lines) {
+                const auto text   = line.text();
+                const auto incr   = line.charSpacing();
+                const auto offset = line.isFirstLine() ? engine->standard_char_width * 2 : 0;
+                QRectF     bb(
+                    text_area.left() + offset,
+                    y_pos,
+                    engine->max_width - offset,
+                    engine->line_height);
+                for (auto &c : text) {
+                    p.drawText(bb, flags, c);
+                    bb.setLeft(bb.left() + incr + fm.horizontalAdvance(c));
+                }
+                y_pos += line_spacing;
+            }
+            y_pos += engine->block_spacing;
+        }
         p.restore();
     }
 
@@ -460,10 +628,10 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
         const auto  offset       = line.isFirstLine() ? engine->standard_char_width * 2 : 0;
         double      cursor_x_pos = text_area.left() + offset + line.charSpacing() * cursor.col;
         double      cursor_y_pos = text_area.top() + d->scroll;
-        //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)` directly,
-        //! and the reason is that the text_width calcualated by that has a few difference with the
-        //! render result of the text, and the cursor will seems not in the correct place, and this
-        //! problem was extremely serious in pure latin texts
+        //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)`
+        //! directly, and the reason is that the text_width calcualated by that has a few
+        //! difference with the render result of the text, and the cursor will seems not in the
+        //! correct place, and this problem was extremely serious in pure latin texts
         for (const auto &c : line.text().mid(0, cursor.col)) {
             cursor_x_pos += fm.horizontalAdvance(c);
         }
@@ -505,6 +673,7 @@ void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
 
 void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
+    unsetSelection();
     d->blink_timer.stop();
     d->engine->active_block_index = -1;
     emit focusLost();
@@ -513,10 +682,10 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
 void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
     if (!d->engine->isCursorAvailable()) { return; }
 
-    //! ATTENTION: normally this branch is unreachable, but when IME events are too frequent and the
-    //! system latency is too high, an IME preedit interrupt may occur and the key is forwarded to
-    //! the keyPress event. in this case, we should reject the event or submit the raw preedit text.
-    //! the first solution is taken here.
+    //! ATTENTION: normally this branch is unreachable, but when IME events are too frequent and
+    //! the system latency is too high, an IME preedit interrupt may occur and the key is
+    //! forwarded to the keyPress event. in this case, we should reject the event or submit the
+    //! raw preedit text. the first solution is taken here.
     //! FIXME: the solution is not fully tested to be safe and correct
     if (d->engine->preedit) { return; }
 
@@ -539,6 +708,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             splitIntoNewLine();
         } break;
         case TextInputCommand::Cancel: {
+            unsetSelection();
         } break;
         case TextInputCommand::Undo: {
         } break;
@@ -681,32 +851,48 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::DeleteToEndOfDocument: {
         } break;
         case TextInputCommand::SelectPrevChar: {
+            expandSelection(-1);
         } break;
         case TextInputCommand::SelectNextChar: {
+            expandSelection(1);
         } break;
         case TextInputCommand::SelectPrevWord: {
         } break;
         case TextInputCommand::SelectNextWord: {
         } break;
         case TextInputCommand::SelectToStartOfLine: {
+            const auto block = d->engine->currentBlock();
+            const auto line  = block->currentLine();
+            expandSelectionTo(block->text_pos + line.textOffset());
         } break;
         case TextInputCommand::SelectToEndOfLine: {
+            const auto block = d->engine->currentBlock();
+            const auto line  = block->currentLine();
+            expandSelectionTo(block->text_pos + line.endp_offset);
         } break;
         case TextInputCommand::SelectToStartOfBlock: {
+            expandSelectionTo(d->engine->currentBlock()->text_pos);
         } break;
         case TextInputCommand::SelectToEndOfBlock: {
+            auto block = d->engine->currentBlock();
+            expandSelectionTo(block->text_pos + block->textLength());
         } break;
         case TextInputCommand::SelectBlock: {
+            auto block = d->engine->currentBlock();
+            select(block->text_pos, block->text_pos + block->textLength());
         } break;
         case TextInputCommand::SelectPrevPage: {
         } break;
         case TextInputCommand::SelectNextPage: {
         } break;
         case TextInputCommand::SelectToStartOfDoc: {
+            expandSelection(0);
         } break;
         case TextInputCommand::SelectToEndOfDoc: {
+            expandSelection(d->engine->text_ref->length());
         } break;
         case TextInputCommand::SelectAll: {
+            select(0, d->engine->text_ref->length());
         } break;
         case TextInputCommand::InsertBeforeBlock: {
             d->engine->insertBlock(d->engine->active_block_index);
@@ -729,6 +915,8 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 
 void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
+
+    unsetSelection();
 
     if (const auto e = d->engine; e->isEmpty() || e->isDirty()) { return; }
     if (d->engine->preedit) { return; }
@@ -757,10 +945,23 @@ void LimitedViewEditor::mouseReleaseEvent(QMouseEvent *e) {
 
 void LimitedViewEditor::mouseDoubleClickEvent(QMouseEvent *e) {
     QWidget::mouseDoubleClickEvent(e);
+    unsetSelection();
 }
 
 void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
     QWidget::mouseMoveEvent(e);
+
+    if (e->buttons() & Qt::LeftButton && d->engine->isCursorAvailable()) {
+        const auto loc = getTextLocAtPos(e->pos());
+        if (loc.block_index != -1) {
+            const auto block = d->engine->active_blocks[loc.block_index];
+            const auto line  = block->lines[loc.row];
+            const auto pos   = block->text_pos + line.textOffset() + loc.col;
+            expandSelectionTo(pos);
+            postUpdateRequest();
+        }
+    }
+
     const auto &area = textArea();
     if (area.contains(e->pos())) {
         setCursor(Qt::IBeamCursor);

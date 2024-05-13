@@ -35,6 +35,7 @@ public:
     QRect textArea() const;
 
     EditorTextLoc textLoc() const;
+    EditorTextLoc textLocAtPos(int pos) const;
     void          setTextLoc(EditorTextLoc loc);
 
     void reset(QString &text, bool swap);
@@ -54,6 +55,13 @@ public:
     void copy();
     void cut();
     void paste();
+
+    bool hasSelection() const;
+    void unsetSelection();
+    void select(int from, int to);
+    void expandSelection(int offset);
+    void expandSelectionTo(int pos);
+
     void splitIntoNewLine();
 
 protected:
