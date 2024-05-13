@@ -258,5 +258,15 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
         }
     }
 
+#ifdef WIN32
+    if (event->type() == QEvent::MouseButtonDblClick) {
+        auto e = static_cast<QMouseEvent *>(event);
+        if (develop_messy_mode && e->buttons() == Qt::MiddleButton) {
+            develop_messy_mode = false;
+            return true;
+        }
+    }
+#endif
+
     return false;
 }

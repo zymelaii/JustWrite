@@ -399,18 +399,24 @@ int TextViewEngine::commitMovement(int offset, bool *moved, bool hard_move) {
 
     cursor.pos += offset;
 
-    //! NOTE: move between blocks cost one more movement
+    //! NOTE: in soft mode, move between blocks cost one more movement
 
     while (true) {
         const auto len = currentBlock()->textLength();
         if (cursor.pos < 0 && active_block_index > 0) {
-            cursor.pos += active_blocks[--active_block_index]->textLength() + 1;
-            if (!hard_move) { ++offset; }
+            cursor.pos += active_blocks[--active_block_index]->textLength();
+            if (!hard_move) {
+                ++cursor.pos;
+                ++offset;
+            }
             continue;
         }
         if (cursor.pos > len && active_block_index + 1 < active_blocks.size()) {
-            cursor.pos -= active_blocks[active_block_index++]->textLength() + 1;
-            if (!hard_move) { --offset; }
+            cursor.pos -= active_blocks[active_block_index++]->textLength();
+            if (!hard_move) {
+                --cursor.pos;
+                --offset;
+            }
             continue;
         }
         const int old_pos  = cursor.pos;

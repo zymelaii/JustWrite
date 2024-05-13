@@ -290,22 +290,23 @@ bool LimitedViewEditor::insertedPairFilter(const QString &text) {
 }
 
 void LimitedViewEditor::move(int offset, bool extend_sel) {
+    if (offset == 0) { return; }
+
     bool cursor_moved = false;
-    bool hard_move    = false;
+    int  text_offset  = 0;
 
     //! FIXME: cursor within selected region
     if (hasSelection() && !extend_sel) {
-        const int sel_from = qMin(d->selected_from, d->selected_to);
-        const int sel_to   = qMax(d->selected_from, d->selected_to);
-        if (offset > 0) {
-            offset += sel_to - d->cursor_pos;
-        } else {
-            offset -= d->cursor_pos - sel_from;
-        }
-        hard_move = true;
+        const int sel_from   = qMin(d->selected_from, d->selected_to);
+        const int sel_to     = qMax(d->selected_from, d->selected_to);
+        const int target_pos = offset > 0 ? sel_to : sel_from;
+        text_offset  = d->engine->commitMovement(target_pos - d->cursor_pos, &cursor_moved, true);
+        offset      -= offset > 0 ? 1 : -1;
     }
 
-    const int text_offset = d->engine->commitMovement(offset, &cursor_moved, hard_move);
+    bool cursor_moved_tmp  = cursor_moved;
+    text_offset           += d->engine->commitMovement(offset, &cursor_moved, false);
+    cursor_moved           = cursor_moved || cursor_moved_tmp;
 
     if (!extend_sel) {
         unsetSelection();
@@ -321,6 +322,22 @@ void LimitedViewEditor::move(int offset, bool extend_sel) {
 
     d->cursor_pos += text_offset;
     if (cursor_moved) { postUpdateRequest(); }
+}
+
+void LimitedViewEditor::moveTo(int pos, bool extend_sel) {
+    //! ATTENTION: pos equals cursor_pos doesn't mean that no action will be taken
+
+    if (!hasSelection() && extend_sel) { d->selected_from = d->cursor_pos; }
+
+    d->cursor_pos += d->engine->commitMovement(pos - d->cursor_pos, nullptr, true);
+
+    if (extend_sel) {
+        d->selected_to = d->cursor_pos;
+    } else if (hasSelection()) {
+        unsetSelection();
+    }
+
+    postUpdateRequest();
 }
 
 void LimitedViewEditor::insert(const QString &text) {
@@ -379,19 +396,6 @@ void LimitedViewEditor::unsetSelection() {
         d->selected_to   = -1;
         postUpdateRequest();
     }
-}
-
-void LimitedViewEditor::select(int from, int to) {
-    const auto max_sel = d->engine->text_ref->length();
-    d->selected_from   = qBound(0, from, max_sel);
-    d->selected_to     = qBound(0, to, max_sel);
-    postUpdateRequest();
-}
-
-void LimitedViewEditor::expandSelectionTo(int pos) {
-    if (d->selected_from == -1) { d->selected_from = d->cursor_pos; }
-    d->selected_to = pos;
-    select(d->selected_from, d->selected_to);
 }
 
 void LimitedViewEditor::splitIntoNewLine() {
@@ -806,16 +810,22 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             }
         } break;
         case TextInputCommand::MoveToStartOfLine: {
-            move(-cursor.col, false);
+            const auto block = d->engine->currentBlock();
+            const auto line  = block->currentLine();
+            moveTo(block->text_pos + line.textOffset(), false);
         } break;
         case TextInputCommand::MoveToEndOfLine: {
-            move(d->engine->currentBlock()->lengthOfLine(cursor.row) - cursor.col, false);
+            const auto block = d->engine->currentBlock();
+            const auto line  = block->currentLine();
+            const auto pos   = block->text_pos + line.textOffset() + line.text().length();
+            moveTo(pos, false);
         } break;
         case TextInputCommand::MoveToStartOfBlock: {
-            move(-cursor.pos, false);
+            moveTo(d->engine->currentBlock()->text_pos, false);
         } break;
         case TextInputCommand::MoveToEndOfBlock: {
-            move(d->engine->currentBlock()->textLength() - cursor.pos, false);
+            const auto block = d->engine->currentBlock();
+            moveTo(block->text_pos + block->textLength(), false);
         } break;
         case TextInputCommand::MoveToStartOfDocument: {
             d->engine->active_block_index = 0;
@@ -895,33 +905,33 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             move(-cursor.col, true);
         } break;
         case TextInputCommand::SelectToEndOfLine: {
-            move(d->engine->currentBlock()->lengthOfLine(cursor.row) - cursor.col, true);
+            move(d->engine->currentLine().text().length() - cursor.col, true);
         } break;
         case TextInputCommand::SelectToStartOfBlock: {
-            move(-cursor.pos, true);
+            moveTo(d->engine->currentBlock()->text_pos, true);
         } break;
         case TextInputCommand::SelectToEndOfBlock: {
-            move(d->engine->currentBlock()->textLength() - cursor.pos, true);
+            const auto block = d->engine->currentBlock();
+            moveTo(block->text_pos + block->textLength(), true);
         } break;
         case TextInputCommand::SelectBlock: {
-            auto block = d->engine->currentBlock();
-            select(block->text_pos, block->text_pos + block->textLength());
+            const auto block = d->engine->currentBlock();
+            moveTo(block->text_pos, false);
+            moveTo(block->text_pos + block->textLength(), true);
         } break;
         case TextInputCommand::SelectPrevPage: {
         } break;
         case TextInputCommand::SelectNextPage: {
         } break;
         case TextInputCommand::SelectToStartOfDoc: {
-            const int offset = d->cursor_pos + d->engine->active_block_index;
-            move(-offset, true);
+            moveTo(0, true);
         } break;
         case TextInputCommand::SelectToEndOfDoc: {
-            const int offset = d->engine->text_ref->length() - d->cursor_pos
-                             + d->engine->active_blocks.size() - d->engine->active_block_index - 1;
-            move(offset, true);
+            moveTo(d->engine->text_ref->length(), true);
         } break;
         case TextInputCommand::SelectAll: {
-            select(0, d->engine->text_ref->length());
+            moveTo(0, false);
+            moveTo(d->engine->text_ref->length(), true);
         } break;
         case TextInputCommand::InsertBeforeBlock: {
             d->engine->insertBlock(d->engine->active_block_index);
@@ -944,6 +954,8 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 
 void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
+
+    if (e->button() != Qt::LeftButton) { return; }
 
     unsetSelection();
 

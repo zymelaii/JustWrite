@@ -50,6 +50,7 @@ public:
     bool insertedPairFilter(const QString &text);
 
     void move(int offset, bool extend_sel);
+    void moveTo(int pos, bool extend_sel);
     void insert(const QString &text);
     void del(int times);
     void copy();
@@ -58,9 +59,6 @@ public:
 
     bool hasSelection() const;
     void unsetSelection();
-    void select(int from, int to);
-    void expandSelection(int offset);
-    void expandSelectionTo(int pos);
 
     void splitIntoNewLine();
 
