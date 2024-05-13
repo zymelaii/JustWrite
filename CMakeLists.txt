@@ -30,6 +30,7 @@ set(CMAKE_AUTORCC ON)
 option(BUILD_TEST "Build the unittests" ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(magic_enum REQUIRED)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")

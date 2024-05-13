@@ -1,5 +1,3 @@
-find_package(magic_enum CONFIG REQUIRED)
-
 aux_source_directory(. SOURCE_FILES)
 
 list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/res.qrc)
