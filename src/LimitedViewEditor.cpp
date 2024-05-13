@@ -982,7 +982,12 @@ void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
         do {
             if (!d->engine->isCursorAvailable()) { break; }
             if (d->engine->preedit) { break; }
-            const auto loc = getTextLocAtPos(e->pos());
+            const auto   bb = textArea();
+            const QPoint pos{
+                qBound(bb.left(), e->pos().x(), bb.right()),
+                qBound(bb.top(), e->pos().y(), bb.bottom()),
+            };
+            const auto loc = getTextLocAtPos(pos);
             if (loc.block_index == -1) { break; }
             auto &active_block_index = d->engine->active_block_index;
             auto &cursor             = d->engine->cursor;
