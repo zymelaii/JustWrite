@@ -32,6 +32,7 @@ struct LimitedViewEditorPrivate {
     QString                          preedit_text;
     int                              selected_from;
     int                              selected_to;
+    QMargins                         margins;
     jwrite::TextViewEngine          *engine;
     jwrite::TextInputCommandManager *input_manager;
 
@@ -72,6 +73,7 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
     setAcceptDrops(true);
     setMouseTracking(true);
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+    setContentsMargins({});
 
     setAlignCenter(true);
 
@@ -96,7 +98,7 @@ LimitedViewEditor::~LimitedViewEditor() {
 }
 
 QSize LimitedViewEditor::minimumSizeHint() const {
-    const auto margins      = contentsMargins();
+    const auto margins      = contentsMargins() + d->margins;
     const auto line_spacing = d->engine->line_height * d->engine->line_spacing_ratio;
     const auto hori_margin  = margins.left() + margins.right();
     const auto vert_margin  = margins.top() + margins.bottom();
@@ -121,15 +123,15 @@ void LimitedViewEditor::setAlignCenter(bool value) {
         const auto mean_width     = qMax(0, width() - min_margin * 2);
         const auto text_width     = qMin<int>(mean_width * 0.8, max_text_width);
         const auto margin         = (width() - text_width) / 2;
-        setContentsMargins(margin, 4, margin, 4);
+        d->margins                = QMargins(margin, 4, margin, 4);
     } else {
-        setContentsMargins(4, 4, 4, 4);
+        d->margins = QMargins(4, 4, 4, 4);
     }
     emit textAreaChanged(textArea());
 }
 
 QRect LimitedViewEditor::textArea() const {
-    return rect() - contentsMargins();
+    return contentsRect() - d->margins;
 }
 
 EditorTextLoc LimitedViewEditor::textLoc() const {
