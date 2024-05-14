@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Windows x64 Debug",
+            "program": "${workspaceFolder}/install/windows-x64-debug/JustWrite",
+            "cwd": "${workspaceFolder}/install/windows-x64-debug",
+            "preLaunchTask": "Build Windows x64 Debug",
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Windows x64 Debug Unittest",
+            "program": "${workspaceFolder}/install/windows-x64-debug/jwrite-test",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build Windows x64 Debug",
+        },
+    ]
+}

@@ -1,0 +1,12 @@
+{
+    "recommendations": [
+        "xaver.clang-format",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "Gruntfuggly.todo-tree",
+        "kevinkyang.auto-comment-blocks",
+        "alefragnani.Bookmarks",
+    ],
+    "unwantedRecommendations": [
+        "ms-vscode.cpptools",
+    ],
+}

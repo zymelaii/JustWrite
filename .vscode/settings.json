@@ -1,0 +1,29 @@
+{
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
+    "files.encoding": "utf8",
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
+    "extensions.ignoreRecommendations": false,
+    "todo-tree.highlights.enabled": false,
+    "todo-tree.regex.regex": "(//!?(!<)?|#|<!--|;|/\\*|^|^[ \\t]*(-|\\d+.))\\s*($TAGS)",
+    "bookmarks.wrapNavigation": true,
+    "[cpp]": {
+        "editor.defaultFormatter": "xaver.clang-format",
+    },
+    "clangd.path": "clangd",
+    "clangd.onConfigChanged": "restart",
+    "clangd.restartAfterCrash": true,
+    "clangd.arguments": [
+        "--enable-config",
+        "--compile-commands-dir=build/windows-x64-debug",
+        "--clang-tidy",
+        "--all-scopes-completion",
+        "--completion-style=detailed",
+        "--header-insertion=never",
+        "--background-index",
+        "--pch-storage=disk",
+        "-j=8"
+    ],
+}
