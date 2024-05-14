@@ -1,0 +1,6 @@
+[submodule "deps/qwindowskit"]
+	path = deps/qwindowskit
+	url = git@github.com:stdware/qwindowkit.git
+[submodule "deps/magic_enum"]
+	path = deps/magic_enum
+	url = git@github.com:Neargye/magic_enum.git
