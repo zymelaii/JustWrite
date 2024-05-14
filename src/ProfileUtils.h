@@ -12,9 +12,9 @@
 #define ON_DEBUG(...)
 #endif
 
-#define SetupJwriteProfiler()        ON_DEBUG(JwriteProfiler.setup())
-#define JwriteProfilerStart(target)  ON_DEBUG(JwriteProfiler.start(ProfileTarget::target))
-#define JwriteProfilerRecord(target) ON_DEBUG(JwriteProfiler.record(ProfileTarget::target))
+#define setup_jwrite_profiler()        ON_DEBUG(JwriteProfiler.setup())
+#define jwrite_profiler_start(target)  ON_DEBUG(JwriteProfiler.start(ProfileTarget::target))
+#define jwrite_profiler_record(target) ON_DEBUG(JwriteProfiler.record(ProfileTarget::target))
 
 #ifndef NDEBUG
 

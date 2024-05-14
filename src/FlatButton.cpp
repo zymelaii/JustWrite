@@ -22,17 +22,17 @@ QSize FlatButton::sizeHint() const {
     return minimumSize();
 }
 
-void FlatButton::setText(const QString &text) {
+void FlatButton::set_text(const QString &text) {
     text_ = text;
     update();
 }
 
-void FlatButton::setRadius(int radius) {
+void FlatButton::set_radius(int radius) {
     radius_ = radius;
     update();
 }
 
-void FlatButton::setTextAlignment(int alignment) {
+void FlatButton::set_text_alignment(int alignment) {
     alignment_ = alignment;
     update();
 }

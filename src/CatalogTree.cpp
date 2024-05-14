@@ -6,7 +6,7 @@
 namespace Ui {
 class CatalogTree {
 public:
-    void setupUi(QWidget *self) {
+    void setup(QWidget *self) {
         auto font = self->font();
         font.setPointSize(10);
         self->setFont(font);
@@ -21,7 +21,7 @@ CatalogTree::CatalogTree(QWidget *parent)
     , expanded_vid_{-1}
     , hover_row_{-1}
     , ui{new Ui::CatalogTree} {
-    ui->setupUi(this);
+    ui->setup(this);
     setMouseTracking(true);
 }
 
@@ -44,7 +44,7 @@ QSize CatalogTree::minimumSizeHint() const {
     return rect.marginsAdded(contentsMargins()).size();
 }
 
-int CatalogTree::addVolume(int order, const QString &title) {
+int CatalogTree::add_volume(int order, const QString &title) {
     if (order < -1 || order > static_cast<int>(vid_list_.size())) { return -1; }
     if (order == -1) { order = vid_list_.size(); }
     const auto vid = static_cast<int>(title_list_.size());
@@ -55,7 +55,7 @@ int CatalogTree::addVolume(int order, const QString &title) {
     return vid;
 }
 
-int CatalogTree::addChapter(int vid, const QString &title) {
+int CatalogTree::add_chapter(int vid, const QString &title) {
     if (!cid_list_set_.contains(vid)) { return -1; }
     auto      &chaps = cid_list_set_[vid];
     const auto cid   = static_cast<int>(title_list_.size());

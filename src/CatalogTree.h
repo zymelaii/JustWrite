@@ -18,18 +18,18 @@ public:
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
 
-    int addVolume(int order, const QString &title);
-    int addChapter(int vid, const QString &title);
+    int add_volume(int order, const QString &title);
+    int add_chapter(int vid, const QString &title);
 
-    int totalVolumes() const {
+    int get_total_volumes() const {
         return vid_list_.size();
     }
 
-    int volumeAt(int index) const {
+    int get_volume(int index) const {
         return vid_list_.value(index, -1);
     }
 
-    QList<int> chapters(int vid) const {
+    QList<int> get_chapters(int vid) const {
         if (!cid_list_set_.contains(vid)) { return {}; }
         return cid_list_set_[vid];
     }

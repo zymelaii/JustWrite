@@ -19,11 +19,11 @@ struct TextLine {
     int        cached_text_width;
     int        cached_mean_width;
 
-    void        markAsDirty() const;
+    void        mark_as_dirty() const;
     QStringView text() const;
-    int         textOffset() const;
-    double      charSpacing() const;
-    bool        isFirstLine() const;
+    int         text_offset() const;
+    double      char_spacing() const;
+    bool        is_first_line() const;
 };
 
 struct TextBlock {
@@ -37,17 +37,17 @@ struct TextBlock {
 
     void            reset(const QString *ref, int pos);
     void            release();
-    void            markAsDirty(int line_nr);
-    bool            isDirty() const;
-    void            joinDirtyLines();
-    int             textLength() const;
-    int             offsetOfLine(int index) const;
-    int             lengthOfLine(int index) const;
-    TextLine       &currentLine();
-    const TextLine &currentLine() const;
-    QStringView     textOfLine(int index) const;
+    void            mark_as_dirty(int line_nr);
+    bool            is_dirty() const;
+    void            join_dirty_lines();
+    int             text_len() const;
+    int             offset_of_line(int index) const;
+    int             len_of_line(int index) const;
+    TextLine       &current_line();
+    const TextLine &current_line() const;
+    QStringView     text_of_line(int index) const;
     QStringView     text() const;
-    void            squeezeAndExtendLastLine(int length);
+    void            squeeze_and_extend_last_line(int length);
     void            render();
 };
 
@@ -89,37 +89,35 @@ struct TextViewEngine {
     TextViewEngine(const QFontMetrics &metrics, int width);
 
     void             reset(const QFontMetrics &metrics, int width);
-    TextBlock       *allocBlock();
-    bool             isEmpty() const;
-    bool             isDirty() const;
-    bool             isCursorAvailable() const;
-    void             markAsDirty();
-    TextLine        &currentLine();
-    const TextLine  &currentLine() const;
-    TextBlock       *currentBlock();
-    const TextBlock *currentBlock() const;
-    void             resetMaxWidth(int width);
-    void             resetBlockSpacing(double spacing);
-    void             resetLineSpacing(double ratio);
-    void             resetFontMetrics(const QFontMetrics &metrics);
-    void             syncCursorRowCol();
+    TextBlock       *alloc_block();
+    bool             is_empty() const;
+    bool             is_dirty() const;
+    bool             is_cursor_available() const;
+    void             mark_as_dirty();
+    TextLine        &current_line();
+    const TextLine  &current_line() const;
+    TextBlock       *current_block();
+    const TextBlock *current_block() const;
+    void             reset_max_width(int width);
+    void             reset_block_spacing(double spacing);
+    void             reset_line_spacing(double ratio);
+    void             reset_font_metrics(const QFontMetrics &metrics);
+    void             sync_cursor_row_col();
     void             render();
 
     //! TODO: promote unsafe method into the safe one
-    void setTextRefUnsafe(const QString *ref, int ref_origin);
-    void clearAll();
-    void insertBlock(int index);
-    void breakBlockAtCursorPos();
-    void commitInsertion(int text_length);
-    int  commitDeletion(int times, int &deleted);
-    int  commitMovement(int offset, bool *moved, bool hard_move);
-    void beginPreEdit(QString &ref);
-    void updatePreEditText(int text_length);
-    void commitPreEdit();
+    void set_text_ref_unsafe(const QString *ref, int ref_origin);
+    void clear_all();
+    void insert_block(int index);
+    void break_block_at_cursor_pos();
+    void commit_insertion(int text_length);
+    int  commit_deletion(int times, int &deleted);
+    int  commit_movement(int offset, bool *moved, bool hard_move);
+    void begin_preedit(QString &ref);
+    void update_preedit_text(int text_length);
+    void commit_preedit();
 
-    static int boundingTextLength(const QFontMetrics &fm, QStringView text, int &width);
+    static int get_bounding_text_len(const QFontMetrics &fm, QStringView text, int &width);
 };
 
 }; // namespace jwrite
-
-QDebug operator<<(QDebug dbg, const jwrite::TextViewEngine::CursorPosition &pos);

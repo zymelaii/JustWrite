@@ -1,10 +1,10 @@
 #include "GlobalCommand.h"
 
-void GlobalCommandManager::loadDefaultMappings() {
+void GlobalCommandManager::load_default() {
     clear();
 
 #define KEYBINDING(cmd, key_name) \
-    insertOrUpdateKeyBinding(QKeySequence::fromString(key_name), GlobalCommand::cmd)
+    insert_or_update(QKeySequence::fromString(key_name), GlobalCommand::cmd)
 
     KEYBINDING(ToggleSidebar, "Ctrl+Alt+B");
     KEYBINDING(ToggleSoftCenterMode, "Ctrl+E");
@@ -17,7 +17,7 @@ void GlobalCommandManager::clear() {
     shortcuts_.clear();
 }
 
-void GlobalCommandManager::insertOrUpdateKeyBinding(QKeySequence key, GlobalCommand cmd) {
+void GlobalCommandManager::insert_or_update(QKeySequence key, GlobalCommand cmd) {
     shortcuts_[key] = cmd;
 }
 

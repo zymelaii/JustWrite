@@ -1,13 +1,14 @@
 #include "TextInputCommand.h"
 
-static QKeySequence defaultKeyBinding(QKeySequence::StandardKey cmd, QKeySequence default_key) {
+static QKeySequence
+    get_default_keybinding(QKeySequence::StandardKey cmd, QKeySequence default_key) {
     const auto bindings = QKeySequence::keyBindings(cmd);
     if (bindings.isEmpty()) { return default_key; }
     //! FIXME: QKeySequence may have extended key combination
     return bindings.first()[0];
 }
 
-void TextInputCommandManager::loadDefaultMappings() {
+void TextInputCommandManager::load_default() {
     const auto InsertBeforeBlock       = QKeySequence::fromString("Ctrl+Shift+Return");
     const auto InsertAfterBlock        = QKeySequence::fromString("Ctrl+Return");
     const auto Cancel                  = QKeySequence::fromString("Escape");
@@ -64,10 +65,10 @@ void TextInputCommandManager::loadDefaultMappings() {
 #define NARG_ENUM(_1, _2, N, ...)        N
 #define KEYBINDING(...)                  KEYBINDING_IMPL(NARG(__VA_ARGS__), __VA_ARGS__)
 #define KEYBINDING_DISPATCH(N)           KEYBINDING_##N
-#define KEYBINDING_IMPL(N, ...)          insertOrUpdateKeyBinding(KEYBINDING_DISPATCH(N)(__VA_ARGS__))
+#define KEYBINDING_IMPL(N, ...)          insert_or_update(KEYBINDING_DISPATCH(N)(__VA_ARGS__))
 #define KEYBINDING_1(cmd)                cmd, TextInputCommand::cmd
 #define KEYBINDING_2(key, cmd)           DEFAULT_KEYBINDING(key, cmd), TextInputCommand::cmd
-#define DEFAULT_KEYBINDING(key, default) defaultKeyBinding(QKeySequence::key, default)
+#define DEFAULT_KEYBINDING(key, default) get_default_keybinding(QKeySequence::key, default)
 
     KEYBINDING(InsertBeforeBlock);
     KEYBINDING(InsertAfterBlock);
@@ -131,7 +132,7 @@ void TextInputCommandManager::loadDefaultMappings() {
 #undef DEFAULT_KEYBINDING
 }
 
-bool TextInputCommandManager::insertOrUpdateKeyBinding(QKeySequence key, TextInputCommand cmd) {
+bool TextInputCommandManager::insert_or_update(QKeySequence key, TextInputCommand cmd) {
     if (conflicts(key)) { return false; }
     key_to_cmd_[key] = cmd;
     cmd_to_key_[cmd] = key;
@@ -142,7 +143,7 @@ bool TextInputCommandManager::conflicts(QKeySequence key) const {
     return key_to_cmd_.contains(key);
 }
 
-std::optional<QKeySequence> TextInputCommandManager::keyBinding(TextInputCommand cmd) const {
+std::optional<QKeySequence> TextInputCommandManager::keybindings(TextInputCommand cmd) const {
     if (!cmd_to_key_.contains(cmd)) { return std::nullopt; }
     return {cmd_to_key_[cmd]};
 }
@@ -156,11 +157,11 @@ TextInputCommand TextInputCommandManager::match(QKeyEvent *e) const {
     const auto modifiers = e->modifiers() & ~Qt::KeypadModifier;
     const auto key       = QKeyCombination::fromCombined(modifiers | e->key());
     if (key_to_cmd_.contains(key)) { return key_to_cmd_[key]; }
-    if (isPrintableChar(key)) { return TextInputCommand::InsertPrintable; }
+    if (is_printable_char(key)) { return TextInputCommand::InsertPrintable; }
     return TextInputCommand::Reject;
 }
 
-bool TextInputCommandManager::isPrintableChar(QKeyCombination key) {
+bool TextInputCommandManager::is_printable_char(QKeyCombination key) {
     const auto modifiers = key.keyboardModifiers() & ~Qt::KeypadModifier;
     if (modifiers & ~Qt::ShiftModifier) { return false; }
     if (key.key() >= Qt::Key_Space && key.key() <= Qt::Key_AsciiTilde) { return true; }
@@ -170,8 +171,8 @@ bool TextInputCommandManager::isPrintableChar(QKeyCombination key) {
     return false;
 }
 
-QChar TextInputCommandManager::translatePrintableChar(QKeyEvent *e) {
-    Q_ASSERT(isPrintableChar(e->keyCombination()));
+QChar TextInputCommandManager::translate_printable_char(QKeyEvent *e) {
+    Q_ASSERT(is_printable_char(e->keyCombination()));
     const auto code = e->key();
     if (code == Qt::Key_Tab) { return '\t'; }
     if (code == Qt::Key_Enter || code == Qt::Key_Return) { return '\n'; }
@@ -191,8 +192,8 @@ TextInputCommand TextInputCommandManager::match(QKeyEvent *e) const {
         } break;
         case TextInputCommand::MoveToEndOfLine: {
             const auto &cursor = engine_.cursor;
-            const auto  block  = engine_.currentBlock();
-            const auto  len    = block->lengthOfLine(cursor.row);
+            const auto  block  = engine_.current_block();
+            const auto  len    = block->len_of_line(cursor.row);
             if (cursor.col == len) { return TextInputCommand::MoveToEndOfBlock; }
         } break;
         case TextInputCommand::SelectToStartOfLine: {
@@ -200,12 +201,12 @@ TextInputCommand TextInputCommandManager::match(QKeyEvent *e) const {
         } break;
         case TextInputCommand::SelectToEndOfLine: {
             const auto &cursor = engine_.cursor;
-            const auto  block  = engine_.currentBlock();
-            const auto  len    = block->lengthOfLine(cursor.row);
+            const auto  block  = engine_.current_block();
+            const auto  len    = block->len_of_line(cursor.row);
             if (cursor.col == len) { return TextInputCommand::SelectToEndOfBlock; }
         } break;
         case TextInputCommand::InsertPrintable: {
-            if (const auto c = translatePrintableChar(e); c == '\n') {
+            if (const auto c = translate_printable_char(e); c == '\n') {
                 return TextInputCommand::InsertNewLine;
             } else if (c == '\t') {
                 return TextInputCommand::InsertTab;

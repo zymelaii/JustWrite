@@ -128,10 +128,10 @@ struct JustWrite {
         pal.setColor(QPalette::Window, QColor(0, 120, 200));
         status_bar->setPalette(pal);
         status_bar->setFont(font);
-        status_bar->setSpacing(20);
+        status_bar->set_spacing(20);
         status_bar->setContentsMargins(12, 4, 12, 4);
-        total_words = status_bar->addItem("全本共 0 字");
-        datetime    = status_bar->addItemAtRightSide("0000-00-00");
+        total_words = status_bar->add_item("全本共 0 字", false);
+        datetime    = status_bar->add_item("0000-00-00", true);
 
         parent->setAutoFillBackground(true);
     }
@@ -146,7 +146,7 @@ struct JustWritePrivate {
     QMap<int, EditorTextLoc> chapter_locs;
 
     JustWritePrivate() {
-        command_manager.loadDefaultMappings();
+        command_manager.load_default();
         sec_timer.setInterval(1000);
         sec_timer.setSingleShot(false);
 
@@ -165,11 +165,11 @@ JustWrite::JustWrite(QWidget *parent)
         ui->editor,
         &LimitedViewEditor::requireEmptyChapter,
         ui->sidebar,
-        &JustWriteSidebar::openEmptyChapter);
+        &JustWriteSidebar::open_empty_chapter);
     connect(ui->editor, &LimitedViewEditor::textChanged, this, [this](const QString &text) {
         ui->total_words->setText(QString("全本共 %1 字").arg(text.length()));
     });
-    connect(ui->sidebar, &JustWriteSidebar::chapterOpened, this, &JustWrite::openChapter);
+    connect(ui->sidebar, &JustWriteSidebar::chapterOpened, this, &JustWrite::open_chapter);
     connect(&d->sec_timer, &QTimer::timeout, this, [this] {
         ui->datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
     });
@@ -195,19 +195,19 @@ JustWrite::~JustWrite() {
     delete ui;
 }
 
-void JustWrite::openChapter(int cid) {
+void JustWrite::open_chapter(int cid) {
 #ifdef WIN32
     if (develop_messy_mode) { return; }
 #endif
     if (cid == d->current_cid) { return; }
 
-    JwriteProfilerStart(SwitchChapter);
+    jwrite_profiler_start(SwitchChapter);
 
     QString  tmp{};
     QString &text = d->chapters.contains(cid) ? d->chapters[cid] : tmp;
 
     if (d->current_cid != -1) {
-        const auto loc = ui->editor->textLoc();
+        const auto loc = ui->editor->get_current_text_loc();
         if (loc.block_index != -1) { d->chapter_locs[d->current_cid] = loc; }
     }
 
@@ -217,10 +217,10 @@ void JustWrite::openChapter(int cid) {
 
     if (d->chapter_locs.contains(cid)) {
         const auto loc = d->chapter_locs[cid];
-        ui->editor->setTextLoc(loc);
+        ui->editor->update_text_loc(loc);
     }
 
-    JwriteProfilerRecord(SwitchChapter);
+    jwrite_profiler_record(SwitchChapter);
 }
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
@@ -231,7 +231,7 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
         //! NOTE: block special keys in messy input mode to avoid unexpceted behavior
         //! ATTENTION: this can not block global shortcut keys
         if (const auto key = QKeyCombination::fromCombined(e->key() | e->modifiers());
-            !TextInputCommandManager::isPrintableChar(key) && develop_messy_mode) {
+            !TextInputCommandManager::is_printable_char(key) && develop_messy_mode) {
             return true;
         }
 #endif
@@ -245,7 +245,7 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
                     ui->sidebar->setVisible(!ui->sidebar->isVisible());
                 } break;
                 case GlobalCommand::ToggleSoftCenterMode: {
-                    ui->editor->setAlignCenter(!ui->editor->alignCenter());
+                    ui->editor->set_soft_center_mode(!ui->editor->is_soft_center_mode());
                 } break;
                 case GlobalCommand::DEV_EnableMessyInput: {
 #ifdef WIN32

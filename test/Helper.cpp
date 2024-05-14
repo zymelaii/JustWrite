@@ -1,11 +1,11 @@
 #include "Helper.h"
 #include <QRandomGenerator>
 
-int genRandomInt(int lo, int hi) {
+int gen_random_nint(int lo, int hi) {
     return QRandomGenerator::global()->bounded(lo, hi);
 }
 
-QString genRandomString(int length) {
+QString gen_random(int length) {
     static const QString char_set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
     QString              str;
     for (int i = 0; i < length; ++i) {

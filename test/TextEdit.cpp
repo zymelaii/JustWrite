@@ -2,78 +2,78 @@
 #include <gtest/gtest.h>
 
 TEST(TextEdit, InitState) {
-    auto e = TextViewEngine::singleLineEngine();
-    e.checkCursor(0, 0, 0, 0);
+    auto e = TextViewEngine::get_single_line_engine();
+    e.check_cursor(0, 0, 0, 0);
 }
 
 TEST(TextEdit, SingleBlockSeqInsert) {
-    auto e = TextViewEngine::singleLineEngine();
+    auto e = TextViewEngine::get_single_line_engine();
 
     int  acc   = 0;
-    auto block = e.currentBlock();
+    auto block = e.current_block();
     for (int i = 0; i < 256; ++i) {
-        const int  len      = genRandomInt(0, 32);
-        const auto inserted = genRandomString(len);
+        const int  len      = gen_random_int(0, 32);
+        const auto inserted = gen_random_str(len);
         e.insert(inserted);
         acc += len;
         ASSERT_EQ(e.text, block->text());
-        e.checkCursor(0, acc, 0, acc);
+        e.check_cursor(0, acc, 0, acc);
     }
 }
 
 TEST(TextEdit, SingleBlockRandomInsert) {
-    auto e = TextViewEngine::singleLineEngine();
+    auto e = TextViewEngine::get_single_line_engine();
 
-    auto block = e.currentBlock();
+    auto block = e.current_block();
     for (int i = 0; i < 256; ++i) {
-        const int  pos      = genRandomInt(0, block->textLength() + 1);
-        const int  len      = genRandomInt(0, 32);
-        const auto inserted = genRandomString(len);
+        const int  pos      = gen_random_int(0, block->text_len() + 1);
+        const int  len      = gen_random_int(0, 32);
+        const auto inserted = gen_random_str(len);
         e.cursor.pos        = pos;
         e.cursor.col        = pos;
         e.insert(inserted);
         ASSERT_EQ(e.text, block->text());
-        e.checkCursor(0, pos + len, 0, pos + len);
+        e.check_cursor(0, pos + len, 0, pos + len);
     }
 }
 
 TEST(TextEdit, MultiBlockInsert) {
-    auto e = TextViewEngine::singleLineEngine();
-    e.genBlocks(32);
+    auto e = TextViewEngine::get_single_line_engine();
+    e.gen_blocks(32);
     //! TODO: rt.
 }
 
 TEST(TextEdit, PreEditBlockInsert) {
-    auto e = TextViewEngine::singleLineEngine();
-    e.genBlocks(32);
+    auto e = TextViewEngine::get_single_line_engine();
+    e.gen_blocks(32);
     //! TODO: rt.
 }
 
 TEST(TextEdit, BreakLine) {
-    auto e = TextViewEngine::singleLineEngine();
+    auto e = TextViewEngine::get_single_line_engine();
 
     const int len = 256;
-    e.insert(genRandomString(256));
+    e.insert(gen_random_str(256));
     ASSERT_EQ(e.active_blocks.size(), 1);
 
-    e.breakBlockAtCursorPos();
-    e.checkCursor(1, 0, 0, 0);
+    e.break_block_at_cursor_pos();
+    e.check_cursor(1, 0, 0, 0);
     ASSERT_EQ(e.active_blocks.size(), 2);
     ASSERT_EQ(e.active_blocks[0]->text(), e.text);
     ASSERT_TRUE(e.active_blocks[1]->text().isEmpty());
 
-    e.resetCursorUnsafe(0, 0, 0, 0);
-    e.breakBlockAtCursorPos();
-    e.checkCursor(1, 0, 0, 0);
+    e.reset_cursor_unsafe(0, 0, 0, 0);
+    e.break_block_at_cursor_pos();
+    e.check_cursor(1, 0, 0, 0);
     ASSERT_EQ(e.active_blocks.size(), 3);
     ASSERT_TRUE(e.active_blocks[0]->text().isEmpty());
     ASSERT_EQ(e.active_blocks[1]->text(), e.text);
     ASSERT_TRUE(e.active_blocks[2]->text().isEmpty());
 
-    const int pos = genRandomInt(1, e.active_blocks[1]->textLength());
-    e.resetCursorUnsafe(1, pos, 0, pos);
-    e.breakBlockAtCursorPos();
-    e.checkCursor(2, 0, 0, 0);
+    const int pos = gen_random_int(1, e.active_blocks[1]->text_len());
+    e.reset_cursor_unsafe(1, pos, 0, pos);
+    e.break_block_at_cursor_pos();
+    e.check_cursor(2, 0, 0, 0);
     ASSERT_EQ(e.active_blocks.size(), 4);
     ASSERT_TRUE(e.active_blocks[0]->text().isEmpty());
     ASSERT_EQ(e.active_blocks[1]->text(), e.text.mid(0, pos));

@@ -14,9 +14,9 @@ public:
     virtual ~JustWriteSidebar();
 
 public slots:
-    void newVolume(int index, const QString &title);
-    void newChapter(int volume_index, const QString &title);
-    void openEmptyChapter();
+    void create_new_volume(int index, const QString &title);
+    void create_new_chapter(int volume_index, const QString &title);
+    void open_empty_chapter();
 
 signals:
     void chapterOpened(int cid);

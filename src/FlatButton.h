@@ -13,9 +13,9 @@ public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
 
-    void setText(const QString &text);
-    void setRadius(int radius);
-    void setTextAlignment(int alignment);
+    void set_text(const QString &text);
+    void set_radius(int radius);
+    void set_text_alignment(int alignment);
 
 signals:
     void pressed();

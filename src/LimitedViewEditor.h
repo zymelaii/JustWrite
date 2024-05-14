@@ -29,42 +29,42 @@ signals:
     void requireEmptyChapter();
 
 public:
-    bool alignCenter() const;
-    void setAlignCenter(bool value);
+    bool is_soft_center_mode() const;
+    void set_soft_center_mode(bool value);
 
-    QRect textArea() const;
+    QRect get_text_area() const;
 
-    EditorTextLoc textLoc() const;
-    EditorTextLoc textLocAtPos(int pos) const;
-    void          setTextLoc(EditorTextLoc loc);
+    EditorTextLoc get_current_text_loc() const;
+    EditorTextLoc get_text_loc_at_pos(int pos) const;
+    void          update_text_loc(EditorTextLoc loc);
 
     void reset(QString &text, bool swap);
-    void cancelPreedit();
-    void scrollToCursor();
+    void cancel_preedit();
+    void scroll_to_cursor();
 
     void scroll(double delta, bool smooth);
-    void scrollToStart();
-    void scrollToEnd();
+    void scoll_to_start();
+    void scroll_to_end();
 
-    void insertDirtyText(const QString &text);
-    bool insertedPairFilter(const QString &text);
+    void insert_raw_text(const QString &text);
+    bool inserted_pair_filter(const QString &text);
 
     void move(int offset, bool extend_sel);
-    void moveTo(int pos, bool extend_sel);
+    void move_to(int pos, bool extend_sel);
     void insert(const QString &text);
     void del(int times);
     void copy();
     void cut();
     void paste();
 
-    bool hasSelection() const;
-    void unsetSelection();
+    bool has_sel() const;
+    void unset_set();
 
-    void splitIntoNewLine();
+    void break_into_newline();
 
 protected:
-    EditorTextLoc getTextLocAtPos(const QPoint &pos);
-    void          postUpdateRequest();
+    EditorTextLoc get_text_loc_at_vpos(const QPoint &pos);
+    void          request_update();
 
 protected:
     void resizeEvent(QResizeEvent *e) override;

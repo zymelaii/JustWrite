@@ -64,16 +64,16 @@ enum class TextInputCommand {
 
 class TextInputCommandManager {
 public:
-    void                        loadDefaultMappings();
-    bool                        insertOrUpdateKeyBinding(QKeySequence key, TextInputCommand cmd);
+    void                        load_default();
+    bool                        insert_or_update(QKeySequence key, TextInputCommand cmd);
     bool                        conflicts(QKeySequence key) const;
-    std::optional<QKeySequence> keyBinding(TextInputCommand cmd) const;
+    std::optional<QKeySequence> keybindings(TextInputCommand cmd) const;
     void                        clear();
 
     virtual TextInputCommand match(QKeyEvent *e) const;
 
-    static bool  isPrintableChar(QKeyCombination e);
-    static QChar translatePrintableChar(QKeyEvent *e);
+    static bool  is_printable_char(QKeyCombination e);
+    static QChar translate_printable_char(QKeyEvent *e);
 
 private:
     QMap<QKeySequence, TextInputCommand> key_to_cmd_;

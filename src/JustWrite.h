@@ -15,9 +15,9 @@ public:
     explicit JustWrite(QWidget *parent = nullptr);
     virtual ~JustWrite();
 
-    void newVolume(int index, const QString &title);
-    void newChapter(int volume_index, const QString &title);
-    void openChapter(int cid);
+    void create_new_volume(int index, const QString &title);
+    void create_new_chapter(int volume_index, const QString &title);
+    void open_chapter(int cid);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;

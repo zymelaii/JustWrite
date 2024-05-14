@@ -60,14 +60,14 @@ struct JustWriteSidebar {
         // book_icon->setPixmap(QPixmap(":/res/icons/light/book-2-line.png"));
         // book_title->setText(QObject::tr("未命名"));
 
-        new_volume->setText(QObject::tr("新建卷"));
-        new_volume->setTextAlignment(Qt::AlignCenter);
+        new_volume->set_text(QObject::tr("新建卷"));
+        new_volume->set_text_alignment(Qt::AlignCenter);
         new_volume->setContentsMargins(10, 0, 10, 0);
-        new_volume->setRadius(6);
-        new_chapter->setText(QObject::tr("新建章"));
-        new_chapter->setTextAlignment(Qt::AlignCenter);
+        new_volume->set_radius(6);
+        new_chapter->set_text(QObject::tr("新建章"));
+        new_chapter->set_text_alignment(Qt::AlignCenter);
         new_chapter->setContentsMargins(10, 0, 10, 0);
-        new_chapter->setRadius(6);
+        new_chapter->set_radius(6);
     }
 };
 }; // namespace Ui
@@ -79,10 +79,10 @@ JustWriteSidebar::JustWriteSidebar(QWidget *parent)
     setMinimumWidth(200);
 
     connect(ui->new_volume, &FlatButton::pressed, this, [this] {
-        newVolume(-1, "");
+        create_new_volume(-1, "");
     });
     connect(ui->new_chapter, &FlatButton::pressed, this, [this] {
-        newChapter(-1, "");
+        create_new_chapter(-1, "");
     });
     connect(ui->book_dir, &CatalogTree::itemClicked, this, [this](int vid, int cid) {
         emit chapterOpened(cid);
@@ -93,21 +93,21 @@ JustWriteSidebar::~JustWriteSidebar() {
     delete ui;
 }
 
-void JustWriteSidebar::newVolume(int index, const QString &title) {
-    if (index == -1) { index = ui->book_dir->totalVolumes(); }
-    ui->book_dir->addVolume(index, title);
+void JustWriteSidebar::create_new_volume(int index, const QString &title) {
+    if (index == -1) { index = ui->book_dir->get_total_volumes(); }
+    ui->book_dir->add_volume(index, title);
 }
 
-void JustWriteSidebar::newChapter(int volume_index, const QString &title) {
-    if (volume_index == -1) { volume_index = ui->book_dir->totalVolumes() - 1; }
-    const auto vid = ui->book_dir->volumeAt(volume_index);
+void JustWriteSidebar::create_new_chapter(int volume_index, const QString &title) {
+    if (volume_index == -1) { volume_index = ui->book_dir->get_total_volumes() - 1; }
+    const auto vid = ui->book_dir->get_volume(volume_index);
     Q_ASSERT(vid != -1);
-    int cid = ui->book_dir->addChapter(vid, title);
+    int cid = ui->book_dir->add_chapter(vid, title);
     emit chapterOpened(cid);
 }
 
-void JustWriteSidebar::openEmptyChapter() {
-    const auto vid = ui->book_dir->volumeAt(0);
-    if (vid == -1) { newVolume(0, ""); }
-    newChapter(ui->book_dir->totalVolumes() - 1, "");
+void JustWriteSidebar::open_empty_chapter() {
+    const auto vid = ui->book_dir->get_volume(0);
+    if (vid == -1) { create_new_volume(0, ""); }
+    create_new_chapter(ui->book_dir->get_total_volumes() - 1, "");
 }

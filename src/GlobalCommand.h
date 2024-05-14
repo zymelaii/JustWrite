@@ -12,9 +12,9 @@ enum class GlobalCommand {
 
 class GlobalCommandManager {
 public:
-    void loadDefaultMappings();
+    void load_default();
     void clear();
-    void insertOrUpdateKeyBinding(QKeySequence key, GlobalCommand cmd);
+    void insert_or_update(QKeySequence key, GlobalCommand cmd);
 
     std::optional<GlobalCommand> match(QKeyEvent* e) const;
 

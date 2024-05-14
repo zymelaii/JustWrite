@@ -2,24 +2,24 @@
 
 namespace jwrite {
 
-void TextLine::markAsDirty() const {
-    parent->markAsDirty(line_nr);
+void TextLine::mark_as_dirty() const {
+    parent->mark_as_dirty(line_nr);
 }
 
 QStringView TextLine::text() const {
-    return parent->textOfLine(line_nr);
+    return parent->text_of_line(line_nr);
 }
 
-int TextLine::textOffset() const {
-    return parent->offsetOfLine(line_nr);
+int TextLine::text_offset() const {
+    return parent->offset_of_line(line_nr);
 }
 
-double TextLine::charSpacing() const {
-    const int len = endp_offset - textOffset();
+double TextLine::char_spacing() const {
+    const int len = endp_offset - text_offset();
     return len < 2 ? 0.0 : cached_mean_width * 1.0 / (len - 1);
 }
 
-bool TextLine::isFirstLine() const {
+bool TextLine::is_first_line() const {
     return line_nr == 0;
 }
 
@@ -35,7 +35,7 @@ void TextBlock::reset(const QString *ref, int pos) {
     line.endp_offset = 0;
     lines.push_back(line);
 
-    markAsDirty(0);
+    mark_as_dirty(0);
 }
 
 void TextBlock::release() {
@@ -43,66 +43,66 @@ void TextBlock::release() {
     parent->block_pool.append(this);
 }
 
-void TextBlock::markAsDirty(int line_nr) {
+void TextBlock::mark_as_dirty(int line_nr) {
     Q_ASSERT(line_nr >= 0 && line_nr < lines.size());
-    dirty_line_nr = !isDirty() ? line_nr : qMin(dirty_line_nr, line_nr);
-    parent->markAsDirty();
+    dirty_line_nr = !is_dirty() ? line_nr : qMin(dirty_line_nr, line_nr);
+    parent->mark_as_dirty();
 }
 
-bool TextBlock::isDirty() const {
+bool TextBlock::is_dirty() const {
     Q_ASSERT(dirty_line_nr == -1 || dirty_line_nr >= 0);
     return dirty_line_nr != -1;
 }
 
-void TextBlock::joinDirtyLines() {
-    Q_ASSERT(isDirty());
+void TextBlock::join_dirty_lines() {
+    Q_ASSERT(is_dirty());
     lines[dirty_line_nr].endp_offset = lines.back().endp_offset;
     lines.remove(dirty_line_nr + 1, lines.size() - dirty_line_nr - 1);
 }
 
-int TextBlock::textLength() const {
+int TextBlock::text_len() const {
     return lines.back().endp_offset;
 }
 
-int TextBlock::offsetOfLine(int index) const {
+int TextBlock::offset_of_line(int index) const {
     Q_ASSERT(index >= 0 && index < lines.size());
     return index == 0 ? 0 : lines[index - 1].endp_offset;
 }
 
-int TextBlock::lengthOfLine(int index) const {
+int TextBlock::len_of_line(int index) const {
     Q_ASSERT(index >= 0 && index < lines.size());
-    return lines[index].endp_offset - offsetOfLine(index);
+    return lines[index].endp_offset - offset_of_line(index);
 }
 
-TextLine &TextBlock::currentLine() {
+TextLine &TextBlock::current_line() {
     Q_ASSERT(
         parent->active_block_index != -1
         && this == parent->active_blocks[parent->active_block_index]);
     return lines[parent->cursor.row];
 }
 
-const TextLine &TextBlock::currentLine() const {
+const TextLine &TextBlock::current_line() const {
     Q_ASSERT(
         parent->active_block_index != -1
         && this == parent->active_blocks[parent->active_block_index]);
     return lines[parent->cursor.row];
 }
 
-QStringView TextBlock::textOfLine(int index) const {
+QStringView TextBlock::text_of_line(int index) const {
     Q_ASSERT(index >= 0 && index < lines.size());
     Q_ASSERT(text_ref);
-    const int offset = offsetOfLine(index);
+    const int offset = offset_of_line(index);
     return QStringView(*text_ref).mid(text_pos + offset, lines[index].endp_offset - offset);
 }
 
 QStringView TextBlock::text() const {
     Q_ASSERT(text_ref);
-    return QStringView(*text_ref).mid(text_pos, textLength());
+    return QStringView(*text_ref).mid(text_pos, text_len());
 }
 
-void TextBlock::squeezeAndExtendLastLine(int length) {
+void TextBlock::squeeze_and_extend_last_line(int length) {
     Q_ASSERT(!lines.isEmpty());
-    Q_ASSERT(length >= 0 && length < lengthOfLine(lines.size() - 1));
+    Q_ASSERT(length >= 0 && length < len_of_line(lines.size() - 1));
     TextLine line;
     line.parent               = this;
     line.line_nr              = lines.size();
@@ -112,22 +112,22 @@ void TextBlock::squeezeAndExtendLastLine(int length) {
 }
 
 void TextBlock::render() {
-    Q_ASSERT(isDirty());
+    Q_ASSERT(is_dirty());
     Q_ASSERT(!lines.isEmpty());
-    joinDirtyLines();
+    join_dirty_lines();
     Q_ASSERT(dirty_line_nr + 1 == lines.size());
     const int leading_space_width = parent->standard_char_width * 2;
     while (true) {
-        auto      &line       = lines.back();
-        const auto text       = line.text();
-        const int  max_width  = parent->max_width - (line.isFirstLine() ? leading_space_width : 0);
+        auto      &line      = lines.back();
+        const auto text      = line.text();
+        const int  max_width = parent->max_width - (line.is_first_line() ? leading_space_width : 0);
         int        text_width = max_width;
-        const int  text_len   = TextViewEngine::boundingTextLength(parent->fm, text, text_width);
+        const int  text_len   = TextViewEngine::get_bounding_text_len(parent->fm, text, text_width);
         const int  text_len_diff = text.length() - text_len;
         line.cached_text_width   = text_width;
         line.cached_mean_width   = text_len_diff == 0 ? 0 : max_width - text_width;
         if (text_len_diff == 0) { break; }
-        squeezeAndExtendLastLine(text_len_diff);
+        squeeze_and_extend_last_line(text_len_diff);
     }
     dirty_line_nr = -1;
 }
@@ -141,14 +141,14 @@ void TextViewEngine::CursorPosition::reset() {
 TextViewEngine::TextViewEngine(const QFontMetrics &metrics, int width)
     : fm(metrics) {
     text_ref = nullptr;
-    resetBlockSpacing(6.0);
-    resetLineSpacing(1.0);
+    reset_block_spacing(6.0);
+    reset_line_spacing(1.0);
     reset(metrics, width);
 }
 
 void TextViewEngine::reset(const QFontMetrics &metrics, int width) {
-    resetFontMetrics(fm);
-    resetMaxWidth(width);
+    reset_font_metrics(fm);
+    reset_max_width(width);
     cursor.reset();
     active_blocks.clear();
     active_block_index = -1;
@@ -156,7 +156,7 @@ void TextViewEngine::reset(const QFontMetrics &metrics, int width) {
     preedit_text_ref   = nullptr;
 }
 
-TextBlock *TextViewEngine::allocBlock() {
+TextBlock *TextViewEngine::alloc_block() {
     TextBlock *ptr = nullptr;
     if (block_pool.isEmpty()) {
         ptr = new TextBlock;
@@ -168,64 +168,64 @@ TextBlock *TextViewEngine::allocBlock() {
     return ptr;
 }
 
-bool TextViewEngine::isEmpty() const {
+bool TextViewEngine::is_empty() const {
     return active_blocks.isEmpty();
 }
 
-bool TextViewEngine::isDirty() const {
+bool TextViewEngine::is_dirty() const {
     return dirty;
 }
 
-bool TextViewEngine::isCursorAvailable() const {
+bool TextViewEngine::is_cursor_available() const {
     return active_block_index != -1;
 }
 
-void TextViewEngine::markAsDirty() {
+void TextViewEngine::mark_as_dirty() {
     dirty = true;
 }
 
-TextLine &TextViewEngine::currentLine() {
+TextLine &TextViewEngine::current_line() {
     Q_ASSERT(active_block_index != -1);
-    return currentBlock()->lines[cursor.row];
+    return current_block()->lines[cursor.row];
 }
 
-const TextLine &TextViewEngine::currentLine() const {
+const TextLine &TextViewEngine::current_line() const {
     Q_ASSERT(active_block_index != -1);
-    return currentBlock()->lines[cursor.row];
+    return current_block()->lines[cursor.row];
 }
 
-TextBlock *TextViewEngine::currentBlock() {
-    Q_ASSERT(active_block_index != -1);
-    return active_blocks[active_block_index];
-}
-
-const TextBlock *TextViewEngine::currentBlock() const {
+TextBlock *TextViewEngine::current_block() {
     Q_ASSERT(active_block_index != -1);
     return active_blocks[active_block_index];
 }
 
-void TextViewEngine::resetMaxWidth(int width) {
+const TextBlock *TextViewEngine::current_block() const {
+    Q_ASSERT(active_block_index != -1);
+    return active_blocks[active_block_index];
+}
+
+void TextViewEngine::reset_max_width(int width) {
     max_width = width;
-    for (auto &block : active_blocks) { block->markAsDirty(0); }
+    for (auto &block : active_blocks) { block->mark_as_dirty(0); }
 }
 
-void TextViewEngine::resetBlockSpacing(double spacing) {
+void TextViewEngine::reset_block_spacing(double spacing) {
     block_spacing = spacing;
 }
 
-void TextViewEngine::resetLineSpacing(double ratio) {
+void TextViewEngine::reset_line_spacing(double ratio) {
     line_spacing_ratio = ratio;
 }
 
-void TextViewEngine::resetFontMetrics(const QFontMetrics &metrics) {
+void TextViewEngine::reset_font_metrics(const QFontMetrics &metrics) {
     fm                  = metrics;
     standard_char_width = fm.horizontalAdvance(SAMPLE_CHAR);
     line_height         = fm.height() + fm.descent();
-    for (auto block : active_blocks) { block->markAsDirty(0); }
+    for (auto block : active_blocks) { block->mark_as_dirty(0); }
 }
 
-void TextViewEngine::syncCursorRowCol() {
-    const auto block = currentBlock();
+void TextViewEngine::sync_cursor_row_col() {
+    const auto block = current_block();
     for (int i = 0; i < block->lines.size(); ++i) {
         if (block->lines[i].endp_offset >= cursor.pos) {
             cursor.row = i;
@@ -239,31 +239,31 @@ void TextViewEngine::syncCursorRowCol() {
 void TextViewEngine::render() {
     if (!dirty) { return; }
     if (!active_blocks.isEmpty()) {
-        bool dirty_cursor = active_block_index != -1 && currentBlock()->isDirty();
+        bool dirty_cursor = active_block_index != -1 && current_block()->is_dirty();
         for (auto block : active_blocks) {
-            if (!block->isDirty()) { continue; }
+            if (!block->is_dirty()) { continue; }
             block->render();
         };
-        if (dirty_cursor) { syncCursorRowCol(); }
+        if (dirty_cursor) { sync_cursor_row_col(); }
     }
     dirty = false;
 }
 
-void TextViewEngine::setTextRefUnsafe(const QString *ref, int ref_origin) {
+void TextViewEngine::set_text_ref_unsafe(const QString *ref, int ref_origin) {
     text_ref         = ref;
     text_ref_origin  = ref_origin;
     preedit_text_ref = nullptr;
 }
 
-void TextViewEngine::clearAll() {
+void TextViewEngine::clear_all() {
     active_blocks.clear();
     active_block_index = -1;
     cursor.reset();
     preedit = false;
-    markAsDirty();
+    mark_as_dirty();
 }
 
-void TextViewEngine::insertBlock(int index) {
+void TextViewEngine::insert_block(int index) {
     Q_ASSERT(text_ref);
     Q_ASSERT(index >= 0 && index <= active_blocks.size());
     int pos = -1;
@@ -275,48 +275,48 @@ void TextViewEngine::insertBlock(int index) {
         const auto &block = active_blocks[index - 1];
         pos               = block->text_pos + block->lines.back().endp_offset;
     }
-    auto block    = allocBlock();
+    auto block    = alloc_block();
     block->parent = this;
     block->reset(text_ref, pos);
     active_blocks.insert(index, block);
     if (index <= active_block_index) { ++active_block_index; }
 }
 
-void TextViewEngine::breakBlockAtCursorPos() {
-    if (isEmpty() || active_block_index == -1) { return; }
+void TextViewEngine::break_block_at_cursor_pos() {
+    if (is_empty() || active_block_index == -1) { return; }
     if (cursor.pos == 0) {
         //! NOTE: handle seperately to avoid expensive costs
-        insertBlock(active_block_index);
+        insert_block(active_block_index);
         return;
     }
-    insertBlock(active_block_index + 1);
-    auto  block            = currentBlock();
+    insert_block(active_block_index + 1);
+    auto  block            = current_block();
     auto  next_block       = active_blocks[active_block_index + 1];
     auto &first_line       = next_block->lines.front();
     next_block->text_pos   = block->text_pos + cursor.pos;
-    first_line.endp_offset = block->textLength() - cursor.pos;
-    next_block->markAsDirty(0);
+    first_line.endp_offset = block->text_len() - cursor.pos;
+    next_block->mark_as_dirty(0);
     if (cursor.col > 0) {
         block->lines[cursor.row].endp_offset = cursor.pos;
     } else {
         --cursor.row;
     }
-    block->markAsDirty(cursor.row);
+    block->mark_as_dirty(cursor.row);
     block->lines.remove(cursor.row + 1, block->lines.size() - cursor.row - 1);
     ++active_block_index;
     cursor.pos = 0;
-    syncCursorRowCol();
+    sync_cursor_row_col();
 }
 
-void TextViewEngine::commitInsertion(int text_length) {
-    Q_ASSERT(isCursorAvailable());
+void TextViewEngine::commit_insertion(int text_length) {
+    Q_ASSERT(is_cursor_available());
 
-    auto block = currentBlock();
+    auto block = current_block();
     for (int i = cursor.row; i < block->lines.size(); ++i) {
         block->lines[i].endp_offset += text_length;
     }
 
-    block->markAsDirty(cursor.row);
+    block->mark_as_dirty(cursor.row);
     cursor.pos += text_length;
     cursor.col += text_length;
 
@@ -327,12 +327,12 @@ void TextViewEngine::commitInsertion(int text_length) {
     }
 }
 
-int TextViewEngine::commitDeletion(int times, int &deleted) {
-    Q_ASSERT(isCursorAvailable());
+int TextViewEngine::commit_deletion(int times, int &deleted) {
+    Q_ASSERT(is_cursor_available());
     Q_ASSERT(!preedit);
 
     bool      cursor_moved = false;
-    const int text_offset  = times < 0 ? commitMovement(times, &cursor_moved, false) : 0;
+    const int text_offset  = times < 0 ? commit_movement(times, &cursor_moved, false) : 0;
     if (times < 0 && !cursor_moved) {
         deleted = 0;
         return 0;
@@ -343,10 +343,10 @@ int TextViewEngine::commitDeletion(int times, int &deleted) {
 
     //! stage 1-1: delete within block
     //! stage 1-2: delete from cursor pos to end of the block
-    auto block = currentBlock();
-    if (const auto mean = block->textLength() - cursor.pos; times <= mean) {
-        block->markAsDirty(cursor.row);
-        block->joinDirtyLines();
+    auto block = current_block();
+    if (const auto mean = block->text_len() - cursor.pos; times <= mean) {
+        block->mark_as_dirty(cursor.row);
+        block->join_dirty_lines();
         block->lines.back().endp_offset -= times;
         total_shift                     += times;
         times                            = 0;
@@ -360,7 +360,7 @@ int TextViewEngine::commitDeletion(int times, int &deleted) {
     //! stage 2: delete any complete blocks from the end of block
     int tail_block_index = active_block_index;
     while (tail_block_index + 1 < active_blocks.size()) {
-        const auto stride = active_blocks[tail_block_index + 1]->textLength() + 1;
+        const auto stride = active_blocks[tail_block_index + 1]->text_len() + 1;
         if (times < stride) { break; }
         times       -= stride;
         total_shift += stride - 1;
@@ -368,16 +368,16 @@ int TextViewEngine::commitDeletion(int times, int &deleted) {
     }
 
     //! stage 3: join part of last deleted block into the current block
-    if (cursor.pos == block->textLength() && times > 0
+    if (cursor.pos == block->text_len() && times > 0
         && tail_block_index + 1 < active_blocks.size()) {
-        const auto len                   = active_blocks[++tail_block_index]->textLength();
+        const auto len                   = active_blocks[++tail_block_index]->text_len();
         block->lines.back().endp_offset += len - times + 1;
         total_shift                     += times - 1;
     }
     active_blocks.remove(active_block_index + 1, tail_block_index - active_block_index);
 
     //! stage 4: sync following lines & blocks
-    block->markAsDirty(cursor.row);
+    block->mark_as_dirty(cursor.row);
     for (int i = cursor.row + 1; i < block->lines.size(); ++i) {
         block->lines[i].endp_offset -= total_shift;
     }
@@ -390,8 +390,8 @@ int TextViewEngine::commitDeletion(int times, int &deleted) {
     return text_offset;
 }
 
-int TextViewEngine::commitMovement(int offset, bool *moved, bool hard_move) {
-    Q_ASSERT(isCursorAvailable());
+int TextViewEngine::commit_movement(int offset, bool *moved, bool hard_move) {
+    Q_ASSERT(is_cursor_available());
     Q_ASSERT(!preedit);
 
     const int last_active_block_index = active_block_index;
@@ -402,9 +402,9 @@ int TextViewEngine::commitMovement(int offset, bool *moved, bool hard_move) {
     //! NOTE: in soft mode, move between blocks cost one more movement
 
     while (true) {
-        const auto len = currentBlock()->textLength();
+        const auto len = current_block()->text_len();
         if (cursor.pos < 0 && active_block_index > 0) {
-            cursor.pos += active_blocks[--active_block_index]->textLength();
+            cursor.pos += active_blocks[--active_block_index]->text_len();
             if (!hard_move) {
                 ++cursor.pos;
                 ++offset;
@@ -412,7 +412,7 @@ int TextViewEngine::commitMovement(int offset, bool *moved, bool hard_move) {
             continue;
         }
         if (cursor.pos > len && active_block_index + 1 < active_blocks.size()) {
-            cursor.pos -= active_blocks[active_block_index++]->textLength();
+            cursor.pos -= active_blocks[active_block_index++]->text_len();
             if (!hard_move) {
                 --cursor.pos;
                 --offset;
@@ -425,11 +425,11 @@ int TextViewEngine::commitMovement(int offset, bool *moved, bool hard_move) {
         break;
     }
 
-    syncCursorRowCol();
+    sync_cursor_row_col();
 
-    //! NOTE: `syncCursorRowCol` always place the pos in a smaller row, correct it if possible
-    if (auto block = currentBlock(); offset < 0 && cursor.col == block->lengthOfLine(cursor.row)
-                                     && cursor.row + 1 < block->lines.size()) {
+    //! NOTE: `sync_cursor_row_col` always place the pos in a smaller row, correct it if possible
+    if (auto block = current_block(); offset < 0 && cursor.col == block->len_of_line(cursor.row)
+                                      && cursor.row + 1 < block->lines.size()) {
         ++cursor.row;
         cursor.col = 0;
     }
@@ -441,51 +441,51 @@ int TextViewEngine::commitMovement(int offset, bool *moved, bool hard_move) {
     return offset;
 }
 
-void TextViewEngine::beginPreEdit(QString &ref) {
-    Q_ASSERT(isCursorAvailable());
+void TextViewEngine::begin_preedit(QString &ref) {
+    Q_ASSERT(is_cursor_available());
     Q_ASSERT(!preedit);
 
-    auto block       = currentBlock();
+    auto block       = current_block();
     ref              = block->text().toString();
     preedit_text_ref = &ref;
 
     saved_text_pos    = block->text_pos;
-    saved_text_length = block->textLength();
+    saved_text_length = block->text_len();
     saved_cursor      = cursor;
     block->text_ref   = preedit_text_ref;
     block->text_pos   = 0;
     preedit           = true;
 }
 
-void TextViewEngine::updatePreEditText(int text_length) {
+void TextViewEngine::update_preedit_text(int text_length) {
     Q_ASSERT(preedit);
     Q_ASSERT(text_length >= 0);
 
     const int last_length = cursor.pos - saved_cursor.pos;
     const int offset      = text_length - last_length;
-    auto      block       = currentBlock();
+    auto      block       = current_block();
 
-    block->markAsDirty(saved_cursor.row);
-    block->joinDirtyLines();
+    block->mark_as_dirty(saved_cursor.row);
+    block->join_dirty_lines();
     block->lines.back().endp_offset += offset;
     cursor.pos                      += offset;
 }
 
-void TextViewEngine::commitPreEdit() {
+void TextViewEngine::commit_preedit() {
     Q_ASSERT(preedit);
 
-    auto block      = currentBlock();
+    auto block      = current_block();
     block->text_ref = text_ref;
     block->text_pos = saved_text_pos;
     cursor          = saved_cursor;
     preedit         = false;
 
-    block->markAsDirty(cursor.row);
-    block->joinDirtyLines();
+    block->mark_as_dirty(cursor.row);
+    block->join_dirty_lines();
     block->lines.back().endp_offset = saved_text_length;
 }
 
-int TextViewEngine::boundingTextLength(const QFontMetrics &fm, QStringView text, int &width) {
+int TextViewEngine::get_bounding_text_len(const QFontMetrics &fm, QStringView text, int &width) {
     int text_width = 0;
     int count      = 0;
     for (auto &c : text) {
@@ -499,8 +499,3 @@ int TextViewEngine::boundingTextLength(const QFontMetrics &fm, QStringView text,
 }
 
 }; // namespace jwrite
-
-QDebug operator<<(QDebug dbg, const jwrite::TextViewEngine::CursorPosition &pos) {
-    dbg.nospace() << "(" << pos.pos << "," << pos.row << ":" << pos.col << ")";
-    return dbg.maybeSpace();
-}

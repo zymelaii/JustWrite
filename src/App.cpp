@@ -7,11 +7,11 @@
 
 constexpr QSize PREFERRED_CLIENT_SIZE(1000, 600);
 
-QScreen *getCurrentScreen() {
+QScreen *get_current_screen() {
     return QGuiApplication::screenAt(QCursor::pos());
 }
 
-QRect getPreferredGeometry(const QRect &parent_geo) {
+QRect compute_preferred_geometry(const QRect &parent_geo) {
     const auto w    = qMin(parent_geo.width(), PREFERRED_CLIENT_SIZE.width());
     const auto h    = qMin(parent_geo.height(), PREFERRED_CLIENT_SIZE.height());
     const auto left = parent_geo.left() + (parent_geo.width() - w) / 2;
@@ -26,13 +26,13 @@ int main(int argc, char *argv[]) {
     QFontDatabase::addApplicationFont(QString("fonts/%1.ttf").arg(font_name));
     QApplication::setFont(QFont(font_name, 16));
 
-    auto       screen     = getCurrentScreen();
+    auto       screen     = get_current_screen();
     const auto screen_geo = screen->geometry();
 
-    SetupJwriteProfiler();
+    setup_jwrite_profiler();
 
     JustWrite client;
-    client.setGeometry(getPreferredGeometry(screen_geo));
+    client.setGeometry(compute_preferred_geometry(screen_geo));
     client.show();
 
     return app.exec();

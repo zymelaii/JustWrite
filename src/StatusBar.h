@@ -17,9 +17,8 @@ public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
 
-    void    setSpacing(int spacing);
-    QLabel *addItem(const QString &text);
-    QLabel *addItemAtRightSide(const QString &text);
+    void    set_spacing(int spacing);
+    QLabel *add_item(const QString &text, bool right_side);
 
 private:
     StatusBarPrivate *d;
