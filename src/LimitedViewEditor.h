@@ -65,6 +65,8 @@ public:
 protected:
     EditorTextLoc get_text_loc_at_vpos(const QPoint &pos);
     void          request_update();
+    void          set_cursor_shape(Qt::CursorShape shape);
+    void          restore_cursor_shape();
 
 protected:
     void resizeEvent(QResizeEvent *e) override;

@@ -42,6 +42,8 @@ struct LimitedViewEditorPrivate {
     double scroll_base_y_pos;
     double scroll_ref_y_pos;
 
+    Qt::CursorShape cursor_shape[2];
+
     LimitedViewEditorPrivate() {
         engine                    = nullptr;
         min_text_line_chars       = 12;
@@ -53,6 +55,8 @@ struct LimitedViewEditorPrivate {
         blink_cursor_should_paint = true;
         selected_from             = -1;
         selected_to               = -1;
+        cursor_shape[0]           = Qt::ArrowCursor;
+        cursor_shape[1]           = Qt::ArrowCursor;
         blink_timer.setInterval(500);
         blink_timer.setSingleShot(false);
         auto_scroll_timer.setInterval(10);
@@ -475,6 +479,16 @@ void LimitedViewEditor::request_update() {
     d->blink_timer.stop();
     update();
     d->blink_timer.start();
+}
+
+void LimitedViewEditor::set_cursor_shape(Qt::CursorShape shape) {
+    d->cursor_shape[1] = d->cursor_shape[0];
+    d->cursor_shape[0] = shape;
+    setCursor(shape);
+}
+
+void LimitedViewEditor::restore_cursor_shape() {
+    set_cursor_shape(d->cursor_shape[1]);
 }
 
 void LimitedViewEditor::resizeEvent(QResizeEvent *e) {
@@ -972,8 +986,11 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
 
-    if (e->button() == Qt::MiddleButton) {
-        setCursor(Qt::SizeVerCursor);
+    qDebug() << __FUNCTION__;
+
+    if (e->button() == Qt::MiddleButton) { d->auto_scroll_mode = !d->auto_scroll_mode; }
+    if (d->auto_scroll_mode) {
+        set_cursor_shape(Qt::SizeVerCursor);
         d->auto_scroll_mode  = true;
         d->scroll_base_y_pos = e->pos().y();
         d->scroll_ref_y_pos  = d->scroll_base_y_pos;
@@ -982,8 +999,7 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     } else {
         d->auto_scroll_mode = false;
         d->auto_scroll_timer.stop();
-        //! FIXME: restore cursor
-        setCursor(Qt::ArrowCursor);
+        restore_cursor_shape();
     }
 
     if (e->button() != Qt::LeftButton) { return; }
@@ -1056,9 +1072,9 @@ void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
 
     const auto &area = get_text_area();
     if (area.contains(e->pos())) {
-        setCursor(Qt::IBeamCursor);
+        set_cursor_shape(Qt::IBeamCursor);
     } else {
-        setCursor(Qt::ArrowCursor);
+        set_cursor_shape(Qt::ArrowCursor);
     }
 }
 

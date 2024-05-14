@@ -314,9 +314,9 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
 
     if (event->type() == QEvent::MouseButtonDblClick) {
         auto e = static_cast<QMouseEvent *>(event);
-        if (e->buttons() == Qt::MiddleButton) {
+        if (e->buttons() == Qt::RightButton) {
             d->messy_input->kill();
-            return true;
+            return false;
         }
     }
 
