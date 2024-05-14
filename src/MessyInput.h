@@ -3,7 +3,9 @@
 
 class MessyInputWorker : public QThread {
 public:
-    explicit MessyInputWorker(QObject *parent = nullptr);
+    explicit MessyInputWorker(QObject *parent = nullptr)
+        : QThread(parent)
+        , enabled_(false) {}
 
     void start();
     void kill();

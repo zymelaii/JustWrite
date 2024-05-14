@@ -986,7 +986,15 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
 
-    if (e->button() == Qt::MiddleButton) { d->auto_scroll_mode = !d->auto_scroll_mode; }
+    bool cancel_auto_scroll = false;
+
+    if (e->button() == Qt::MiddleButton) {
+        d->auto_scroll_mode = !d->auto_scroll_mode;
+    } else if (d->auto_scroll_mode) {
+        cancel_auto_scroll  = true;
+        d->auto_scroll_mode = false;
+    }
+
     if (d->auto_scroll_mode) {
         set_cursor_shape(Qt::SizeVerCursor);
         d->auto_scroll_mode  = true;
@@ -999,6 +1007,10 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
         d->auto_scroll_timer.stop();
         restore_cursor_shape();
     }
+
+    //! NOTE: do not perform the locating action if the current click is to cancel the auto scroll
+    //! mode, so that user could have more choices when they scroll to a different view pos
+    if (cancel_auto_scroll) { return; }
 
     if (e->button() != Qt::LeftButton) { return; }
 
