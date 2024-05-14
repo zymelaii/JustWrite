@@ -15,8 +15,10 @@ public:
     explicit JustWrite(QWidget *parent = nullptr);
     virtual ~JustWrite();
 
+public slots:
     void create_new_volume(int index, const QString &title);
     void create_new_chapter(int volume_index, const QString &title);
+    void open_empty_chapter();
     void open_chapter(int cid);
 
 protected:

@@ -3,31 +3,15 @@
 #include <QPainter>
 #include <QMouseEvent>
 
-namespace Ui {
-class CatalogTree {
-public:
-    void setup(QWidget *self) {
-        auto font = self->font();
-        font.setPointSize(10);
-        self->setFont(font);
-
-        self->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
-    }
-};
-}; // namespace Ui
-
 CatalogTree::CatalogTree(QWidget *parent)
     : QWidget(parent)
     , expanded_vid_{-1}
-    , hover_row_{-1}
-    , ui{new Ui::CatalogTree} {
-    ui->setup(this);
+    , hover_row_{-1} {
+    setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
     setMouseTracking(true);
 }
 
-CatalogTree::~CatalogTree() {
-    delete ui;
-}
+CatalogTree::~CatalogTree() {}
 
 QSize CatalogTree::sizeHint() const {
     const auto fm         = fontMetrics();

@@ -1,10 +1,12 @@
 #include "JustWrite.h"
 #include "LimitedViewEditor.h"
-#include "JustWriteSidebar.h"
 #include "StatusBar.h"
 #include "GlobalCommand.h"
 #include "TextInputCommand.h"
+#include "FlatButton.h"
+#include "CatalogTree.h"
 #include "ProfileUtils.h"
+#include "MessyInput.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -16,67 +18,20 @@
 #include <atomic>
 #include <random>
 #include <QMap>
-
-#ifdef WIN32
-
-#include <windows.h>
-#include <QThread>
-
-std::atomic_bool develop_messy_mode{false};
-
-class DevelopModeMessyTest : public QThread {
-public:
-    explicit DevelopModeMessyTest(QObject *parent = nullptr)
-        : QThread(parent) {}
-
-protected:
-    void sendKey(int key) {
-        keybd_event(key, 0, 0, 0);
-        keybd_event(key, 0, KEYEVENTF_KEYUP, 0);
-    }
-
-    void run() override {
-        std::random_device{};
-        std::mt19937                       rng{std::random_device{}()};
-        std::uniform_int_distribution<int> type_dist{1, 12};
-        std::uniform_int_distribution<int> char_dist{'A', 'Z'};
-        std::uniform_int_distribution<int> nl_dist{0, 4};
-
-        while (true) {
-            if (!develop_messy_mode) { continue; }
-
-            const int type_times = type_dist(rng);
-            for (int j = 0; j < type_times; ++j) {
-                if (!develop_messy_mode) { break; }
-                const auto ch = char_dist(rng);
-                sendKey(ch);
-                Sleep(1);
-            }
-
-            if (!develop_messy_mode) { continue; }
-            sendKey(VK_SPACE);
-            Sleep(10);
-
-            if (nl_dist(rng) == 0) {
-                if (!develop_messy_mode) { continue; }
-                sendKey(VK_RETURN);
-                Sleep(10);
-            }
-        }
-    }
-};
-
-DevelopModeMessyTest *messy_input_thread = nullptr;
-
-#endif
+#include <QFrame>
 
 namespace Ui {
 struct JustWrite {
-    jwrite::StatusBar  *status_bar;
-    ::JustWriteSidebar *sidebar;
-    LimitedViewEditor  *editor;
-    QLabel             *total_words;
-    QLabel             *datetime;
+    jwrite::StatusBar *status_bar;
+    LimitedViewEditor *editor;
+    QLabel            *total_words;
+    QLabel            *datetime;
+
+    //! left sidebar
+    QWidget       *sidebar;
+    FlatButton    *new_volume;
+    FlatButton    *new_chapter;
+    ::CatalogTree *book_dir;
 
     JustWrite(::JustWrite *parent) {
         auto layout         = new QVBoxLayout(parent);
@@ -84,8 +39,57 @@ struct JustWrite {
         auto layout_content = new QHBoxLayout(content);
         auto splitter       = new QSplitter;
         status_bar          = new jwrite::StatusBar;
-        sidebar             = new ::JustWriteSidebar(splitter);
-        editor              = new LimitedViewEditor(splitter);
+        editor              = new LimitedViewEditor;
+
+        //! setup left sidebar
+        {
+            sidebar     = new QWidget;
+            new_volume  = new FlatButton;
+            new_chapter = new FlatButton;
+            book_dir    = new ::CatalogTree;
+
+            auto btn_line        = new QWidget;
+            auto btn_line_layout = new QHBoxLayout(btn_line);
+            btn_line_layout->setContentsMargins({});
+            btn_line_layout->addStretch();
+            btn_line_layout->addWidget(new_volume);
+            btn_line_layout->addStretch();
+            btn_line_layout->addWidget(new_chapter);
+            btn_line_layout->addStretch();
+
+            auto sep_line = new QFrame;
+            sep_line->setFrameShape(QFrame::HLine);
+
+            auto sidebar_layout = new QVBoxLayout(sidebar);
+            sidebar_layout->setContentsMargins(0, 10, 0, 10);
+            sidebar_layout->addWidget(btn_line);
+            sidebar_layout->addWidget(sep_line);
+            sidebar_layout->addWidget(book_dir);
+
+            auto font = parent->font();
+            font.setPointSize(10);
+            sidebar->setFont(font);
+
+            auto pal = parent->palette();
+            pal.setColor(QPalette::WindowText, QColor(70, 70, 70));
+            sep_line->setPalette(pal);
+
+            new_volume->setContentsMargins(10, 0, 10, 0);
+            new_volume->set_text(QObject::tr("新建卷"));
+            new_volume->set_text_alignment(Qt::AlignCenter);
+            new_volume->set_radius(6);
+
+            new_chapter->setContentsMargins(10, 0, 10, 0);
+            new_chapter->set_text(QObject::tr("新建章"));
+            new_chapter->set_text_alignment(Qt::AlignCenter);
+            new_chapter->set_radius(6);
+
+            sidebar->setAutoFillBackground(true);
+            sidebar->setMinimumWidth(200);
+        }
+
+        splitter->addWidget(sidebar);
+        splitter->addWidget(editor);
 
         layout->addWidget(content);
         layout->addWidget(status_bar);
@@ -145,12 +149,21 @@ struct JustWritePrivate {
     QMap<int, QString>       chapters;
     QMap<int, EditorTextLoc> chapter_locs;
 
+    MessyInputWorker *messy_input;
+
     JustWritePrivate() {
         command_manager.load_default();
         sec_timer.setInterval(1000);
         sec_timer.setSingleShot(false);
 
         current_cid = -1;
+    }
+
+    ~JustWritePrivate() {
+        if (messy_input) {
+            messy_input->kill();
+            delete messy_input;
+        }
     }
 };
 
@@ -161,44 +174,59 @@ JustWrite::JustWrite(QWidget *parent)
     ui->editor->installEventFilter(this);
     ui->editor->setFocus();
 
+    d->messy_input = new MessyInputWorker(this);
+
     connect(
-        ui->editor,
-        &LimitedViewEditor::requireEmptyChapter,
-        ui->sidebar,
-        &JustWriteSidebar::open_empty_chapter);
+        ui->editor, &LimitedViewEditor::requireEmptyChapter, this, &JustWrite::open_empty_chapter);
     connect(ui->editor, &LimitedViewEditor::textChanged, this, [this](const QString &text) {
         ui->total_words->setText(QString("全本共 %1 字").arg(text.length()));
     });
-    connect(ui->sidebar, &JustWriteSidebar::chapterOpened, this, &JustWrite::open_chapter);
+    connect(ui->book_dir, &CatalogTree::itemClicked, this, [this](int vid, int cid) {
+        open_chapter(cid);
+    });
+    connect(ui->new_volume, &FlatButton::pressed, this, [this] {
+        create_new_volume(-1, "");
+    });
+    connect(ui->new_chapter, &FlatButton::pressed, this, [this] {
+        create_new_chapter(-1, "");
+    });
     connect(&d->sec_timer, &QTimer::timeout, this, [this] {
         ui->datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
     });
+    connect(ui->editor, &LimitedViewEditor::focusLost, this, [this] {
+        d->messy_input->kill();
+    });
 
     d->sec_timer.start();
-
-#ifdef WIN32
-    connect(ui->editor, &LimitedViewEditor::focusLost, this, [] {
-        develop_messy_mode = false;
-    });
-    messy_input_thread = new DevelopModeMessyTest(this);
-    messy_input_thread->start();
-#endif
 }
 
 JustWrite::~JustWrite() {
-#ifdef WIN32
-    messy_input_thread->terminate();
-    messy_input_thread->wait();
-#endif
-
     delete d;
     delete ui;
 }
 
+void JustWrite::create_new_volume(int index, const QString &title) {
+    if (index == -1) { index = ui->book_dir->get_total_volumes(); }
+    ui->book_dir->add_volume(index, title);
+}
+
+void JustWrite::create_new_chapter(int volume_index, const QString &title) {
+    if (volume_index == -1) { volume_index = ui->book_dir->get_total_volumes() - 1; }
+    const auto vid = ui->book_dir->get_volume(volume_index);
+    Q_ASSERT(vid != -1);
+    int cid = ui->book_dir->add_chapter(vid, title);
+    open_chapter(cid);
+}
+
+void JustWrite::open_empty_chapter() {
+    const auto vid = ui->book_dir->get_volume(0);
+    if (vid == -1) { create_new_volume(0, ""); }
+    create_new_chapter(-1, "");
+}
+
 void JustWrite::open_chapter(int cid) {
-#ifdef WIN32
-    if (develop_messy_mode) { return; }
-#endif
+    if (d->messy_input->is_running()) { return; }
+
     if (cid == d->current_cid) { return; }
 
     jwrite_profiler_start(SwitchChapter);
@@ -227,14 +255,12 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto e = static_cast<QKeyEvent *>(event);
 
-#ifdef WIN32
         //! NOTE: block special keys in messy input mode to avoid unexpceted behavior
         //! ATTENTION: this can not block global shortcut keys
         if (const auto key = QKeyCombination::fromCombined(e->key() | e->modifiers());
-            !TextInputCommandManager::is_printable_char(key) && develop_messy_mode) {
+            !TextInputCommandManager::is_printable_char(key) && d->messy_input->is_running()) {
             return true;
         }
-#endif
 
         if (auto opt = d->command_manager.match(e)) {
             const auto action = *opt;
@@ -248,25 +274,21 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
                     ui->editor->set_soft_center_mode(!ui->editor->is_soft_center_mode());
                 } break;
                 case GlobalCommand::DEV_EnableMessyInput: {
-#ifdef WIN32
                     ui->editor->setFocus();
-                    develop_messy_mode = true;
-#endif
+                    d->messy_input->start();
                 } break;
             }
             return true;
         }
     }
 
-#ifdef WIN32
     if (event->type() == QEvent::MouseButtonDblClick) {
         auto e = static_cast<QMouseEvent *>(event);
-        if (develop_messy_mode && e->buttons() == Qt::MiddleButton) {
-            develop_messy_mode = false;
+        if (e->buttons() == Qt::MiddleButton) {
+            d->messy_input->kill();
             return true;
         }
     }
-#endif
 
     return false;
 }

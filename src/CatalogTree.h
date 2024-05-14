@@ -44,7 +44,6 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
 
 private:
-    Ui::CatalogTree      *ui;
     QList<int>            vid_list_;
     QMap<int, QList<int>> cid_list_set_;
     QList<QString>        title_list_;
