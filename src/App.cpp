@@ -20,6 +20,7 @@ QRect compute_preferred_geometry(const QRect &parent_geo) {
 }
 
 int main(int argc, char *argv[]) {
+    QGuiApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
     QApplication app(argc, argv);
 
     const auto font_name = u8"更纱黑体 SC Light";

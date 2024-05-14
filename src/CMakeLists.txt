@@ -8,6 +8,7 @@ target_link_libraries(
 	${CMAKE_PROJECT_NAME}
 	PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets
 	PRIVATE magic_enum::magic_enum
+	PRIVATE QWindowKit::Widgets
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")

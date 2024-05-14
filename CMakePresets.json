@@ -8,7 +8,7 @@
       "binaryDir": "${sourceDir}/build/${presetName}",
       "installDir": "${sourceDir}/install/${presetName}",
       "cacheVariables": {
-        "BUILD_TEST": true
+        "JWRITE_BUILD_TESTS": true
       }
     },
     {

@@ -27,16 +27,40 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-option(BUILD_TEST "Build the unittests" ON)
+option(JWRITE_BUILD_TESTS "Build the unittests" ON)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
-find_package(magic_enum REQUIRED)
+
+find_package(magic_enum QUIET)
+if(NOT magic_enum_FOUND)
+    set(MAGIC_ENUM_OPT_BUILD_EXAMPLES OFF)
+    set(MAGIC_ENUM_OPT_BUILD_TESTS OFF)
+    set(MAGIC_ENUM_OPT_INSTALL OFF)
+    add_subdirectory(deps/magic_enum)
+endif()
+
+find_package(QWindowKit QUIET)
+if(NOT QWindowKit_FOUND)
+    set(QWINDOWKIT_INSTALL OFF)
+    set(QWINDOWKIT_BUILD_STATIC ON)
+    set(QWINDOWKIT_BUILD_EXAMPLES OFF)
+    set(QWINDOWKIT_BUILD_EXAMPLES OFF)
+    add_subdirectory(deps/qwindowskit)
+endif()
+
+if(JWRITE_BUILD_TESTS)
+    find_package(GTest)
+    if(NOT GTest_FOUND)
+        message(WARNING "-- GTest not found, skip building tests")
+        set(JWRITE_BUILD_TESTS OFF)
+    endif()
+endif()
 
 set(INSTALL_TARGETS ${CMAKE_PROJECT_NAME})
 
 add_subdirectory(src)
 
-if(BUILD_TEST)
+if(JWRITE_BUILD_TESTS)
     add_subdirectory(test)
     list(APPEND INSTALL_TARGETS jwrite-test)
 endif()

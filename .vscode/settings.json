@@ -29,5 +29,7 @@
     "git.ignoredRepositories": [
         "deps/magic_enum",
         "deps/qwindowskit",
-    ]
+        "deps/qwindowskit/qmsetup",
+        "deps/qwindowskit/syscmdline",
+    ],
 }

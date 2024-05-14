@@ -1,7 +1,5 @@
 project(jwrite-test)
 
-find_package(GTest REQUIRED)
-
 aux_source_directory(. SOURCE_FILES)
 
 list(APPEND SOURCE_FILES ../src/TextViewEngine.cpp)

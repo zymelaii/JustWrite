@@ -5,6 +5,7 @@
 #include "TextInputCommand.h"
 #include "FlatButton.h"
 #include "CatalogTree.h"
+#include "TitleBar.h"
 #include "ProfileUtils.h"
 #include "MessyInput.h"
 #include <QVBoxLayout>
@@ -19,11 +20,13 @@
 #include <random>
 #include <QMap>
 #include <QFrame>
+#include <QWKWidgets/widgetwindowagent.h>
 
 namespace Ui {
 struct JustWrite {
-    jwrite::StatusBar *status_bar;
+    jwrite::TitleBar  *title_bar;
     LimitedViewEditor *editor;
+    jwrite::StatusBar *status_bar;
     QLabel            *total_words;
     QLabel            *datetime;
 
@@ -33,13 +36,16 @@ struct JustWrite {
     FlatButton    *new_chapter;
     ::CatalogTree *book_dir;
 
-    JustWrite(::JustWrite *parent) {
+    QWK::WidgetWindowAgent *agent;
+
+    void setup(::JustWrite *parent) {
         auto layout         = new QVBoxLayout(parent);
         auto content        = new QWidget;
         auto layout_content = new QHBoxLayout(content);
         auto splitter       = new QSplitter;
-        status_bar          = new jwrite::StatusBar;
+        title_bar           = new jwrite::TitleBar;
         editor              = new LimitedViewEditor;
+        status_bar          = new jwrite::StatusBar;
 
         //! setup left sidebar
         {
@@ -91,6 +97,7 @@ struct JustWrite {
         splitter->addWidget(sidebar);
         splitter->addWidget(editor);
 
+        layout->addWidget(title_bar);
         layout->addWidget(content);
         layout->addWidget(status_bar);
         layout->setContentsMargins({});
@@ -99,24 +106,39 @@ struct JustWrite {
         layout_content->addWidget(splitter);
         layout_content->setContentsMargins({});
 
+        struct {
+            const QColor Window     = QColor(60, 60, 60);
+            const QColor WindowText = QColor(160, 160, 160);
+            const QColor Frame      = QColor(38, 38, 38);
+            const QColor Base       = QColor(30, 30, 30);
+            const QColor Text       = QColor(255, 255, 255);
+            const QColor Highlight  = QColor(50, 100, 150, 150);
+        } Palette;
+
         auto pal = editor->palette();
-        pal.setColor(QPalette::Window, QColor(30, 30, 30));
-        pal.setColor(QPalette::Text, Qt::white);
-        pal.setColor(QPalette::Highlight, QColor(50, 100, 150, 150));
+        pal.setColor(QPalette::Window, Palette.Window);
+        pal.setColor(QPalette::WindowText, Palette.WindowText);
+        title_bar->setPalette(pal);
+        status_bar->setPalette(pal);
+
+        pal = editor->palette();
+        pal.setColor(QPalette::Window, Palette.Base);
+        pal.setColor(QPalette::Text, Palette.Text);
+        pal.setColor(QPalette::Highlight, Palette.Highlight);
         editor->setPalette(pal);
 
         pal = sidebar->palette();
-        pal.setColor(QPalette::Window, QColor(38, 38, 38));
-        pal.setColor(QPalette::WindowText, Qt::white);
-        pal.setColor(QPalette::Base, QColor(38, 38, 38));
-        pal.setColor(QPalette::Button, QColor(55, 55, 55));
-        pal.setColor(QPalette::Text, Qt::white);
-        pal.setColor(QPalette::ButtonText, Qt::white);
+        pal.setColor(QPalette::Window, Palette.Frame);
+        pal.setColor(QPalette::WindowText, Palette.WindowText);
+        pal.setColor(QPalette::Base, Palette.Frame);
+        pal.setColor(QPalette::Button, Palette.Window);
+        pal.setColor(QPalette::Text, Palette.WindowText);
+        pal.setColor(QPalette::ButtonText, Palette.WindowText);
         sidebar->setPalette(pal);
 
         pal = parent->palette();
-        pal.setColor(QPalette::Window, QColor(30, 30, 30));
-        pal.setColor(QPalette::WindowText, Qt::white);
+        pal.setColor(QPalette::Window, Palette.Base);
+        pal.setColor(QPalette::WindowText, Palette.WindowText);
         parent->setPalette(pal);
 
         splitter->setOrientation(Qt::Horizontal);
@@ -127,10 +149,13 @@ struct JustWrite {
 
         content->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 
-        auto font = status_bar->font();
+        auto font = title_bar->font();
         font.setPointSize(10);
-        pal.setColor(QPalette::Window, QColor(0, 120, 200));
-        status_bar->setPalette(pal);
+        title_bar->setFont(font);
+        title_bar->set_title("只写 丶 阐释你的梦");
+
+        font = status_bar->font();
+        font.setPointSize(10);
         status_bar->setFont(font);
         status_bar->set_spacing(20);
         status_bar->setContentsMargins(12, 4, 12, 4);
@@ -138,6 +163,10 @@ struct JustWrite {
         datetime    = status_bar->add_item("0000-00-00", true);
 
         parent->setAutoFillBackground(true);
+
+        agent = new QWK::WidgetWindowAgent(parent);
+        agent->setup(parent);
+        agent->setTitleBar(title_bar);
     }
 };
 } // namespace Ui
@@ -170,7 +199,8 @@ struct JustWritePrivate {
 JustWrite::JustWrite(QWidget *parent)
     : QWidget(parent)
     , d{new JustWritePrivate}
-    , ui{new Ui::JustWrite(this)} {
+    , ui{new Ui::JustWrite} {
+    ui->setup(this);
     ui->editor->installEventFilter(this);
     ui->editor->setFocus();
 
