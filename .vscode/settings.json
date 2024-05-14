@@ -26,4 +26,8 @@
         "--pch-storage=disk",
         "-j=8"
     ],
+    "git.ignoredRepositories": [
+        "deps/magic_enum",
+        "deps/qwindowskit",
+    ]
 }
