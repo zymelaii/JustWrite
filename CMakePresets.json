@@ -1,14 +1,30 @@
 {
-  "version": 2,
+  "version": 3,
   "configurePresets": [
     {
-      "name": "default",
+      "name": "ninja-base",
+      "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_INSTALL_PREFIX": "build",
-        "BUILD_TEST": "OFF"
+        "BUILD_TEST": true
+      }
+    },
+    {
+      "name": "windows-x64-debug",
+      "displayName": "Windows x64 Debug",
+      "inherits": "ninja-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows-x64-release",
+      "displayName": "Windows x64 Release",
+      "inherits": "ninja-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
       }
     }
   ]
