@@ -859,19 +859,11 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             move_to(block->text_pos + block->text_len(), false);
         } break;
         case TextInputCommand::MoveToStartOfDocument: {
-            d->engine->active_block_index = 0;
-            d->engine->cursor.reset();
-            d->cursor_pos = 0;
+            move_to(0, false);
             scoll_to_start();
         } break;
         case TextInputCommand::MoveToEndOfDocument: {
-            auto &cursor                  = d->engine->cursor;
-            d->engine->active_block_index = d->engine->active_blocks.size() - 1;
-            auto block                    = d->engine->current_block();
-            cursor.pos                    = block->text_len();
-            cursor.row                    = block->lines.size() - 1;
-            cursor.col                    = block->len_of_line(block->lines.size() - 1);
-            d->cursor_pos                 = d->text.size();
+            move_to(d->engine->text_ref->length(), false);
             scroll_to_end();
         } break;
         case TextInputCommand::MoveToPrevPage: {
