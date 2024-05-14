@@ -13,7 +13,7 @@ void MessyInputWorker::start() {
 void MessyInputWorker::kill() {
     if (!enabled_) { return; }
     enabled_ = false;
-    terminate();
+    quit();
     wait();
 }
 

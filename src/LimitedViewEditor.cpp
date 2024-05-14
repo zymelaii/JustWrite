@@ -986,8 +986,6 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
 
-    qDebug() << __FUNCTION__;
-
     if (e->button() == Qt::MiddleButton) { d->auto_scroll_mode = !d->auto_scroll_mode; }
     if (d->auto_scroll_mode) {
         set_cursor_shape(Qt::SizeVerCursor);
