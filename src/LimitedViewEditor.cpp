@@ -27,6 +27,7 @@ struct LimitedViewEditorPrivate {
     bool                             edit_op_happens;
     bool                             blink_cursor_should_paint;
     QTimer                           blink_timer;
+    QTimer                           auto_scroll_timer;
     int                              cursor_pos;
     QString                          text;
     QString                          preedit_text;
@@ -36,6 +37,10 @@ struct LimitedViewEditorPrivate {
     jwrite::TextViewEngine          *engine;
     jwrite::TextInputCommandManager *input_manager;
     QMap<int, double>                cached_block_y_pos;
+
+    bool   auto_scroll_mode;
+    double scroll_base_y_pos;
+    double scroll_ref_y_pos;
 
     LimitedViewEditorPrivate() {
         engine                    = nullptr;
@@ -50,6 +55,8 @@ struct LimitedViewEditorPrivate {
         selected_to               = -1;
         blink_timer.setInterval(500);
         blink_timer.setSingleShot(false);
+        auto_scroll_timer.setInterval(10);
+        auto_scroll_timer.setSingleShot(false);
     }
 
     ~LimitedViewEditorPrivate() {
@@ -84,6 +91,10 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
     });
     connect(&d->blink_timer, &QTimer::timeout, this, [this] {
         d->blink_cursor_should_paint = !d->blink_cursor_should_paint;
+        update();
+    });
+    connect(&d->auto_scroll_timer, &QTimer::timeout, this, [this] {
+        scroll((d->scroll_base_y_pos - d->scroll_ref_y_pos) / 10, false);
         update();
     });
 }
@@ -363,15 +374,23 @@ void LimitedViewEditor::del(int times) {
 
 void LimitedViewEditor::copy() {
     if (!d->engine->is_cursor_available()) { return; }
-    auto clipboard  = QGuiApplication::clipboard();
-    auto block_text = d->engine->current_block()->text().toString();
-    clipboard->setText(block_text);
+    auto clipboard = QGuiApplication::clipboard();
+    if (has_sel()) {
+        //! TODO: copy selected text
+    } else {
+        auto block_text = d->engine->current_block()->text().toString();
+        clipboard->setText(block_text);
+    }
 }
 
 void LimitedViewEditor::cut() {
-    copy();
-    move(-d->engine->cursor.pos, false);
-    del(d->engine->current_block()->text_len());
+    if (has_sel()) {
+        //! TODO: cut selected text
+    } else {
+        copy();
+        move(-d->engine->cursor.pos, false);
+        del(d->engine->current_block()->text_len());
+    }
 }
 
 void LimitedViewEditor::paste() {
@@ -953,6 +972,20 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
 void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
 
+    if (e->button() == Qt::MiddleButton) {
+        setCursor(Qt::SizeVerCursor);
+        d->auto_scroll_mode  = true;
+        d->scroll_base_y_pos = e->pos().y();
+        d->scroll_ref_y_pos  = d->scroll_base_y_pos;
+        d->auto_scroll_timer.start();
+        return;
+    } else {
+        d->auto_scroll_mode = false;
+        d->auto_scroll_timer.stop();
+        //! FIXME: restore cursor
+        setCursor(Qt::ArrowCursor);
+    }
+
     if (e->button() != Qt::LeftButton) { return; }
 
     unset_sel();
@@ -989,6 +1022,11 @@ void LimitedViewEditor::mouseDoubleClickEvent(QMouseEvent *e) {
 
 void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
     QWidget::mouseMoveEvent(e);
+
+    if (d->auto_scroll_mode) {
+        d->scroll_ref_y_pos = e->pos().y();
+        return;
+    }
 
     if (e->buttons() & Qt::LeftButton) {
         do {
