@@ -6,7 +6,7 @@ add_executable(${CMAKE_PROJECT_NAME} ${SOURCE_FILES})
 
 target_link_libraries(
 	${CMAKE_PROJECT_NAME}
-	PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets
+	PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Widgets
 	PRIVATE magic_enum::magic_enum
 	PRIVATE QWindowKit::Widgets
 )

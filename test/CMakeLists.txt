@@ -10,6 +10,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE ../src)
 
 target_link_libraries(
 	${PROJECT_NAME}
-	PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets
+	PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Widgets
 	PRIVATE GTest::gtest
 )

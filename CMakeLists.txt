@@ -29,7 +29,8 @@ set(CMAKE_AUTORCC ON)
 
 option(JWRITE_BUILD_TESTS "Build the unittests" ON)
 
-find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
+find_package(QT NAMES Qt6 COMPONENTS Core Gui Widgets REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Core Gui Widgets REQUIRED)
 
 find_package(magic_enum QUIET)
 if(NOT magic_enum_FOUND)
