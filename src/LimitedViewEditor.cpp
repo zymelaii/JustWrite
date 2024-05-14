@@ -304,7 +304,7 @@ void LimitedViewEditor::move(int offset, bool extend_sel) {
     cursor_moved           = cursor_moved || cursor_moved_tmp;
 
     if (!extend_sel) {
-        unset_set();
+        unset_sel();
     } else if (has_sel()) {
         Q_ASSERT(
             d->cursor_pos >= d->selected_from && d->cursor_pos <= d->selected_to
@@ -329,7 +329,7 @@ void LimitedViewEditor::move_to(int pos, bool extend_sel) {
     if (extend_sel) {
         d->selected_to = d->cursor_pos;
     } else if (has_sel()) {
-        unset_set();
+        unset_sel();
     }
 
     request_update();
@@ -385,7 +385,7 @@ bool LimitedViewEditor::has_sel() const {
     return d->selected_from != -1 && d->selected_to != -1 && d->selected_from != d->selected_to;
 }
 
-void LimitedViewEditor::unset_set() {
+void LimitedViewEditor::unset_sel() {
     if (has_sel()) {
         d->selected_from = -1;
         d->selected_to   = -1;
@@ -706,7 +706,7 @@ void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
 
 void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
-    unset_set();
+    unset_sel();
     d->blink_timer.stop();
     d->engine->active_block_index = -1;
     emit focusLost();
@@ -741,7 +741,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
             break_into_newline();
         } break;
         case TextInputCommand::Cancel: {
-            unset_set();
+            unset_sel();
         } break;
         case TextInputCommand::Undo: {
         } break;
@@ -955,7 +955,7 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
 
     if (e->button() != Qt::LeftButton) { return; }
 
-    unset_set();
+    unset_sel();
 
     if (const auto e = d->engine; e->is_empty() || e->is_dirty()) { return; }
     if (d->engine->preedit) { return; }
@@ -984,7 +984,7 @@ void LimitedViewEditor::mouseReleaseEvent(QMouseEvent *e) {
 
 void LimitedViewEditor::mouseDoubleClickEvent(QMouseEvent *e) {
     QWidget::mouseDoubleClickEvent(e);
-    unset_set();
+    unset_sel();
 }
 
 void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {

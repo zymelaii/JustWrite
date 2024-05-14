@@ -58,7 +58,7 @@ public:
     void paste();
 
     bool has_sel() const;
-    void unset_set();
+    void unset_sel();
 
     void break_into_newline();
 
