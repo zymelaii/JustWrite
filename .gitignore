@@ -37,8 +37,15 @@
 
 # End of https://www.toptal.com/developers/gitignore/api/c++
 
-.*/
+# Build files
 build/
 build-*/
 install/
+
+# Defaultly hidden files
+.*/
 !.github/
+
+# Understand project files
+/*.und
+/id.txt
