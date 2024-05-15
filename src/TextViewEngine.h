@@ -102,7 +102,7 @@ struct TextViewEngine {
     void             reset_block_spacing(double spacing);
     void             reset_line_spacing(double ratio);
     void             reset_font_metrics(const QFontMetrics &metrics);
-    void             sync_cursor_row_col();
+    void             sync_cursor_row_col(int direction_hint);
     void             render();
 
     //! TODO: promote unsafe method into the safe one

@@ -178,7 +178,7 @@ void LimitedViewEditor::update_text_loc(EditorTextLoc loc) {
     e->active_block_index = loc.block_index;
     e->cursor.pos         = loc.pos;
     d->cursor_pos         = e->current_block()->text_pos + e->cursor.pos;
-    e->sync_cursor_row_col();
+    e->sync_cursor_row_col(0);
     scroll_to_cursor();
 }
 
@@ -899,12 +899,30 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::DeleteNextWord: {
         } break;
         case TextInputCommand::DeleteToStartOfLine: {
-            del(-qMax(d->engine->cursor.col, 1));
+            const auto &block  = d->engine->current_block();
+            const auto &cursor = d->engine->cursor;
+            int         times  = cursor.col;
+            if (times == 0) {
+                if (cursor.row > 0) {
+                    times = block->len_of_line(cursor.row - 1);
+                } else {
+                    times = 1;
+                }
+            }
+            del(-times);
         } break;
         case TextInputCommand::DeleteToEndOfLine: {
-            const auto block  = d->engine->current_block();
-            const auto cursor = d->engine->cursor;
-            del(qMax(block->len_of_line(cursor.row) - cursor.col, 1));
+            const auto &block  = d->engine->current_block();
+            const auto &cursor = d->engine->cursor;
+            int         times  = block->len_of_line(cursor.row) - cursor.col;
+            if (times == 0) {
+                if (cursor.row + 1 == block->lines.size()) {
+                    times = 1;
+                } else {
+                    times = block->len_of_line(cursor.row + 1);
+                }
+            }
+            del(times);
         } break;
         case TextInputCommand::DeleteToStartOfBlock: {
         } break;

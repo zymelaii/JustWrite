@@ -224,12 +224,21 @@ void TextViewEngine::reset_font_metrics(const QFontMetrics &metrics) {
     for (auto block : active_blocks) { block->mark_as_dirty(0); }
 }
 
-void TextViewEngine::sync_cursor_row_col() {
+void TextViewEngine::sync_cursor_row_col(int direction_hint) {
     const auto block = current_block();
     for (int i = 0; i < block->lines.size(); ++i) {
-        if (block->lines[i].endp_offset >= cursor.pos) {
+        if (const auto line = block->lines[i]; line.endp_offset >= cursor.pos) {
             cursor.row = i;
-            cursor.col = i == 0 ? cursor.pos : cursor.pos - block->lines[i - 1].endp_offset;
+            cursor.col = cursor.pos;
+            if (i > 0) {
+                const auto last_line  = block->lines[i - 1];
+                cursor.col           -= last_line.endp_offset;
+            }
+            if (direction_hint < 0 && cursor.col == line.text().length()
+                && cursor.row + 1 < block->lines.size()) {
+                ++cursor.row;
+                cursor.col = 0;
+            }
             return;
         }
     }
@@ -244,7 +253,7 @@ void TextViewEngine::render() {
             if (!block->is_dirty()) { continue; }
             block->render();
         };
-        if (dirty_cursor) { sync_cursor_row_col(); }
+        if (dirty_cursor) { sync_cursor_row_col(0); }
     }
     dirty = false;
 }
@@ -305,7 +314,7 @@ void TextViewEngine::break_block_at_cursor_pos() {
     block->lines.remove(cursor.row + 1, block->lines.size() - cursor.row - 1);
     ++active_block_index;
     cursor.pos = 0;
-    sync_cursor_row_col();
+    sync_cursor_row_col(0);
 }
 
 void TextViewEngine::commit_insertion(int text_length) {
@@ -387,6 +396,12 @@ int TextViewEngine::commit_deletion(int times, int &deleted) {
 
     deleted = total_shift;
 
+    //! ATTENTION: mark as dirty would cause the cursor lost its direction hint when running render
+    //! method by TextViewEngine, here we render the block in advance to keep the info of cursor
+    //! FIXME: render per delete op could be costful, consider a better solution
+    //! HINT: by checking the dirty cursor pos to guess the direction hint and render it in engine
+    block->render();
+
     return text_offset;
 }
 
@@ -397,7 +412,8 @@ int TextViewEngine::commit_movement(int offset, bool *moved, bool hard_move) {
     const int last_active_block_index = active_block_index;
     const int last_cursor_pos         = cursor.pos;
 
-    cursor.pos += offset;
+    const int direction_hint  = offset;
+    cursor.pos               += offset;
 
     //! NOTE: in soft mode, move between blocks cost one more movement
 
@@ -425,14 +441,7 @@ int TextViewEngine::commit_movement(int offset, bool *moved, bool hard_move) {
         break;
     }
 
-    sync_cursor_row_col();
-
-    //! NOTE: `sync_cursor_row_col` always place the pos in a smaller row, correct it if possible
-    if (auto block = current_block(); offset < 0 && cursor.col == block->len_of_line(cursor.row)
-                                      && cursor.row + 1 < block->lines.size()) {
-        ++cursor.row;
-        cursor.col = 0;
-    }
+    sync_cursor_row_col(direction_hint);
 
     if (moved) {
         *moved = last_active_block_index != active_block_index || last_cursor_pos != cursor.pos;
