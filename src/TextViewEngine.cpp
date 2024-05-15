@@ -336,12 +336,12 @@ void TextViewEngine::commit_insertion(int text_length) {
     }
 }
 
-int TextViewEngine::commit_deletion(int times, int &deleted) {
+int TextViewEngine::commit_deletion(int times, int &deleted, bool hard_del) {
     Q_ASSERT(is_cursor_available());
     Q_ASSERT(!preedit);
 
     bool      cursor_moved = false;
-    const int text_offset  = times < 0 ? commit_movement(times, &cursor_moved, false) : 0;
+    const int text_offset  = times < 0 ? commit_movement(times, &cursor_moved, hard_del) : 0;
     if (times < 0 && !cursor_moved) {
         deleted = 0;
         return 0;
@@ -369,19 +369,23 @@ int TextViewEngine::commit_deletion(int times, int &deleted) {
     //! stage 2: delete any complete blocks from the end of block
     int tail_block_index = active_block_index;
     while (tail_block_index + 1 < active_blocks.size()) {
-        const auto stride = active_blocks[tail_block_index + 1]->text_len() + 1;
+        int stride = active_blocks[tail_block_index + 1]->text_len();
+        if (!hard_del) { ++stride; }
         if (times < stride) { break; }
         times       -= stride;
-        total_shift += stride - 1;
+        total_shift += stride;
+        if (!hard_del) { --total_shift; }
         ++tail_block_index;
     }
 
     //! stage 3: join part of last deleted block into the current block
     if (cursor.pos == block->text_len() && times > 0
         && tail_block_index + 1 < active_blocks.size()) {
-        const auto len                   = active_blocks[++tail_block_index]->text_len();
-        block->lines.back().endp_offset += len - times + 1;
-        total_shift                     += times - 1;
+        const int len                = active_blocks[++tail_block_index]->text_len();
+        int       next_block_del_len = times;
+        if (!hard_del) { --next_block_del_len; }
+        block->lines.back().endp_offset += len - next_block_del_len;
+        total_shift                     += next_block_del_len;
     }
     active_blocks.remove(active_block_index + 1, tail_block_index - active_block_index);
 

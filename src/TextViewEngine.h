@@ -111,7 +111,7 @@ struct TextViewEngine {
     void insert_block(int index);
     void break_block_at_cursor_pos();
     void commit_insertion(int text_length);
-    int  commit_deletion(int times, int &deleted);
+    int  commit_deletion(int times, int &deleted, bool hard_del);
     int  commit_movement(int offset, bool *moved, bool hard_move);
     void begin_preedit(QString &ref);
     void update_preedit_text(int text_length);

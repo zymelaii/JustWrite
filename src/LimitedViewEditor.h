@@ -57,8 +57,9 @@ public:
     void cut();
     void paste();
 
-    bool has_sel() const;
-    void unset_sel();
+    bool            has_sel() const;
+    void            unset_sel();
+    QPair<int, int> sel_region() const;
 
     void break_into_newline();
 

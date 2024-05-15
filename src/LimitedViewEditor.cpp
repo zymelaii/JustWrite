@@ -307,9 +307,8 @@ void LimitedViewEditor::move(int offset, bool extend_sel) {
 
     //! FIXME: cursor within selected region
     if (has_sel() && !extend_sel) {
-        const int sel_from   = qMin(d->selected_from, d->selected_to);
-        const int sel_to     = qMax(d->selected_from, d->selected_to);
-        const int target_pos = offset > 0 ? sel_to : sel_from;
+        const auto sel        = sel_region();
+        const int  target_pos = offset > 0 ? sel.second : sel.first;
         text_offset  = d->engine->commit_movement(target_pos - d->cursor_pos, &cursor_moved, true);
         offset      -= offset > 0 ? 1 : -1;
     }
@@ -353,6 +352,8 @@ void LimitedViewEditor::move_to(int pos, bool extend_sel) {
 void LimitedViewEditor::insert(const QString &text) {
     Q_ASSERT(d->engine->is_cursor_available());
 
+    if (has_sel()) { del(1); }
+
     if (inserted_pair_filter(text)) { return; }
 
     d->text.insert(d->cursor_pos, text);
@@ -366,10 +367,20 @@ void LimitedViewEditor::insert(const QString &text) {
 
 void LimitedViewEditor::del(int times) {
     //! NOTE: times means delete |times| chars, and the sign indicates the del direction
-    //! TODO: delete selected text
-    int       deleted  = 0;
-    const int offset   = d->engine->commit_deletion(times, deleted);
-    d->cursor_pos     += offset;
+
+    int  deleted  = 0;
+    int  offset   = 0;
+    bool hard_del = false;
+
+    if (has_sel()) {
+        times    = qAbs(d->selected_from - d->selected_to);
+        hard_del = true;
+        move(-1, false);
+        Q_ASSERT(!has_sel());
+    }
+
+    offset         = d->engine->commit_deletion(times, deleted, hard_del);
+    d->cursor_pos += offset;
     d->text.remove(d->cursor_pos, deleted);
 
     emit textChanged(*d->engine->text_ref);
@@ -380,20 +391,24 @@ void LimitedViewEditor::copy() {
     if (!d->engine->is_cursor_available()) { return; }
     auto clipboard = QGuiApplication::clipboard();
     if (has_sel()) {
-        //! TODO: copy selected text
+        const auto sel         = sel_region();
+        const auto copied_text = d->engine->text_ref->mid(sel.first, sel.second - sel.first);
+        clipboard->setText(copied_text);
     } else {
-        auto block_text = d->engine->current_block()->text().toString();
-        clipboard->setText(block_text);
+        //! copy the current block if has no sel
+        const auto copied_text = d->engine->current_block()->text();
+        clipboard->setText(copied_text.toString());
     }
 }
 
 void LimitedViewEditor::cut() {
+    copy();
     if (has_sel()) {
-        //! TODO: cut selected text
+        del(1);
     } else {
-        copy();
+        //! cut the current block if has no sel, also remove the block
         move(-d->engine->cursor.pos, false);
-        del(d->engine->current_block()->text_len());
+        del(d->engine->current_block()->text_len() + 1);
     }
 }
 
@@ -414,6 +429,13 @@ void LimitedViewEditor::unset_sel() {
         d->selected_to   = -1;
         request_update();
     }
+}
+
+QPair<int, int> LimitedViewEditor::sel_region() const {
+    if (!has_sel()) { return {d->cursor_pos, d->cursor_pos}; }
+    const int sel_left  = qMin(d->selected_from, d->selected_to);
+    const int sel_right = qMax(d->selected_from, d->selected_to);
+    return {sel_left, sel_right};
 }
 
 void LimitedViewEditor::break_into_newline() {
