@@ -37,6 +37,7 @@ struct LimitedViewEditorPrivate {
     jwrite::TextViewEngine          *engine;
     jwrite::TextInputCommandManager *input_manager;
     QMap<int, double>                cached_block_y_pos;
+    bool                             inserted_filter_enabled;
 
     bool   auto_scroll_mode;
     double scroll_base_y_pos;
@@ -55,6 +56,7 @@ struct LimitedViewEditorPrivate {
         blink_cursor_should_paint = true;
         selected_from             = -1;
         selected_to               = -1;
+        inserted_filter_enabled   = true;
         cursor_shape[0]           = Qt::ArrowCursor;
         cursor_shape[1]           = Qt::ArrowCursor;
         blink_timer.setInterval(500);
@@ -258,13 +260,15 @@ void LimitedViewEditor::scroll_to_end() {
 }
 
 void LimitedViewEditor::insert_raw_text(const QString &text) {
-    auto text_list = text.split('\n');
+    auto text_list             = text.split('\n');
+    d->inserted_filter_enabled = false;
     for (int i = 0; i < text_list.size(); ++i) {
         auto text = text_list[i].trimmed();
         if (text.isEmpty()) { continue; }
         insert(text);
         if (i + 1 < text_list.size()) { break_into_newline(); }
     }
+    d->inserted_filter_enabled = true;
 }
 
 bool LimitedViewEditor::inserted_pair_filter(const QString &text) {
@@ -354,7 +358,9 @@ void LimitedViewEditor::insert(const QString &text) {
 
     if (has_sel()) { del(1); }
 
-    if (inserted_pair_filter(text)) { return; }
+    if (d->inserted_filter_enabled) {
+        if (inserted_pair_filter(text)) { return; }
+    }
 
     d->text.insert(d->cursor_pos, text);
     const int len  = text.length();
@@ -1141,6 +1147,8 @@ void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
     if (const auto preedit_text = e->preeditString(); !preedit_text.isEmpty()) {
         if (!d->engine->preedit) {
             d->engine->begin_preedit(d->preedit_text);
+            //! FIXME: merge into insert op
+            if (has_sel()) { del(1); }
         } else {
             d->preedit_text.remove(saved_cursor.pos, last_preedit_text_len);
         }
