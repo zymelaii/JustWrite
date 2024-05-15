@@ -1082,6 +1082,15 @@ void LimitedViewEditor::mouseReleaseEvent(QMouseEvent *e) {
 void LimitedViewEditor::mouseDoubleClickEvent(QMouseEvent *e) {
     QWidget::mouseDoubleClickEvent(e);
     unset_sel();
+
+    if (e->button() == Qt::LeftButton) {
+        const auto loc = get_text_loc_at_vpos(e->pos());
+        if (loc.block_index != -1) {
+            const auto block = d->engine->active_blocks[loc.block_index];
+            move_to(block->text_pos, false);
+            move(block->text_len(), true);
+        }
+    }
 }
 
 void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
