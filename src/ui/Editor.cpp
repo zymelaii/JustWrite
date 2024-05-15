@@ -21,66 +21,8 @@
 
 namespace jwrite::Ui {
 
-struct EditorPrivate {
-    int                              min_text_line_chars;
-    bool                             align_center;
-    double                           scroll;
-    double                           expected_scroll;
-    bool                             edit_op_happens;
-    bool                             blink_cursor_should_paint;
-    QTimer                           blink_timer;
-    QTimer                           auto_scroll_timer;
-    int                              cursor_pos;
-    QString                          text;
-    QString                          preedit_text;
-    int                              selected_from;
-    int                              selected_to;
-    QMargins                         margins;
-    jwrite::TextViewEngine          *engine;
-    jwrite::TextInputCommandManager *input_manager;
-    QMap<int, double>                cached_block_y_pos;
-    bool                             inserted_filter_enabled;
-
-    bool   auto_scroll_mode;
-    double scroll_base_y_pos;
-    double scroll_ref_y_pos;
-
-    bool   vertical_move;
-    double vertical_move_x_pos;
-
-    Qt::CursorShape cursor_shape[2];
-
-    EditorPrivate() {
-        engine                    = nullptr;
-        min_text_line_chars       = 12;
-        cursor_pos                = 0;
-        align_center              = false;
-        scroll                    = 0.0;
-        expected_scroll           = scroll;
-        edit_op_happens           = false;
-        blink_cursor_should_paint = true;
-        selected_from             = -1;
-        selected_to               = -1;
-        inserted_filter_enabled   = true;
-        vertical_move             = false;
-        cursor_shape[0]           = Qt::ArrowCursor;
-        cursor_shape[1]           = Qt::ArrowCursor;
-        blink_timer.setInterval(500);
-        blink_timer.setSingleShot(false);
-        auto_scroll_timer.setInterval(10);
-        auto_scroll_timer.setSingleShot(false);
-    }
-
-    ~EditorPrivate() {
-        Q_ASSERT(engine);
-        delete input_manager;
-        delete engine;
-    }
-};
-
 Editor::Editor(QWidget *parent)
-    : QWidget(parent)
-    , d{new EditorPrivate} {
+    : QWidget(parent) {
     setFocusPolicy(Qt::ClickFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
     setAutoFillBackground(true);
@@ -89,181 +31,174 @@ Editor::Editor(QWidget *parent)
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
     setContentsMargins({});
 
-    set_soft_center_mode(true);
+    min_text_line_chars_       = 12;
+    soft_center_mode_          = false;
+    expected_scroll_           = 0.0;
+    blink_cursor_should_paint_ = true;
+    inserted_filter_enabled_   = true;
+    cursor_shape_[0]           = Qt::ArrowCursor;
+    cursor_shape_[1]           = Qt::ArrowCursor;
 
-    d->engine        = new jwrite::TextViewEngine(fontMetrics(), get_text_area().width());
-    d->input_manager = new jwrite::GeneralTextInputCommandManager(*d->engine);
-    d->input_manager->load_default();
+    setSoftCenterMode(true);
 
-    scoll_to_start();
+    const auto text_area = textArea();
+    context_             = new jwrite::VisualTextEditContext(fontMetrics(), text_area.width());
+    context_->resize_viewport(context_->viewport_width, text_area.height());
+
+    blink_timer_.setInterval(500);
+    blink_timer_.setSingleShot(false);
+    auto_scroll_timer_.setInterval(10);
+    auto_scroll_timer_.setSingleShot(false);
+
+    input_manager_ = new jwrite::GeneralTextInputCommandManager(context_->engine);
+    input_manager_->load_default();
+
+    scrollToStart();
 
     connect(this, &Editor::textAreaChanged, this, [this](QRect area) {
-        d->engine->reset_max_width(area.width());
+        context_->resize_viewport(area.width(), area.height());
         update();
     });
-    connect(&d->blink_timer, &QTimer::timeout, this, [this] {
-        d->blink_cursor_should_paint = !d->blink_cursor_should_paint;
+    connect(&blink_timer_, &QTimer::timeout, this, [this] {
+        blink_cursor_should_paint_ = !blink_cursor_should_paint_;
         update();
     });
-    connect(&d->auto_scroll_timer, &QTimer::timeout, this, [this] {
-        scroll((d->scroll_base_y_pos - d->scroll_ref_y_pos) / 10, false);
+    connect(&auto_scroll_timer_, &QTimer::timeout, this, [this] {
+        scroll((scroll_ref_y_pos_ - scroll_base_y_pos_) / 10, false);
         update();
     });
 }
 
 Editor::~Editor() {
-    delete d;
+    delete context_;
+    delete input_manager_;
 }
 
-bool Editor::is_soft_center_mode() const {
-    return d->align_center;
+bool Editor::softCenterMode() const {
+    return soft_center_mode_;
 }
 
-void Editor::set_soft_center_mode(bool value) {
-    d->align_center = value;
-    if (d->align_center) {
+void Editor::setSoftCenterMode(bool value) {
+    soft_center_mode_ = value;
+    if (soft_center_mode_) {
         const auto min_margin     = 32;
         const auto max_text_width = 1000;
         const auto mean_width     = qMax(0, width() - min_margin * 2);
         const auto text_width     = qMin<int>(mean_width * 0.8, max_text_width);
         const auto margin         = (width() - text_width) / 2;
-        d->margins                = QMargins(margin, 4, margin, 4);
+        margins_                  = QMargins(margin, 4, margin, 4);
     } else {
-        d->margins = QMargins(4, 4, 4, 4);
+        margins_ = QMargins(4, 4, 4, 4);
     }
-    emit textAreaChanged(get_text_area());
+    emit textAreaChanged(textArea());
 }
 
-QRect Editor::get_text_area() const {
-    return contentsRect() - d->margins;
-}
-
-EditorTextLoc Editor::get_current_text_loc() const {
-    EditorTextLoc loc{};
-    loc.block_index = d->engine->active_block_index;
-    loc.pos         = d->engine->cursor.pos;
-    return loc;
-}
-
-EditorTextLoc Editor::get_text_loc_at_pos(int pos) const {
-    EditorTextLoc loc{};
-    loc.block_index = -1;
-    for (int i = 0; i < d->engine->active_blocks.size(); ++i) {
-        auto block = d->engine->active_blocks[i];
-        if (pos < block->text_pos) { continue; }
-        if (pos > block->text_pos + block->text_len()) { continue; }
-        int relpos = pos - block->text_pos;
-        for (int j = 0; j < block->lines.size(); ++j) {
-            auto line = block->lines[j];
-            if (relpos > line.text_offset() + line.text().length()) { continue; }
-            loc.block_index = i;
-            loc.pos         = relpos;
-            loc.row         = j;
-            loc.col         = relpos - line.text_offset();
-            return loc;
-        }
-    }
-    return loc;
-}
-
-void Editor::update_text_loc(EditorTextLoc loc) {
-    const auto e = d->engine;
-    if (!(loc.block_index >= 0 && loc.block_index < e->active_blocks.size())) { return; }
-    e->active_block_index = loc.block_index;
-    e->cursor.pos         = loc.pos;
-    d->cursor_pos         = e->current_block()->text_pos + e->cursor.pos;
-    e->sync_cursor_row_col(0);
-    scroll_to_cursor();
+QRect Editor::textArea() const {
+    return contentsRect() - margins_;
 }
 
 void Editor::reset(QString &text, bool swap) {
-    if (d->engine->preedit) { cancel_preedit(); }
+    context_->quit_preedit();
 
     QStringList blocks{};
-    for (auto block : d->engine->active_blocks) { blocks << block->text().toString(); }
+    for (auto block : context_->engine.active_blocks) { blocks << block->text().toString(); }
     auto text_out = blocks.join("\n");
-    d->text.clear();
+    context_->edit_text.clear();
 
-    d->engine->clear_all();
-    d->engine->insert_block(0);
-    d->engine->active_block_index = 0;
-    d->cursor_pos                 = 0;
-    d->engine->cursor.reset();
-    insert_raw_text(text);
+    context_->engine.clear_all();
+    context_->engine.insert_block(0);
+    context_->engine.active_block_index = 0;
+    context_->engine.cursor.reset();
 
-    d->engine->active_block_index = 0;
-    d->cursor_pos                 = 0;
-    d->engine->cursor.reset();
+    context_->edit_cursor_pos = 0;
+
+    context_->cached_render_data_ready = false;
+    context_->cursor_moved             = true;
+    context_->vertical_move_state      = false;
+    context_->unset_sel();
+
+    insertRawText(text);
+
+    context_->engine.active_block_index = 0;
+    context_->edit_cursor_pos           = 0;
+    context_->engine.cursor.reset();
 
     if (swap) { text.swap(text_out); }
 
-    request_update();
+    requestUpdate();
 }
 
-void Editor::cancel_preedit() {
-    Q_ASSERT(d->engine->preedit);
-    const auto &cursor                = d->engine->cursor;
-    const auto &saved_cursor          = d->engine->saved_cursor;
-    const auto  last_preedit_text_len = cursor.pos - saved_cursor.pos;
-    d->preedit_text.remove(saved_cursor.pos, last_preedit_text_len);
-    d->engine->update_preedit_text(0);
-    d->engine->commit_preedit();
+void Editor::scrollToCursor() {
+    context_->cursor_moved = true;
+    requestUpdate();
 }
 
-void Editor::scroll_to_cursor() {
-    d->edit_op_happens = true;
-    request_update();
+VisualTextEditContext::TextLoc Editor::currentTextLoc() const {
+    VisualTextEditContext::TextLoc loc{.block_index = -1};
+
+    const auto &e = context_->engine;
+    if (!e.is_cursor_available()) { return loc; }
+
+    loc.block_index = e.active_block_index;
+    loc.row         = e.cursor.row;
+    loc.col         = e.cursor.col;
+    loc.pos         = e.current_line().text_offset() + e.cursor.col;
+
+    return loc;
+}
+
+void Editor::setCursorToTextLoc(const VisualTextEditContext::TextLoc &loc) {
+    context_->set_cursor_to_textloc(loc, 0);
+}
+
+QPair<double, double> Editor::scrollBound() const {
+    const auto  &e            = context_->engine;
+    const double line_spacing = e.line_spacing_ratio * e.line_height;
+
+    const double slack     = line_spacing + e.block_spacing;
+    const double min_y_pos = -slack;
+    double       max_y_pos = -slack;
+    for (auto block : e.active_blocks) {
+        max_y_pos += block->lines.size() * line_spacing + e.block_spacing;
+    }
+
+    return {min_y_pos, max_y_pos};
 }
 
 void Editor::scroll(double delta, bool smooth) {
-    const auto e            = d->engine;
-    const auto line_spacing = e->line_spacing_ratio * e->line_height;
-    double     max_scroll   = line_spacing + e->block_spacing;
-    double     min_scroll   = 0;
-    for (auto block : e->active_blocks) {
-        min_scroll -= block->lines.size() * line_spacing + e->block_spacing;
-    }
-    min_scroll         += line_spacing + e->block_spacing;
-    d->expected_scroll  = qBound<double>(min_scroll, d->scroll + delta, max_scroll);
-    if (!smooth) { d->scroll = d->expected_scroll; }
+    const auto [min_y_pos, max_y_pos] = scrollBound();
+    expected_scroll_ = qBound(min_y_pos, context_->viewport_y_pos + delta, max_y_pos);
+    if (!smooth) { context_->scroll_to(expected_scroll_); }
     update();
 }
 
-void Editor::scoll_to_start() {
-    const auto   e            = d->engine;
-    const auto   line_spacing = e->line_spacing_ratio * e->line_height;
-    const double max_scroll   = line_spacing + e->block_spacing;
-    d->expected_scroll        = max_scroll;
-    d->scroll                 = d->expected_scroll;
-    request_update();
+void Editor::scrollToStart() {
+    const auto [min_y_pos, _] = scrollBound();
+    expected_scroll_          = min_y_pos;
+    context_->scroll_to(expected_scroll_);
+    requestUpdate();
 }
 
-void Editor::scroll_to_end() {
-    const auto e            = d->engine;
-    const auto line_spacing = e->line_spacing_ratio * e->line_height;
-    double     min_scroll   = 0;
-    for (auto block : e->active_blocks) {
-        min_scroll -= block->lines.size() * line_spacing + e->block_spacing;
-    }
-    min_scroll         += line_spacing + e->block_spacing;
-    d->expected_scroll  = min_scroll;
-    d->scroll           = d->expected_scroll;
-    request_update();
+void Editor::scrollToEnd() {
+    const auto [_, max_y_pos] = scrollBound();
+    expected_scroll_          = max_y_pos;
+    context_->scroll_to(expected_scroll_);
+    requestUpdate();
 }
 
-void Editor::insert_raw_text(const QString &text) {
-    auto text_list             = text.split('\n');
-    d->inserted_filter_enabled = false;
+void Editor::insertRawText(const QString &text) {
+    auto text_list           = text.split('\n');
+    inserted_filter_enabled_ = false;
     for (int i = 0; i < text_list.size(); ++i) {
         auto text = text_list[i].trimmed();
         if (text.isEmpty()) { continue; }
-        insert(text);
-        if (i + 1 < text_list.size()) { break_into_newline(); }
+        context_->insert(text);
+        if (i + 1 < text_list.size()) { breakIntoNewLine(); }
     }
-    d->inserted_filter_enabled = true;
+    inserted_filter_enabled_ = true;
 }
 
-bool Editor::inserted_pair_filter(const QString &text) {
+bool Editor::insertedPairFilter(const QString &text) {
     static QMap<QString, QString> QUOTE_PAIRS{
         {"“", "”"},
         {"‘", "’"},
@@ -281,138 +216,74 @@ bool Editor::inserted_pair_filter(const QString &text) {
 
     if (QUOTE_PAIRS.count(text)) {
         auto matched = QUOTE_PAIRS[text];
-        insert(text + matched);
-        move(-1, false);
+        context_->insert(text + matched);
+        context_->move(-1, false);
         return true;
     }
 
+    const auto &e = context_->engine;
     if (auto index = QUOTE_PAIRS.values().indexOf(text); index != -1) {
-        int pos = d->engine->current_block()->text_pos + d->engine->cursor.pos;
-        if (pos == d->engine->text_ref->length()) { return false; }
-        if (d->engine->text_ref->at(pos) == text) { return true; }
+        const int pos = context_->edit_cursor_pos;
+        if (pos == context_->edit_text.length()) { return false; }
+        if (context_->edit_text.at(pos) == text) { return true; }
     }
 
     return false;
 }
 
 void Editor::move(int offset, bool extend_sel) {
-    //! FIXME: remove patch
-    d->vertical_move = false;
-
-    if (offset == 0) { return; }
-
-    bool cursor_moved = false;
-    int  text_offset  = 0;
-
-    //! FIXME: cursor within selected region
-    if (has_sel() && !extend_sel) {
-        const auto sel        = sel_region();
-        const int  target_pos = offset > 0 ? sel.second : sel.first;
-        text_offset  = d->engine->commit_movement(target_pos - d->cursor_pos, &cursor_moved, true);
-        offset      -= offset > 0 ? 1 : -1;
-    }
-
-    bool cursor_moved_tmp  = cursor_moved;
-    text_offset           += d->engine->commit_movement(offset, &cursor_moved, false);
-    cursor_moved           = cursor_moved || cursor_moved_tmp;
-
-    if (!extend_sel) {
-        unset_sel();
-    } else if (has_sel()) {
-        Q_ASSERT(
-            d->cursor_pos >= d->selected_from && d->cursor_pos <= d->selected_to
-            || d->cursor_pos >= d->selected_to && d->cursor_pos <= d->selected_from);
-        d->selected_to += text_offset;
-    } else {
-        d->selected_from = d->cursor_pos;
-        d->selected_to   = d->cursor_pos + text_offset;
-    }
-
-    d->cursor_pos += text_offset;
-    if (cursor_moved) { request_update(); }
+    context_->move(offset, extend_sel);
+    requestUpdate();
 }
 
-void Editor::move_to(int pos, bool extend_sel) {
-    //! FIXME: remove patch
-    d->vertical_move = false;
-
-    //! ATTENTION: pos equals cursor_pos doesn't mean that no action will be taken
-
-    if (!has_sel() && extend_sel) { d->selected_from = d->cursor_pos; }
-
-    d->cursor_pos += d->engine->commit_movement(pos - d->cursor_pos, nullptr, true);
-
-    if (extend_sel) {
-        d->selected_to = d->cursor_pos;
-    } else if (has_sel()) {
-        unset_sel();
-    }
-
-    request_update();
+void Editor::moveTo(int pos, bool extend_sel) {
+    context_->move_to(pos, extend_sel);
+    requestUpdate();
 }
 
 void Editor::insert(const QString &text) {
-    Q_ASSERT(d->engine->is_cursor_available());
+    if (context_->engine.preedit) { context_->commit_preedit(); }
 
-    if (has_sel()) { del(1); }
-
-    if (d->inserted_filter_enabled) {
-        if (inserted_pair_filter(text)) { return; }
+    if (inserted_filter_enabled_) {
+        if (insertedPairFilter(text)) { return; }
     }
 
-    d->text.insert(d->cursor_pos, text);
-    const int len  = text.length();
-    d->cursor_pos += len;
-    d->engine->commit_insertion(len);
+    jwrite_profiler_start(GeneralTextEdit);
+    context_->insert(text);
+    jwrite_profiler_record(GeneralTextEdit);
 
-    emit textChanged(*d->engine->text_ref);
-    request_update();
+    emit textChanged(context_->edit_text);
+    requestUpdate();
 }
 
 void Editor::del(int times) {
-    //! NOTE: times means delete |times| chars, and the sign indicates the del direction
-
-    int  deleted  = 0;
-    int  offset   = 0;
-    bool hard_del = false;
-
-    if (has_sel()) {
-        times    = qAbs(d->selected_from - d->selected_to);
-        hard_del = true;
-        move(-1, false);
-        Q_ASSERT(!has_sel());
-    }
-
-    offset         = d->engine->commit_deletion(times, deleted, hard_del);
-    d->cursor_pos += offset;
-    d->text.remove(d->cursor_pos, deleted);
-
-    emit textChanged(*d->engine->text_ref);
-    request_update();
+    context_->del(times, false);
+    emit textChanged(context_->edit_text);
+    requestUpdate();
 }
 
 void Editor::copy() {
-    if (!d->engine->is_cursor_available()) { return; }
     auto clipboard = QGuiApplication::clipboard();
-    if (has_sel()) {
-        const auto sel         = sel_region();
-        const auto copied_text = d->engine->text_ref->mid(sel.first, sel.second - sel.first);
+    if (context_->has_sel()) {
+        const int  pos         = qMin(context_->sel.from, context_->sel.to);
+        const auto copied_text = context_->edit_text.mid(pos, context_->sel.len());
         clipboard->setText(copied_text);
-    } else {
+    } else if (const auto &e = context_->engine; e.is_cursor_available()) {
         //! copy the current block if has no sel
-        const auto copied_text = d->engine->current_block()->text();
+        const auto copied_text = e.current_block()->text();
         clipboard->setText(copied_text.toString());
     }
 }
 
 void Editor::cut() {
     copy();
-    if (has_sel()) {
-        del(1);
+    if (context_->has_sel()) {
+        context_->remove_sel_region();
     } else {
         //! cut the current block if has no sel, also remove the block
-        move(-d->engine->cursor.pos, false);
-        del(d->engine->current_block()->text_len() + 1);
+        const auto &e = context_->engine;
+        context_->move(-e.cursor.pos, false);
+        context_->del(e.current_block()->text_len() + 1, false);
     }
 }
 
@@ -420,182 +291,35 @@ void Editor::paste() {
     auto clipboard = QGuiApplication::clipboard();
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
-    insert_raw_text(clipboard->text());
+    insertRawText(clipboard->text());
 }
 
-bool Editor::has_sel() const {
-    return d->selected_from != -1 && d->selected_to != -1 && d->selected_from != d->selected_to;
+void Editor::breakIntoNewLine() {
+    context_->remove_sel_region();
+    context_->engine.break_block_at_cursor_pos();
+    requestUpdate();
 }
 
-void Editor::unset_sel() {
-    if (has_sel()) {
-        d->selected_from = -1;
-        d->selected_to   = -1;
-        request_update();
-    }
+void Editor::verticalMove(bool up) {
+    context_->vertical_move(up);
+    requestUpdate();
 }
 
-QPair<int, int> Editor::sel_region() const {
-    if (!has_sel()) { return {d->cursor_pos, d->cursor_pos}; }
-    const int sel_left  = qMin(d->selected_from, d->selected_to);
-    const int sel_right = qMax(d->selected_from, d->selected_to);
-    return {sel_left, sel_right};
-}
-
-void Editor::break_into_newline() {
-    d->engine->break_block_at_cursor_pos();
-    request_update();
-}
-
-void Editor::visual_vertical_move(bool up) {
-    const int direction_hint = up ? -1 : 1;
-    if (has_sel()) { move(direction_hint, false); }
-
-    const auto &fm          = d->engine->fm;
-    const auto &block       = d->engine->current_block();
-    const auto &line        = block->current_line();
-    const auto &cursor      = d->engine->cursor;
-    const int   block_index = d->engine->active_block_index;
-    const auto  text_area   = get_text_area();
-
-    if (!d->vertical_move) {
-        d->vertical_move        = true;
-        d->vertical_move_x_pos  = text_area.left();
-        d->vertical_move_x_pos += line.is_first_line() ? d->engine->standard_char_width * 2 : 0;
-        d->vertical_move_x_pos += cursor.col * line.char_spacing();
-        for (auto c : line.text().mid(0, cursor.col)) {
-            d->vertical_move_x_pos += d->engine->fm.horizontalAdvance(c);
-        }
-    }
-
-    jwrite::TextLine *target_line = nullptr;
-
-    bool cross_block = false;
-
-    do {
-        if (up) {
-            if (cursor.row > 0) {
-                target_line = &block->lines[cursor.row - 1];
-                break;
-            }
-            if (block_index == 0) {
-                move_to(block->text_pos, false);
-                break;
-            }
-            target_line = &d->engine->active_blocks[block_index - 1]->lines.back();
-            cross_block = true;
-        } else {
-            if (cursor.row + 1 < block->lines.size()) {
-                target_line = &block->lines[cursor.row + 1];
-                break;
-            }
-            if (block_index + 1 == d->engine->active_blocks.size()) {
-                move_to(block->text_pos + block->text_len(), false);
-                break;
-            }
-            target_line = &d->engine->active_blocks[block_index + 1]->lines.front();
-            cross_block = true;
-        }
-    } while (0);
-
-    if (!target_line) {
-        d->vertical_move = false;
-        return;
-    }
-
-    const auto &target_text  = target_line->text();
-    int         target_col   = 0;
-    double      target_x_pos = text_area.left();
-    target_x_pos += target_line->is_first_line() ? d->engine->standard_char_width * 2 : 0;
-
-    while (target_col < target_text.length()) {
-        const double advance    = fm.horizontalAdvance(target_text[target_col]);
-        const double char_width = advance + target_line->char_spacing();
-        if (d->vertical_move_x_pos < target_x_pos + 0.5 * char_width) { break; }
-        target_x_pos += char_width;
-        ++target_col;
-    }
-
-    const int target_pos = target_line->text_offset() + target_line->parent->text_pos + target_col;
-    int       offset     = target_pos - d->cursor_pos;
-    if (cross_block) { offset += direction_hint; }
-
-    move(offset, false);
-
-    //! NOTE: move always set vertical_move to false, restore the value here
-    d->vertical_move = true;
-
-    request_update();
-}
-
-EditorTextLoc Editor::get_text_loc_at_vpos(const QPoint &pos) {
-    EditorTextLoc loc{.block_index = -1, .row = 0, .col = 0};
-
-    const auto &area = get_text_area();
-    if (!area.contains(pos)) { return loc; }
-
-    //! TODO: cache block bounds to accelerate location query
-
-    jwrite_profiler_start(GetLocationAtPos);
-
-    QPointF      real_pos      = pos - area.topLeft() - QPointF(0, d->scroll);
-    const double line_spacing  = d->engine->line_height * d->engine->line_spacing_ratio;
-    const double block_spacing = d->engine->block_spacing;
-
-    int    block_index = 0;
-    double y_pos       = 0.0;
-    double y_limit     = y_pos;
-    while (block_index < d->engine->active_blocks.size()) {
-        auto block = d->engine->active_blocks[block_index];
-        y_limit    = y_pos + block->lines.size() * line_spacing + block_spacing;
-        if (real_pos.y() < y_limit) { break; }
-        if (block_index + 1 == d->engine->active_blocks.size()) { break; }
-        y_pos = y_limit;
-        ++block_index;
-    }
-
-    auto      block = d->engine->active_blocks[block_index];
-    const int row = qBound<int>(0, (real_pos.y() - y_pos) / line_spacing, block->lines.size() - 1);
-    const auto &line   = block->lines[row];
-    const auto  text   = line.text();
-    const auto  incr   = line.char_spacing();
-    const auto  offset = line.is_first_line() ? d->engine->standard_char_width * 2 : 0;
-
-    double      x_pos = offset;
-    int         col   = 0;
-    const auto &fm    = d->engine->fm;
-    while (col < text.length()) {
-        const double char_width = fm.horizontalAdvance(text[col]) + incr;
-        if (real_pos.x() < x_pos + 0.5 * char_width) { break; }
-        x_pos += char_width;
-        ++col;
-    }
-
-    loc.block_index = block_index;
-    loc.row         = row;
-    loc.col         = col;
-
-    jwrite_profiler_record(GetLocationAtPos);
-
-    return loc;
-}
-
-void Editor::request_update() {
-    d->blink_cursor_should_paint = true;
-    d->edit_op_happens           = true;
-    d->blink_timer.stop();
+void Editor::requestUpdate() {
+    blink_cursor_should_paint_ = true;
+    blink_timer_.stop();
     update();
-    d->blink_timer.start();
+    blink_timer_.start();
 }
 
-void Editor::set_cursor_shape(Qt::CursorShape shape) {
-    d->cursor_shape[1] = d->cursor_shape[0];
-    d->cursor_shape[0] = shape;
+void Editor::setCursorShape(Qt::CursorShape shape) {
+    cursor_shape_[1] = cursor_shape_[0];
+    cursor_shape_[0] = shape;
     setCursor(shape);
 }
 
-void Editor::restore_cursor_shape() {
-    set_cursor_shape(d->cursor_shape[1]);
+void Editor::restoreCursorShape() {
+    setCursorShape(cursor_shape_[1]);
 }
 
 QSize Editor::sizeHint() const {
@@ -603,244 +327,230 @@ QSize Editor::sizeHint() const {
 }
 
 QSize Editor::minimumSizeHint() const {
-    const auto margins      = contentsMargins() + d->margins;
-    const auto line_spacing = d->engine->line_height * d->engine->line_spacing_ratio;
+    const auto margins      = contentsMargins() + margins_;
+    const auto line_spacing = context_->engine.line_height * context_->engine.line_spacing_ratio;
     const auto hori_margin  = margins.left() + margins.right();
     const auto vert_margin  = margins.top() + margins.bottom();
-    const auto min_width    = d->min_text_line_chars * d->engine->standard_char_width + hori_margin;
-    const auto min_height   = line_spacing * 3 + d->engine->block_spacing * 2 + vert_margin;
+    const auto min_width =
+        min_text_line_chars_ * context_->engine.standard_char_width + hori_margin;
+    const auto min_height = line_spacing * 3 + context_->engine.block_spacing * 2 + vert_margin;
     return QSize(min_width, min_height);
+}
+
+void Editor::drawTextArea(QPainter *p) {
+    const auto &d = context_->cached_render_state;
+    if (!d.found_visible_block) { return; }
+
+    jwrite_profiler_start(TextBodyRenderCost);
+
+    const auto pal   = palette();
+    const auto flags = Qt::AlignBaseline | Qt::TextDontClip;
+
+    p->save();
+    p->setPen(pal.color(QPalette::Text));
+
+    const auto  &e            = context_->engine;
+    const double indent       = e.standard_char_width * 2;
+    const double line_spacing = e.line_height * e.line_spacing_ratio;
+    const auto   viewport     = textArea();
+
+    QRectF bb(viewport.left(), viewport.top(), viewport.width(), e.line_height);
+    bb.translate(0, d.first_visible_block_y_pos - context_->viewport_y_pos);
+
+    const auto y_pos = d.first_visible_block_y_pos - context_->viewport_y_pos;
+    auto       pos   = viewport.topLeft() + QPointF(0, y_pos);
+
+    for (int index = d.visible_block.first; index <= d.visible_block.last; ++index) {
+        const auto block = e.active_blocks[index];
+
+        for (const auto &line : block->lines) {
+            const double leading_space = line.is_first_line() ? indent : 0;
+            const double spacing       = line.char_spacing();
+            bb.setLeft(viewport.left() + leading_space);
+            for (const auto c : line.text()) {
+                p->drawText(bb, flags, c);
+                const double advance = e.fm.horizontalAdvance(c);
+                bb.adjust(advance + spacing, 0, 0, 0);
+            }
+            bb.translate(0, line_spacing);
+        }
+        bb.translate(0, e.block_spacing);
+    }
+
+    p->restore();
+
+    jwrite_profiler_record(TextBodyRenderCost);
+}
+
+void Editor::drawSelection(QPainter *p) {
+    const auto &e = context_->engine;
+    const auto &d = context_->cached_render_state;
+    if (!context_->has_sel()) { return; }
+    if (d.visible_sel.first == -1) { return; }
+
+    jwrite_profiler_start(SelectionAreaRenderCost);
+
+    const auto pal = palette();
+
+    const auto   viewport     = textArea();
+    const double line_spacing = e.line_height * e.line_spacing_ratio;
+
+    double y_pos = d.cached_block_y_pos[d.visible_sel.first];
+
+    for (int index = d.visible_sel.first; index <= d.visible_sel.last; ++index) {
+        const auto   block         = e.active_blocks[index];
+        const bool   is_first      = index == d.sel_loc_from.block_index;
+        const bool   is_last       = index == d.sel_loc_to.block_index;
+        const int    line_nr_begin = is_first ? d.sel_loc_from.row : 0;
+        const int    line_nr_end   = is_last ? d.sel_loc_to.row : block->lines.size() - 1;
+        const double stride        = line_nr_begin * line_spacing;
+
+        double y_pos = d.cached_block_y_pos[index] + stride - context_->viewport_y_pos;
+        //! add the minus part to make the selection area align center
+        y_pos -= e.fm.descent() * 0.5;
+
+        for (int line_nr = line_nr_begin; line_nr <= line_nr_end; ++line_nr) {
+            const auto line   = block->lines[line_nr];
+            const auto offset = line.is_first_line() ? e.standard_char_width * 2 : 0;
+
+            double x_pos = offset;
+            if (is_first && line_nr == d.sel_loc_from.row) {
+                x_pos += line.char_spacing() * d.sel_loc_from.col;
+                for (const auto &c : line.text().left(d.sel_loc_from.col)) {
+                    x_pos += e.fm.horizontalAdvance(c);
+                }
+            }
+
+            double sel_width = line.cached_text_width + (line.text_len() - 1) * line.char_spacing()
+                             - (x_pos - offset);
+            if (is_last && line_nr == d.sel_loc_to.row) {
+                sel_width -= line.char_spacing() * (line.text_len() - d.sel_loc_to.col);
+                for (const auto &c : line.text().mid(d.sel_loc_to.col)) {
+                    sel_width -= e.fm.horizontalAdvance(c);
+                }
+            }
+
+            QRectF bb(x_pos, y_pos, sel_width, e.line_height);
+            bb.translate(viewport.topLeft());
+            p->fillRect(bb, pal.highlightedText());
+
+            y_pos += line_spacing;
+        }
+    }
+
+    jwrite_profiler_record(SelectionAreaRenderCost);
+}
+
+void Editor::drawCursor(QPainter *p) {
+    const auto &d = context_->cached_render_state;
+    const auto &e = context_->engine;
+    if (!e.is_cursor_available() || !blink_cursor_should_paint_) { return; }
+    if (!d.active_block_visible) { return; }
+
+    jwrite_profiler_start(CursorRenderCost);
+
+    p->save();
+
+    //! NOTE: set pen width less than 1 to ensure a single pixel cursor
+    p->setPen(QPen(palette().text(), 0.8));
+
+    const auto   viewport      = textArea();
+    const auto  &line          = e.current_line();
+    const auto  &cursor        = e.cursor;
+    const double line_spacing  = e.line_height * e.line_spacing_ratio;
+    const double stride        = cursor.row * line_spacing;
+    const double cursor_y_pos  = d.active_block_y_start - context_->viewport_y_pos + stride;
+    const double leading_space = line.is_first_line() ? e.standard_char_width * 2 : 0;
+
+    //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)`
+    //! directly, and the reason is that the text_width calcualated by that has a few
+    //! difference with the render result of the text, and the cursor will seems not in the
+    //! correct place, and this problem was extremely serious in pure latin texts
+    double cursor_x_pos = leading_space + line.char_spacing() * cursor.col;
+    for (const auto &c : line.text().left(cursor.col)) {
+        cursor_x_pos += e.fm.horizontalAdvance(c);
+    }
+
+    const auto cursor_pos = QPoint(cursor_x_pos, cursor_y_pos) + viewport.topLeft();
+    p->drawLine(cursor_pos, cursor_pos + QPoint(0, e.fm.height()));
+
+    p->restore();
+
+    jwrite_profiler_record(CursorRenderCost);
+}
+
+void Editor::drawHighlightBlock(QPainter *p) {
+    const auto &d = context_->cached_render_state;
+    const auto &e = context_->engine;
+    if (!e.is_cursor_available() || context_->has_sel()) { return; }
+    if (!d.active_block_visible) { return; }
+
+    const auto pal = palette();
+
+    p->save();
+    p->setPen(Qt::transparent);
+    p->setBrush(pal.highlight());
+
+    const auto viewport = textArea();
+
+    const double line_spacing = e.line_height * e.line_spacing_ratio;
+    const double line_slack   = qMax(0.0, line_spacing - e.line_height);
+    const double start_y_pos  = d.active_block_y_start - context_->viewport_y_pos - line_slack;
+    const double end_y_pos    = d.active_block_y_end - context_->viewport_y_pos - e.block_spacing;
+
+    const double height  = end_y_pos - start_y_pos;
+    const double w_slack = 8.0;
+    const double h_slack = context_->engine.block_spacing * 0.75;
+    const int    radius  = 4;
+
+    QRectF bb(0, start_y_pos, context_->viewport_width, height);
+    bb.translate(viewport.topLeft());
+    bb.adjust(-w_slack, -h_slack, w_slack, h_slack);
+
+    p->drawRoundedRect(bb, radius, radius);
+
+    p->restore();
 }
 
 void Editor::resizeEvent(QResizeEvent *e) {
     QWidget::resizeEvent(e);
-    if (d->align_center) { set_soft_center_mode(true); }
-    emit textAreaChanged(get_text_area());
+    if (soft_center_mode_) { setSoftCenterMode(true); }
+    emit textAreaChanged(textArea());
 }
 
 void Editor::paintEvent(QPaintEvent *e) {
     jwrite_profiler_start(FrameRenderCost);
 
-    jwrite_profiler_start(TextEngineRenderCost);
-    auto engine = d->engine;
-    engine->render();
-    jwrite_profiler_record(TextEngineRenderCost);
-
     QPainter p(this);
     auto     pal = palette();
 
-    struct {
-        const QColor Selection = QColor(60, 60, 255, 80);
-        const QColor Highlight = QColor(255, 255, 255, 10);
-    } Palette;
-
     //! smooth scroll
-    d->scroll = d->scroll * 0.45 + d->expected_scroll * 0.55;
-    if (qAbs(d->scroll - d->expected_scroll) > 1e-3) {
+    context_->scroll_to(context_->viewport_y_pos * 0.45 + expected_scroll_ * 0.55);
+    if (qAbs(context_->viewport_y_pos - expected_scroll_) > 1e-3) {
         update();
     } else {
-        d->scroll = d->expected_scroll;
+        context_->scroll_to(expected_scroll_);
     }
 
     //! prepare render data
     jwrite_profiler_start(PrepareRenderData);
-
-    const auto  &fm           = engine->fm;
-    const double line_spacing = engine->line_height * engine->line_spacing_ratio;
-    const auto   text_area    = get_text_area();
-    double       y_pos        = text_area.top() + d->scroll;
-
-    struct {
-        struct {
-            double first_non_clip_block;
-            double active_block_begin;
-            double active_block_end;
-        } named_y_pos;
-
-        struct BlockRange {
-            int first;
-            int last;
-        };
-
-        BlockRange visible_range;
-        BlockRange select_range;
-
-        bool found_non_clip_block;
-    } context;
-
-    context.visible_range        = {-1, -1};
-    context.found_non_clip_block = false;
-
-    d->cached_block_y_pos.clear();
-
-    for (int index = 0; index < engine->active_blocks.size(); ++index) {
-        const auto block        = engine->active_blocks[index];
-        const auto block_stride = block->lines.size() * engine->line_height + engine->block_spacing;
-        if (y_pos + block_stride < text_area.top()) {
-            y_pos += block_stride;
-            continue;
-        } else if (y_pos > text_area.bottom()) {
-            break;
-        } else if (!context.found_non_clip_block) {
-            context.named_y_pos.first_non_clip_block = y_pos;
-            context.found_non_clip_block             = true;
-        }
-        d->cached_block_y_pos[index] = y_pos;
-        if (context.visible_range.first == -1) { context.visible_range.first = index; }
-        context.visible_range.last = index;
-        if (index == engine->active_block_index) { context.named_y_pos.active_block_begin = y_pos; }
-        y_pos += line_spacing * block->lines.size();
-        if (index == engine->active_block_index) { context.named_y_pos.active_block_end = y_pos; }
-        y_pos += engine->block_spacing;
-    }
-
+    context_->prepare_render_data();
     jwrite_profiler_record(PrepareRenderData);
 
     //! draw selection
-    if (has_sel()) {
-        jwrite_profiler_start(SelectionAreaRenderCost);
-
-        auto loc_from = get_text_loc_at_pos(d->selected_from);
-        auto loc_to   = get_text_loc_at_pos(d->selected_to);
-        if (d->selected_from > d->selected_to) { std::swap(loc_from, loc_to); }
-
-        context.select_range.first = qMax(loc_from.block_index, context.visible_range.first);
-        context.select_range.last  = qMin(loc_to.block_index, context.visible_range.last);
-
-        //! add the minus part to make the selection area align center
-        double y_pos = context.named_y_pos.first_non_clip_block - fm.descent() * 0.5;
-        for (int index = context.visible_range.first; index < context.select_range.first; ++index) {
-            const auto block = engine->active_blocks[index];
-            const auto block_stride =
-                block->lines.size() * engine->line_height + engine->block_spacing;
-            y_pos += block_stride;
-        }
-
-        for (int index = context.select_range.first; index <= context.select_range.last; ++index) {
-            const auto block = engine->active_blocks[index];
-            const auto block_stride =
-                block->lines.size() * engine->line_height + engine->block_spacing;
-            if (index < context.select_range.first) {
-                y_pos += block_stride;
-                continue;
-            }
-            if (index > context.select_range.last) { break; }
-            const int line_nr_begin = index == loc_from.block_index ? loc_from.row : 0;
-            const int line_nr_end   = index == loc_to.block_index
-                                        ? loc_to.row
-                                        : engine->active_blocks[index]->lines.size() - 1;
-            auto      sel_y_pos     = y_pos + line_nr_begin * engine->line_height;
-            for (int line_nr = line_nr_begin; line_nr <= line_nr_end; ++line_nr) {
-                const auto line   = block->lines[line_nr];
-                const auto offset = line.is_first_line() ? engine->standard_char_width * 2 : 0;
-                const auto sel_x_origin = text_area.left() + offset;
-                double     sel_x_pos    = sel_x_origin;
-                if (index == loc_from.block_index && line_nr == loc_from.row) {
-                    sel_x_pos += line.char_spacing() * loc_from.col;
-                    for (const auto &c : line.text().mid(0, loc_from.col)) {
-                        sel_x_pos += fm.horizontalAdvance(c);
-                    }
-                }
-                double sel_x_width = line.cached_text_width
-                                   + (line.text().length() - 1) * line.char_spacing()
-                                   - (sel_x_pos - sel_x_origin);
-                if (index == loc_to.block_index && line_nr == loc_to.row) {
-                    sel_x_width -= line.char_spacing() * (line.text().length() - loc_to.col);
-                    for (const auto &c : line.text().mid(loc_to.col)) {
-                        sel_x_width -= fm.horizontalAdvance(c);
-                    }
-                }
-                QRectF bb(sel_x_pos, sel_y_pos, sel_x_width, engine->line_height);
-                p.fillRect(bb, Palette.Selection);
-                sel_y_pos += engine->line_height;
-            }
-            y_pos += block_stride;
-        }
-
-        jwrite_profiler_record(SelectionAreaRenderCost);
-    }
+    drawSelection(&p);
 
     //! draw highlight text block
-    if (engine->is_cursor_available() && !has_sel()) {
-        QRect highlight_rect(
-            text_area.left() - 8,
-            context.named_y_pos.active_block_begin - engine->block_spacing,
-            text_area.width() + 16,
-            context.named_y_pos.active_block_end - context.named_y_pos.active_block_begin
-                + engine->block_spacing * 1.5);
-        p.save();
-        p.setBrush(Palette.Highlight);
-        p.setPen(Qt::transparent);
-        p.drawRoundedRect(highlight_rect, 4, 4);
-        p.restore();
-    }
+    drawHighlightBlock(&p);
 
     //! draw text area
-    if (context.found_non_clip_block) {
-        jwrite_profiler_start(TextBodyRenderCost);
-        p.save();
-        p.setPen(pal.text().color());
-        const auto flags = Qt::AlignBaseline | Qt::TextDontClip;
-        double     y_pos = context.named_y_pos.first_non_clip_block;
-        for (int index = context.visible_range.first; index <= context.visible_range.last;
-             ++index) {
-            const auto block = engine->active_blocks[index];
-            for (const auto &line : block->lines) {
-                const auto text   = line.text();
-                const auto incr   = line.char_spacing();
-                const auto offset = line.is_first_line() ? engine->standard_char_width * 2 : 0;
-                QRectF     bb(
-                    text_area.left() + offset,
-                    y_pos,
-                    engine->max_width - offset,
-                    engine->line_height);
-                for (auto &c : text) {
-                    p.drawText(bb, flags, c);
-                    bb.setLeft(bb.left() + incr + fm.horizontalAdvance(c));
-                }
-                y_pos += line_spacing;
-            }
-            y_pos += engine->block_spacing;
-        }
-        p.restore();
-        jwrite_profiler_record(TextBodyRenderCost);
-    }
+    drawTextArea(&p);
 
     //! draw cursor
-    if (engine->is_cursor_available() && d->blink_cursor_should_paint) {
-        jwrite_profiler_start(CursorRenderCost);
-        const auto &line         = engine->current_line();
-        const auto &cursor       = engine->cursor;
-        const auto  offset       = line.is_first_line() ? engine->standard_char_width * 2 : 0;
-        double      cursor_x_pos = text_area.left() + offset + line.char_spacing() * cursor.col;
-        double      cursor_y_pos = text_area.top() + d->scroll;
-        //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)`
-        //! directly, and the reason is that the text_width calcualated by that has a few
-        //! difference with the render result of the text, and the cursor will seems not in the
-        //! correct place, and this problem was extremely serious in pure latin texts
-        for (const auto &c : line.text().mid(0, cursor.col)) {
-            cursor_x_pos += fm.horizontalAdvance(c);
-        }
-        for (int i = 0; i < engine->active_block_index; ++i) {
-            cursor_y_pos +=
-                line_spacing * engine->active_blocks[i]->lines.size() + engine->block_spacing;
-        }
-        cursor_y_pos += cursor.row * line_spacing;
-        if (d->edit_op_happens) {
-            const double margin = engine->block_spacing * 0.75;
-            if (auto bottom = cursor_y_pos + fm.height() + margin; bottom > text_area.bottom()) {
-                const double delta = bottom - text_area.bottom();
-                scroll(-delta - d->engine->block_spacing, false);
-            } else if (auto top = cursor_y_pos - margin; top < text_area.top()) {
-                const double delta = text_area.top() - top;
-                scroll(delta + d->engine->block_spacing, false);
-            }
-        }
-        p.drawLine(cursor_x_pos, cursor_y_pos, cursor_x_pos, cursor_y_pos + fm.height());
-        jwrite_profiler_record(CursorRenderCost);
-    }
+    drawCursor(&p);
 
-    d->edit_op_happens = false;
+    //! TODO: auto scroll
+    context_->cursor_moved = false;
 
     jwrite_profiler_record(IME2UpdateDelay);
     jwrite_profiler_record(FrameRenderCost);
@@ -848,38 +558,39 @@ void Editor::paintEvent(QPaintEvent *e) {
 
 void Editor::focusInEvent(QFocusEvent *e) {
     QWidget::focusInEvent(e);
-    if (auto e = d->engine; e->is_empty()) {
-        e->set_text_ref_unsafe(&d->text, 0);
-        e->insert_block(0);
+    if (auto &e = context_->engine; e.is_empty()) {
+        e.insert_block(0);
         //! TODO: move it into a safe method
-        e->active_block_index = 0;
+        e.active_block_index = 0;
         emit requireEmptyChapter();
     }
-    request_update();
+    requestUpdate();
 }
 
 void Editor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
-    unset_sel();
-    d->blink_timer.stop();
-    d->engine->active_block_index = -1;
+    context_->unset_sel();
+    blink_timer_.stop();
+    context_->engine.active_block_index = -1;
     emit focusLost();
 }
 
 void Editor::keyPressEvent(QKeyEvent *e) {
-    if (!d->engine->is_cursor_available()) { return; }
+    if (!context_->engine.is_cursor_available()) { return; }
 
     //! ATTENTION: normally this branch is unreachable, but when IME events are too frequent and
     //! the system latency is too high, an IME preedit interrupt may occur and the key is
     //! forwarded to the keyPress event. in this case, we should reject the event or submit the
     //! raw preedit text. the first solution is taken here.
     //! FIXME: the solution is not fully tested to be safe and correct
-    if (d->engine->preedit) { return; }
+    if (context_->engine.preedit) { return; }
 
-    const auto action = d->input_manager->match(e);
+    const auto action = input_manager_->match(e);
     qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
 
-    const auto &cursor = d->engine->cursor;
+    auto        &engine       = context_->engine;
+    auto        &cursor       = engine.cursor;
+    const double line_spacing = engine.line_height * engine.line_spacing_ratio;
 
     jwrite_profiler_start(GeneralTextEdit);
 
@@ -887,15 +598,16 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::Reject: {
         } break;
         case TextInputCommand::InsertPrintable: {
-            insert(d->input_manager->translate_printable_char(e));
+            insert(input_manager_->translate_printable_char(e));
         } break;
         case TextInputCommand::InsertTab: {
         } break;
         case TextInputCommand::InsertNewLine: {
-            break_into_newline();
+            breakIntoNewLine();
         } break;
         case TextInputCommand::Cancel: {
-            unset_sel();
+            context_->unset_sel();
+            update();
         } break;
         case TextInputCommand::Undo: {
         } break;
@@ -911,10 +623,10 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             paste();
         } break;
         case TextInputCommand::ScrollUp: {
-            scroll(d->engine->line_height * d->engine->line_spacing_ratio, true);
+            scroll(line_spacing, true);
         } break;
         case TextInputCommand::ScrollDown: {
-            scroll(-d->engine->line_height * d->engine->line_spacing_ratio, true);
+            scroll(-line_spacing, true);
         } break;
         case TextInputCommand::MoveToPrevChar: {
             move(-1, false);
@@ -927,57 +639,57 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::MoveToNextWord: {
         } break;
         case TextInputCommand::MoveToPrevLine: {
-            visual_vertical_move(true);
+            verticalMove(true);
         } break;
         case TextInputCommand::MoveToNextLine: {
-            visual_vertical_move(false);
+            verticalMove(false);
         } break;
         case TextInputCommand::MoveToStartOfLine: {
-            const auto block = d->engine->current_block();
+            const auto block = engine.current_block();
             const auto line  = block->current_line();
-            move_to(block->text_pos + line.text_offset(), false);
+            moveTo(block->text_pos + line.text_offset(), false);
         } break;
         case TextInputCommand::MoveToEndOfLine: {
-            const auto block = d->engine->current_block();
+            const auto block = engine.current_block();
             const auto line  = block->current_line();
             const auto pos   = block->text_pos + line.text_offset() + line.text().length();
-            move_to(pos, false);
+            moveTo(pos, false);
         } break;
         case TextInputCommand::MoveToStartOfBlock: {
-            move_to(d->engine->current_block()->text_pos, false);
+            moveTo(engine.current_block()->text_pos, false);
         } break;
         case TextInputCommand::MoveToEndOfBlock: {
-            const auto block = d->engine->current_block();
-            move_to(block->text_pos + block->text_len(), false);
+            const auto block = engine.current_block();
+            moveTo(block->text_pos + block->text_len(), false);
         } break;
         case TextInputCommand::MoveToStartOfDocument: {
-            move_to(0, false);
-            scoll_to_start();
+            moveTo(0, false);
+            scrollToStart();
         } break;
         case TextInputCommand::MoveToEndOfDocument: {
-            move_to(d->engine->text_ref->length(), false);
-            scroll_to_end();
+            moveTo(engine.text_ref->length(), false);
+            scrollToEnd();
         } break;
         case TextInputCommand::MoveToPrevPage: {
-            scroll(get_text_area().height() * 0.5, true);
+            scroll(textArea().height() * 0.5, true);
         } break;
         case TextInputCommand::MoveToNextPage: {
-            scroll(-get_text_area().height() * 0.5, true);
+            scroll(-textArea().height() * 0.5, true);
         } break;
         case TextInputCommand::MoveToPrevBlock: {
-            if (d->engine->active_block_index > 0) {
-                --d->engine->active_block_index;
-                d->engine->cursor.reset();
-                d->cursor_pos = d->engine->current_block()->text_pos;
-                request_update();
+            if (engine.active_block_index > 0) {
+                --engine.active_block_index;
+                cursor.reset();
+                context_->edit_cursor_pos = engine.current_block()->text_pos;
+                requestUpdate();
             }
         } break;
         case TextInputCommand::MoveToNextBlock: {
-            if (d->engine->active_block_index + 1 < d->engine->active_blocks.size()) {
-                ++d->engine->active_block_index;
-                d->engine->cursor.reset();
-                d->cursor_pos = d->engine->current_block()->text_pos;
-                request_update();
+            if (engine.active_block_index + 1 < engine.active_blocks.size()) {
+                ++engine.active_block_index;
+                cursor.reset();
+                context_->edit_cursor_pos = engine.current_block()->text_pos;
+                requestUpdate();
             }
         } break;
         case TextInputCommand::DeletePrevChar: {
@@ -991,9 +703,8 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::DeleteNextWord: {
         } break;
         case TextInputCommand::DeleteToStartOfLine: {
-            const auto &block  = d->engine->current_block();
-            const auto &cursor = d->engine->cursor;
-            int         times  = cursor.col;
+            const auto &block = engine.current_block();
+            int         times = cursor.col;
             if (times == 0) {
                 if (cursor.row > 0) {
                     times = block->len_of_line(cursor.row - 1);
@@ -1004,9 +715,8 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             del(-times);
         } break;
         case TextInputCommand::DeleteToEndOfLine: {
-            const auto &block  = d->engine->current_block();
-            const auto &cursor = d->engine->cursor;
-            int         times  = block->len_of_line(cursor.row) - cursor.col;
+            const auto &block = engine.current_block();
+            int         times = block->len_of_line(cursor.row) - cursor.col;
             if (times == 0) {
                 if (cursor.row + 1 == block->lines.size()) {
                     times = 1;
@@ -1038,45 +748,45 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             move(-cursor.col, true);
         } break;
         case TextInputCommand::SelectToEndOfLine: {
-            move(d->engine->current_line().text().length() - cursor.col, true);
+            move(engine.current_line().text().length() - cursor.col, true);
         } break;
         case TextInputCommand::SelectToStartOfBlock: {
-            move_to(d->engine->current_block()->text_pos, true);
+            moveTo(engine.current_block()->text_pos, true);
         } break;
         case TextInputCommand::SelectToEndOfBlock: {
-            const auto block = d->engine->current_block();
-            move_to(block->text_pos + block->text_len(), true);
+            const auto block = engine.current_block();
+            moveTo(block->text_pos + block->text_len(), true);
         } break;
         case TextInputCommand::SelectBlock: {
-            const auto block = d->engine->current_block();
-            move_to(block->text_pos, false);
-            move_to(block->text_pos + block->text_len(), true);
+            const auto block = engine.current_block();
+            moveTo(block->text_pos, false);
+            moveTo(block->text_pos + block->text_len(), true);
         } break;
         case TextInputCommand::SelectPrevPage: {
         } break;
         case TextInputCommand::SelectNextPage: {
         } break;
         case TextInputCommand::SelectToStartOfDoc: {
-            move_to(0, true);
+            moveTo(0, true);
         } break;
         case TextInputCommand::SelectToEndOfDoc: {
-            move_to(d->engine->text_ref->length(), true);
+            moveTo(engine.text_ref->length(), true);
         } break;
         case TextInputCommand::SelectAll: {
-            move_to(0, false);
-            move_to(d->engine->text_ref->length(), true);
+            moveTo(0, false);
+            moveTo(engine.text_ref->length(), true);
         } break;
         case TextInputCommand::InsertBeforeBlock: {
-            d->engine->insert_block(d->engine->active_block_index);
-            --d->engine->active_block_index;
-            d->engine->cursor.reset();
-            d->cursor_pos = d->engine->current_block()->text_pos;
-            request_update();
+            engine.insert_block(engine.active_block_index);
+            --engine.active_block_index;
+            cursor.reset();
+            context_->edit_cursor_pos = engine.current_block()->text_pos;
+            requestUpdate();
         } break;
         case TextInputCommand::InsertAfterBlock: {
-            d->engine->insert_block(d->engine->active_block_index + 1);
-            auto block = d->engine->current_block();
-            move(block->text_len() - d->engine->cursor.pos + 1, false);
+            engine.insert_block(engine.active_block_index + 1);
+            auto block = engine.current_block();
+            move(block->text_len() - cursor.pos + 1, false);
         } break;
     }
 
@@ -1091,23 +801,23 @@ void Editor::mousePressEvent(QMouseEvent *e) {
     bool cancel_auto_scroll = false;
 
     if (e->button() == Qt::MiddleButton) {
-        d->auto_scroll_mode = !d->auto_scroll_mode;
-    } else if (d->auto_scroll_mode) {
-        cancel_auto_scroll  = true;
-        d->auto_scroll_mode = false;
+        auto_scroll_mode_ = !auto_scroll_mode_;
+    } else if (auto_scroll_mode_) {
+        cancel_auto_scroll = true;
+        auto_scroll_mode_  = false;
     }
 
-    if (d->auto_scroll_mode) {
-        set_cursor_shape(Qt::SizeVerCursor);
-        d->auto_scroll_mode  = true;
-        d->scroll_base_y_pos = e->pos().y();
-        d->scroll_ref_y_pos  = d->scroll_base_y_pos;
-        d->auto_scroll_timer.start();
+    if (auto_scroll_mode_) {
+        setCursorShape(Qt::SizeVerCursor);
+        auto_scroll_mode_  = true;
+        scroll_base_y_pos_ = e->pos().y();
+        scroll_ref_y_pos_  = scroll_base_y_pos_;
+        auto_scroll_timer_.start();
         return;
     } else {
-        d->auto_scroll_mode = false;
-        d->auto_scroll_timer.stop();
-        restore_cursor_shape();
+        auto_scroll_mode_ = false;
+        auto_scroll_timer_.stop();
+        restoreCursorShape();
     }
 
     //! NOTE: do not perform the locating action if the current click is to cancel the auto scroll
@@ -1116,27 +826,20 @@ void Editor::mousePressEvent(QMouseEvent *e) {
 
     if (e->button() != Qt::LeftButton) { return; }
 
-    unset_sel();
+    context_->unset_sel();
 
-    if (const auto e = d->engine; e->is_empty() || e->is_dirty()) { return; }
-    if (d->engine->preedit) { return; }
+    auto &engine = context_->engine;
 
-    const auto loc = get_text_loc_at_vpos(e->pos());
-    if (loc.block_index == -1) { return; }
+    if (engine.is_empty() || engine.is_dirty()) { return; }
+    if (engine.preedit) { return; }
 
-    auto &active_block_index = d->engine->active_block_index;
-    auto &cursor             = d->engine->cursor;
-    if (active_block_index == loc.block_index && cursor.row == loc.row && cursor.col == loc.col) {
-        return;
-    }
+    const auto loc = context_->get_textloc_at_vpos(e->pos() - textArea().topLeft());
+    Q_ASSERT(loc.block_index != -1);
 
-    active_block_index = loc.block_index;
-    cursor.row         = loc.row;
-    cursor.col         = loc.col;
-    cursor.pos         = d->engine->current_line().text_offset() + cursor.col;
-    d->cursor_pos      = d->engine->current_block()->text_pos + cursor.pos;
+    const bool success = context_->set_cursor_to_textloc(loc, 0);
+    Q_ASSERT(success);
 
-    request_update();
+    requestUpdate();
 }
 
 void Editor::mouseReleaseEvent(QMouseEvent *e) {
@@ -1145,13 +848,14 @@ void Editor::mouseReleaseEvent(QMouseEvent *e) {
 
 void Editor::mouseDoubleClickEvent(QMouseEvent *e) {
     QWidget::mouseDoubleClickEvent(e);
-    unset_sel();
+
+    context_->unset_sel();
 
     if (e->button() == Qt::LeftButton) {
-        const auto loc = get_text_loc_at_vpos(e->pos());
+        const auto loc = context_->get_textloc_at_vpos(e->pos() - textArea().topLeft());
         if (loc.block_index != -1) {
-            const auto block = d->engine->active_blocks[loc.block_index];
-            move_to(block->text_pos, false);
+            const auto block = context_->engine.active_blocks[loc.block_index];
+            moveTo(block->text_pos, false);
             move(block->text_len(), true);
         }
     }
@@ -1160,79 +864,69 @@ void Editor::mouseDoubleClickEvent(QMouseEvent *e) {
 void Editor::mouseMoveEvent(QMouseEvent *e) {
     QWidget::mouseMoveEvent(e);
 
-    if (d->auto_scroll_mode) {
-        d->scroll_ref_y_pos = e->pos().y();
+    if (auto_scroll_mode_) {
+        scroll_ref_y_pos_ = e->pos().y();
         return;
     }
 
     if (e->buttons() & Qt::LeftButton) {
         do {
-            if (!d->engine->is_cursor_available()) { break; }
-            if (d->engine->preedit) { break; }
-            const auto   bb = get_text_area();
+            auto &engine = context_->engine;
+            if (!engine.is_cursor_available()) { break; }
+            if (engine.preedit) { break; }
+            const auto   bb = textArea();
             const QPoint pos{
                 qBound(bb.left(), e->pos().x(), bb.right()),
                 qBound(bb.top(), e->pos().y(), bb.bottom()),
             };
-            const auto loc = get_text_loc_at_vpos(pos);
-            if (loc.block_index == -1) { break; }
-            auto &active_block_index = d->engine->active_block_index;
-            auto &cursor             = d->engine->cursor;
-            active_block_index       = loc.block_index;
-            cursor.row               = loc.row;
-            cursor.col               = loc.col;
-            const auto block         = d->engine->current_block();
-            const auto line          = block->current_line();
-            cursor.pos               = line.text_offset() + cursor.col;
-            if (!has_sel()) { d->selected_from = d->cursor_pos; }
-            d->cursor_pos  = block->text_pos + cursor.pos;
-            d->selected_to = d->cursor_pos;
-            request_update();
+            const auto loc = context_->get_textloc_at_vpos(pos - bb.topLeft());
+            Q_ASSERT(loc.block_index != -1);
+            const auto block = engine.active_blocks[loc.block_index];
+            moveTo(block->text_pos + loc.pos, true);
+            // auto &active_block_index = engine.active_block_index;
+            // auto &cursor             = engine.cursor;
+            // auto &sel                = context_->sel;
+            // active_block_index       = loc.block_index;
+            // cursor.row               = loc.row;
+            // cursor.col               = loc.col;
+            // const auto block         = engine.current_block();
+            // const auto line          = block->current_line();
+            // cursor.pos               = line.text_offset() + cursor.col;
+            // if (!context_->has_sel()) { sel.from = context_->edit_cursor_pos; }
+            // context_->edit_cursor_pos = block->text_pos + cursor.pos;
+            // sel.to                    = context_->edit_cursor_pos;
+            // requestUpdate();
         } while (0);
     }
 
-    const auto &area = get_text_area();
+    const auto &area = textArea();
     if (area.contains(e->pos())) {
-        set_cursor_shape(Qt::IBeamCursor);
+        setCursorShape(Qt::IBeamCursor);
     } else {
-        set_cursor_shape(Qt::ArrowCursor);
+        setCursorShape(Qt::ArrowCursor);
     }
 }
 
 void Editor::wheelEvent(QWheelEvent *e) {
-    const auto engine = d->engine;
-    if (engine->is_empty()) { return; }
-    const auto ratio = 1.0 / 180 * 3;
-    auto       delta = e->angleDelta().y() * engine->line_height * ratio;
+    const auto &engine = context_->engine;
+    if (engine.is_empty()) { return; }
+    const auto   ratio        = 1.0 / 180 * 3;
+    const double line_spacing = engine.line_height * engine.line_spacing_ratio;
+    auto         delta        = -e->angleDelta().y() * line_spacing * ratio;
     scroll((e->modifiers() & Qt::ControlModifier) ? delta * 8 : delta, true);
 }
 
 void Editor::inputMethodEvent(QInputMethodEvent *e) {
-    if (!d->engine->is_cursor_available()) { return; }
-
-    const auto &cursor                = d->engine->cursor;
-    const auto &saved_cursor          = d->engine->saved_cursor;
-    const auto  last_preedit_text_len = cursor.pos - saved_cursor.pos;
-
-    //! FIXME: methods for IME preedit introduce some unexpected bugs, but i can't concretely
-    //! describe them so far
-
+    auto &engine = context_->engine;
+    if (!engine.is_cursor_available()) { return; }
     if (const auto preedit_text = e->preeditString(); !preedit_text.isEmpty()) {
-        if (!d->engine->preedit) {
-            d->engine->begin_preedit(d->preedit_text);
-            //! FIXME: merge into insert op
-            if (has_sel()) { del(1); }
-        } else {
-            d->preedit_text.remove(saved_cursor.pos, last_preedit_text_len);
-        }
-        d->preedit_text.insert(saved_cursor.pos, preedit_text);
-        d->engine->update_preedit_text(preedit_text.length());
-        request_update();
+        if (!engine.preedit) { context_->begin_preedit(); }
+        context_->update_preedit(e->preeditString());
         jwrite_profiler_start(IME2UpdateDelay);
     } else {
-        if (d->engine->preedit) { d->engine->commit_preedit(); }
         insert(e->commitString());
     }
+    requestUpdate();
 }
 
 void Editor::dragEnterEvent(QDragEnterEvent *e) {

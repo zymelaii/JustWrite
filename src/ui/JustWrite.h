@@ -7,6 +7,7 @@
 #include "TwoLevelTree.h"
 #include "../GlobalCommand.h"
 #include "../MessyInput.h"
+#include "../VisualTextEditContext.h"
 #include <QWidget>
 #include <QTimer>
 #include <QLabel>
@@ -35,12 +36,12 @@ protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:
-    jwrite::GlobalCommandManager command_manager_;
-    jwrite::MessyInputWorker    *messy_input_;
-    QTimer                       sec_timer_;
-    int                          current_cid_;
-    QMap<int, QString>           chapters_;
-    QMap<int, EditorTextLoc>     chapter_locs_;
+    jwrite::GlobalCommandManager              command_manager_;
+    jwrite::MessyInputWorker                 *messy_input_;
+    QTimer                                    sec_timer_;
+    int                                       current_cid_;
+    QMap<int, QString>                        chapters_;
+    QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;
 
     jwrite::Ui::TitleBar     *ui_title_bar;
     jwrite::Ui::Editor       *ui_editor;

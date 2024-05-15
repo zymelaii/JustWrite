@@ -1,16 +1,11 @@
 #pragma once
 
+#include "../VisualTextEditContext.h"
+#include "../TextInputCommand.h"
+#include <QTimer>
 #include <QWidget>
 
 namespace jwrite::Ui {
-
-struct EditorTextLoc {
-    int block_index;
-    //! NOTE: only one of the {row, col}/{pos} is valid
-    int row;
-    int col;
-    int pos;
-};
 
 struct EditorPrivate;
 
@@ -28,52 +23,51 @@ signals:
     void requireEmptyChapter();
 
 public:
-    bool is_soft_center_mode() const;
-    void set_soft_center_mode(bool value);
+    bool softCenterMode() const;
+    void setSoftCenterMode(bool value);
 
-    QRect get_text_area() const;
-
-    EditorTextLoc get_current_text_loc() const;
-    EditorTextLoc get_text_loc_at_pos(int pos) const;
-    void          update_text_loc(EditorTextLoc loc);
+    QRect textArea() const;
 
     void reset(QString &text, bool swap);
-    void cancel_preedit();
-    void scroll_to_cursor();
+    void scrollToCursor();
 
-    void scroll(double delta, bool smooth);
-    void scoll_to_start();
-    void scroll_to_end();
+    VisualTextEditContext::TextLoc currentTextLoc() const;
+    void                           setCursorToTextLoc(const VisualTextEditContext::TextLoc &loc);
 
-    void insert_raw_text(const QString &text);
-    bool inserted_pair_filter(const QString &text);
+    QPair<double, double> scrollBound() const;
+    void                  scroll(double delta, bool smooth);
+    void                  scrollToStart();
+    void                  scrollToEnd();
+
+    void insertRawText(const QString &text);
+    bool insertedPairFilter(const QString &text);
 
     void move(int offset, bool extend_sel);
-    void move_to(int pos, bool extend_sel);
+    void moveTo(int pos, bool extend_sel);
     void insert(const QString &text);
     void del(int times);
     void copy();
     void cut();
     void paste();
 
-    bool            has_sel() const;
-    void            unset_sel();
-    QPair<int, int> sel_region() const;
-
-    void break_into_newline();
-    void visual_vertical_move(bool up);
+    void breakIntoNewLine();
+    void verticalMove(bool up);
 
 protected:
-    EditorTextLoc get_text_loc_at_vpos(const QPoint &pos);
-    void          request_update();
-    void          set_cursor_shape(Qt::CursorShape shape);
-    void          restore_cursor_shape();
+    void requestUpdate();
+    void setCursorShape(Qt::CursorShape shape);
+    void restoreCursorShape();
 
 public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
 
 protected:
+    void drawTextArea(QPainter *p);
+    void drawSelection(QPainter *p);
+    void drawCursor(QPainter *p);
+    void drawHighlightBlock(QPainter *p);
+
     void resizeEvent(QResizeEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
     void focusInEvent(QFocusEvent *e) override;
@@ -89,7 +83,21 @@ protected:
     void dropEvent(QDropEvent *e) override;
 
 private:
-    EditorPrivate *d;
+    VisualTextEditContext           *context_;
+    jwrite::TextInputCommandManager *input_manager_;
+    int                              min_text_line_chars_;
+    bool                             soft_center_mode_;
+    double                           expected_scroll_;
+    bool                             blink_cursor_should_paint_;
+    QTimer                           blink_timer_;
+    QTimer                           auto_scroll_timer_;
+    QMargins                         margins_;
+    bool                             inserted_filter_enabled_;
+    bool                             auto_scroll_mode_;
+    double                           scroll_base_y_pos_;
+    double                           scroll_ref_y_pos_;
+
+    Qt::CursorShape cursor_shape_[2];
 };
 
 } // namespace jwrite::Ui

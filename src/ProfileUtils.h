@@ -28,6 +28,7 @@ enum class ProfileTarget {
     TextBodyRenderCost,
     SelectionAreaRenderCost,
     CursorRenderCost,
+    SelectionLocatingCost,
     GetLocationAtPos,
     GeneralTextEdit,
     SwitchChapter,

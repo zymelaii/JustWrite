@@ -99,7 +99,7 @@ void JustWrite::openChapter(int cid) {
     QString &text = chapters_.contains(cid) ? chapters_[cid] : tmp;
 
     if (current_cid_ != -1) {
-        const auto loc = ui_editor->get_current_text_loc();
+        const auto loc = ui_editor->currentTextLoc();
         if (loc.block_index != -1) { chapter_locs_[current_cid_] = loc; }
     }
 
@@ -109,7 +109,7 @@ void JustWrite::openChapter(int cid) {
 
     if (chapter_locs_.contains(cid)) {
         const auto loc = chapter_locs_[cid];
-        ui_editor->update_text_loc(loc);
+        ui_editor->setCursorToTextLoc(loc);
     }
 
     jwrite_profiler_record(SwitchChapter);
@@ -193,13 +193,15 @@ void JustWrite::setupUi() {
 
     //! config properties
     struct {
-        const QColor Window     = QColor(60, 60, 60);
-        const QColor WindowText = QColor(160, 160, 160);
-        const QColor Frame      = QColor(38, 38, 38);
-        const QColor Base       = QColor(30, 30, 30);
-        const QColor Text       = QColor(255, 255, 255);
-        const QColor Highlight  = QColor(50, 100, 150, 150);
-        const QColor Hover      = QColor(255, 255, 255, 30);
+        const QColor Window          = QColor(60, 60, 60);
+        const QColor WindowText      = QColor(160, 160, 160);
+        const QColor Frame           = QColor(38, 38, 38);
+        const QColor Base            = QColor(30, 30, 30);
+        const QColor Text            = QColor(255, 255, 255);
+        const QColor Highlight       = QColor(50, 100, 150, 150);
+        const QColor Hover           = QColor(255, 255, 255, 30);
+        const QColor HighlightedText = QColor(255, 255, 255, 10);
+        const QColor SelectedText    = QColor(60, 60, 255, 80);
     } Palette;
 
     pal = ui_editor->palette();
@@ -211,7 +213,8 @@ void JustWrite::setupUi() {
     pal = ui_editor->palette();
     pal.setColor(QPalette::Window, Palette.Base);
     pal.setColor(QPalette::Text, Palette.Text);
-    pal.setColor(QPalette::Highlight, Palette.Highlight);
+    pal.setColor(QPalette::Highlight, Palette.HighlightedText);
+    pal.setColor(QPalette::HighlightedText, Palette.SelectedText);
     ui_editor->setPalette(pal);
 
     pal = ui_sidebar->palette();
@@ -278,7 +281,7 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
                     ui_sidebar->setVisible(!ui_sidebar->isVisible());
                 } break;
                 case GlobalCommand::ToggleSoftCenterMode: {
-                    ui_editor->set_soft_center_mode(!ui_editor->is_soft_center_mode());
+                    ui_editor->setSoftCenterMode(!ui_editor->softCenterMode());
                 } break;
                 case GlobalCommand::DEV_EnableMessyInput: {
                     ui_editor->setFocus();
