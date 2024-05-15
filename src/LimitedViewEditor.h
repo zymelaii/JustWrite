@@ -62,6 +62,7 @@ public:
     QPair<int, int> sel_region() const;
 
     void break_into_newline();
+    void visual_vertical_move(bool up);
 
 protected:
     EditorTextLoc get_text_loc_at_vpos(const QPoint &pos);

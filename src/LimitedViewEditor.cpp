@@ -43,6 +43,9 @@ struct LimitedViewEditorPrivate {
     double scroll_base_y_pos;
     double scroll_ref_y_pos;
 
+    bool   vertical_move;
+    double vertical_move_x_pos;
+
     Qt::CursorShape cursor_shape[2];
 
     LimitedViewEditorPrivate() {
@@ -57,6 +60,7 @@ struct LimitedViewEditorPrivate {
         selected_from             = -1;
         selected_to               = -1;
         inserted_filter_enabled   = true;
+        vertical_move             = false;
         cursor_shape[0]           = Qt::ArrowCursor;
         cursor_shape[1]           = Qt::ArrowCursor;
         blink_timer.setInterval(500);
@@ -304,6 +308,9 @@ bool LimitedViewEditor::inserted_pair_filter(const QString &text) {
 }
 
 void LimitedViewEditor::move(int offset, bool extend_sel) {
+    //! FIXME: remove patch
+    d->vertical_move = false;
+
     if (offset == 0) { return; }
 
     bool cursor_moved = false;
@@ -338,6 +345,9 @@ void LimitedViewEditor::move(int offset, bool extend_sel) {
 }
 
 void LimitedViewEditor::move_to(int pos, bool extend_sel) {
+    //! FIXME: remove patch
+    d->vertical_move = false;
+
     //! ATTENTION: pos equals cursor_pos doesn't mean that no action will be taken
 
     if (!has_sel() && extend_sel) { d->selected_from = d->cursor_pos; }
@@ -446,6 +456,87 @@ QPair<int, int> LimitedViewEditor::sel_region() const {
 
 void LimitedViewEditor::break_into_newline() {
     d->engine->break_block_at_cursor_pos();
+    request_update();
+}
+
+void LimitedViewEditor::visual_vertical_move(bool up) {
+    const int direction_hint = up ? -1 : 1;
+    if (has_sel()) { move(direction_hint, false); }
+
+    const auto &fm          = d->engine->fm;
+    const auto &block       = d->engine->current_block();
+    const auto &line        = block->current_line();
+    const auto &cursor      = d->engine->cursor;
+    const int   block_index = d->engine->active_block_index;
+    const auto  text_area   = get_text_area();
+
+    if (!d->vertical_move) {
+        d->vertical_move        = true;
+        d->vertical_move_x_pos  = text_area.left();
+        d->vertical_move_x_pos += line.is_first_line() ? d->engine->standard_char_width * 2 : 0;
+        d->vertical_move_x_pos += cursor.col * line.char_spacing();
+        for (auto c : line.text().mid(0, cursor.col)) {
+            d->vertical_move_x_pos += d->engine->fm.horizontalAdvance(c);
+        }
+    }
+
+    jwrite::TextLine *target_line = nullptr;
+
+    bool cross_block = false;
+
+    do {
+        if (up) {
+            if (cursor.row > 0) {
+                target_line = &block->lines[cursor.row - 1];
+                break;
+            }
+            if (block_index == 0) {
+                move_to(block->text_pos, false);
+                break;
+            }
+            target_line = &d->engine->active_blocks[block_index - 1]->lines.back();
+            cross_block = true;
+        } else {
+            if (cursor.row + 1 < block->lines.size()) {
+                target_line = &block->lines[cursor.row + 1];
+                break;
+            }
+            if (block_index + 1 == d->engine->active_blocks.size()) {
+                move_to(block->text_pos + block->text_len(), false);
+                break;
+            }
+            target_line = &d->engine->active_blocks[block_index + 1]->lines.front();
+            cross_block = true;
+        }
+    } while (0);
+
+    if (!target_line) {
+        d->vertical_move = false;
+        return;
+    }
+
+    const auto &target_text  = target_line->text();
+    int         target_col   = 0;
+    double      target_x_pos = text_area.left();
+    target_x_pos += target_line->is_first_line() ? d->engine->standard_char_width * 2 : 0;
+
+    while (target_col < target_text.length()) {
+        const double advance    = fm.horizontalAdvance(target_text[target_col]);
+        const double char_width = advance + target_line->char_spacing();
+        if (d->vertical_move_x_pos < target_x_pos + 0.5 * char_width) { break; }
+        target_x_pos += char_width;
+        ++target_col;
+    }
+
+    const int target_pos = target_line->text_offset() + target_line->parent->text_pos + target_col;
+    int       offset     = target_pos - d->cursor_pos;
+    if (cross_block) { offset += direction_hint; }
+
+    move(offset, false);
+
+    //! NOTE: move always set vertical_move to false, restore the value here
+    d->vertical_move = true;
+
     request_update();
 }
 
@@ -834,39 +925,10 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::MoveToNextWord: {
         } break;
         case TextInputCommand::MoveToPrevLine: {
-            auto block = d->engine->current_block();
-            if (d->engine->active_block_index == 0 && cursor.row == 0) {
-                move(-cursor.pos, false);
-            } else if (cursor.row == 0) {
-                const auto prev_block = d->engine->active_blocks[d->engine->active_block_index - 1];
-                const int  equiv_col  = prev_block->lines.size() == 1 ? cursor.col : cursor.col + 2;
-                const int  line_length = prev_block->len_of_line(prev_block->lines.size() - 1);
-                const int  col         = qMin(equiv_col, line_length);
-                move(-(cursor.pos + (line_length - col) + 1), false);
-            } else {
-                const int equiv_col = cursor.row - 1 == 0 ? cursor.col - 2 : cursor.col;
-                const int col       = qBound(0, equiv_col, block->len_of_line(cursor.row - 1));
-                const int pos       = block->offset_of_line(cursor.row - 1) + col;
-                move(pos - cursor.pos, false);
-            }
+            visual_vertical_move(true);
         } break;
         case TextInputCommand::MoveToNextLine: {
-            const auto &cursor = d->engine->cursor;
-            auto        block  = d->engine->current_block();
-            if (d->engine->active_block_index + 1 == d->engine->active_blocks.size()
-                && cursor.row + 1 == block->lines.size()) {
-                move(block->text_len() - cursor.pos, false);
-            } else if (cursor.row + 1 == block->lines.size()) {
-                const auto next_block = d->engine->active_blocks[d->engine->active_block_index + 1];
-                const int  equiv_col  = cursor.row == 0 ? cursor.col : cursor.col - 2;
-                const int  col        = qBound(0, equiv_col, next_block->len_of_line(0));
-                move(block->text_len() - cursor.pos + col + 1, false);
-            } else {
-                const int equiv_col = cursor.row == 0 ? cursor.col + 2 : cursor.col;
-                const int col       = qMin(equiv_col, block->len_of_line(cursor.row + 1));
-                const int pos       = block->offset_of_line(cursor.row + 1) + col;
-                move(pos - cursor.pos, false);
-            }
+            visual_vertical_move(false);
         } break;
         case TextInputCommand::MoveToStartOfLine: {
             const auto block = d->engine->current_block();
