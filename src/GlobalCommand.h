@@ -4,6 +4,8 @@
 #include <QMap>
 #include <optional>
 
+namespace jwrite {
+
 enum class GlobalCommand {
     ToggleSidebar,
     ToggleSoftCenterMode,
@@ -21,3 +23,5 @@ public:
 private:
     QMap<QKeySequence, GlobalCommand> shortcuts_;
 };
+
+} // namespace jwrite

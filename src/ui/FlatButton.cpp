@@ -1,12 +1,30 @@
 #include "FlatButton.h"
 #include <QPainter>
-#include <QPaintEvent>
+
+namespace jwrite::Ui {
 
 FlatButton::FlatButton(QWidget *parent)
     : QWidget(parent)
-    , radius_{0}
-    , alignment_{Qt::AlignLeft}
-    , enter_{false} {}
+    , ui_radius_{0}
+    , ui_alignment_{Qt::AlignLeft}
+    , ui_mouse_entered_{false} {}
+
+FlatButton::~FlatButton() {}
+
+void FlatButton::setText(const QString &text) {
+    text_ = text;
+    update();
+}
+
+void FlatButton::setRadius(int radius) {
+    ui_radius_ = radius;
+    update();
+}
+
+void FlatButton::setTextAlignment(Qt::Alignment alignment) {
+    ui_alignment_ = alignment;
+    update();
+}
 
 QSize FlatButton::minimumSizeHint() const {
     const auto margins      = contentsMargins();
@@ -22,49 +40,37 @@ QSize FlatButton::sizeHint() const {
     return minimumSize();
 }
 
-void FlatButton::set_text(const QString &text) {
-    text_ = text;
-    update();
-}
-
-void FlatButton::set_radius(int radius) {
-    radius_ = radius;
-    update();
-}
-
-void FlatButton::set_text_alignment(int alignment) {
-    alignment_ = alignment;
-    update();
-}
-
 void FlatButton::paintEvent(QPaintEvent *e) {
     QPainter   p(this);
     const auto pal = palette();
 
+    const auto brush = !ui_mouse_entered_ ? pal.base() : pal.button();
+
     p.save();
-    const auto brush = !enter_ ? pal.base() : pal.button();
     p.setBrush(brush);
     p.setPen(brush.color());
-    p.drawRoundedRect(rect(), radius_, radius_);
+    p.drawRoundedRect(rect(), ui_radius_, ui_radius_);
     p.restore();
 
     const auto bb    = contentsRect();
-    const auto flags = alignment_;
+    const auto flags = ui_alignment_;
     p.drawText(bb, flags, text_);
 }
 
 void FlatButton::enterEvent(QEnterEvent *event) {
     setCursor(Qt::PointingHandCursor);
-    enter_ = true;
+    ui_mouse_entered_ = true;
     update();
 }
 
 void FlatButton::leaveEvent(QEvent *event) {
     setCursor(Qt::ArrowCursor);
-    enter_ = false;
+    ui_mouse_entered_ = false;
     update();
 }
 
 void FlatButton::mouseReleaseEvent(QMouseEvent *e) {
     emit pressed();
 }
+
+} // namespace jwrite::Ui

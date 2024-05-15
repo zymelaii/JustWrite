@@ -1,7 +1,7 @@
-#include "LimitedViewEditor.h"
-#include "TextViewEngine.h"
-#include "TextInputCommand.h"
-#include "ProfileUtils.h"
+#include "Editor.h"
+#include "../TextViewEngine.h"
+#include "../TextInputCommand.h"
+#include "../ProfileUtils.h"
 #include <QResizeEvent>
 #include <QPaintEvent>
 #include <QFocusEvent>
@@ -19,7 +19,9 @@
 #include <QMap>
 #include <magic_enum.hpp>
 
-struct LimitedViewEditorPrivate {
+namespace jwrite::Ui {
+
+struct EditorPrivate {
     int                              min_text_line_chars;
     bool                             align_center;
     double                           scroll;
@@ -48,7 +50,7 @@ struct LimitedViewEditorPrivate {
 
     Qt::CursorShape cursor_shape[2];
 
-    LimitedViewEditorPrivate() {
+    EditorPrivate() {
         engine                    = nullptr;
         min_text_line_chars       = 12;
         cursor_pos                = 0;
@@ -69,16 +71,16 @@ struct LimitedViewEditorPrivate {
         auto_scroll_timer.setSingleShot(false);
     }
 
-    ~LimitedViewEditorPrivate() {
+    ~EditorPrivate() {
         Q_ASSERT(engine);
         delete input_manager;
         delete engine;
     }
 };
 
-LimitedViewEditor::LimitedViewEditor(QWidget *parent)
+Editor::Editor(QWidget *parent)
     : QWidget(parent)
-    , d{new LimitedViewEditorPrivate} {
+    , d{new EditorPrivate} {
     setFocusPolicy(Qt::ClickFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
     setAutoFillBackground(true);
@@ -90,12 +92,12 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
     set_soft_center_mode(true);
 
     d->engine        = new jwrite::TextViewEngine(fontMetrics(), get_text_area().width());
-    d->input_manager = new jwrite::TextInputCommandManager(*d->engine);
+    d->input_manager = new jwrite::GeneralTextInputCommandManager(*d->engine);
     d->input_manager->load_default();
 
     scoll_to_start();
 
-    connect(this, &LimitedViewEditor::textAreaChanged, this, [this](QRect area) {
+    connect(this, &Editor::textAreaChanged, this, [this](QRect area) {
         d->engine->reset_max_width(area.width());
         update();
     });
@@ -109,29 +111,15 @@ LimitedViewEditor::LimitedViewEditor(QWidget *parent)
     });
 }
 
-LimitedViewEditor::~LimitedViewEditor() {
+Editor::~Editor() {
     delete d;
 }
 
-QSize LimitedViewEditor::minimumSizeHint() const {
-    const auto margins      = contentsMargins() + d->margins;
-    const auto line_spacing = d->engine->line_height * d->engine->line_spacing_ratio;
-    const auto hori_margin  = margins.left() + margins.right();
-    const auto vert_margin  = margins.top() + margins.bottom();
-    const auto min_width    = d->min_text_line_chars * d->engine->standard_char_width + hori_margin;
-    const auto min_height   = line_spacing * 3 + d->engine->block_spacing * 2 + vert_margin;
-    return QSize(min_width, min_height);
-}
-
-QSize LimitedViewEditor::sizeHint() const {
-    return minimumSizeHint();
-}
-
-bool LimitedViewEditor::is_soft_center_mode() const {
+bool Editor::is_soft_center_mode() const {
     return d->align_center;
 }
 
-void LimitedViewEditor::set_soft_center_mode(bool value) {
+void Editor::set_soft_center_mode(bool value) {
     d->align_center = value;
     if (d->align_center) {
         const auto min_margin     = 32;
@@ -146,18 +134,18 @@ void LimitedViewEditor::set_soft_center_mode(bool value) {
     emit textAreaChanged(get_text_area());
 }
 
-QRect LimitedViewEditor::get_text_area() const {
+QRect Editor::get_text_area() const {
     return contentsRect() - d->margins;
 }
 
-EditorTextLoc LimitedViewEditor::get_current_text_loc() const {
+EditorTextLoc Editor::get_current_text_loc() const {
     EditorTextLoc loc{};
     loc.block_index = d->engine->active_block_index;
     loc.pos         = d->engine->cursor.pos;
     return loc;
 }
 
-EditorTextLoc LimitedViewEditor::get_text_loc_at_pos(int pos) const {
+EditorTextLoc Editor::get_text_loc_at_pos(int pos) const {
     EditorTextLoc loc{};
     loc.block_index = -1;
     for (int i = 0; i < d->engine->active_blocks.size(); ++i) {
@@ -178,7 +166,7 @@ EditorTextLoc LimitedViewEditor::get_text_loc_at_pos(int pos) const {
     return loc;
 }
 
-void LimitedViewEditor::update_text_loc(EditorTextLoc loc) {
+void Editor::update_text_loc(EditorTextLoc loc) {
     const auto e = d->engine;
     if (!(loc.block_index >= 0 && loc.block_index < e->active_blocks.size())) { return; }
     e->active_block_index = loc.block_index;
@@ -188,7 +176,7 @@ void LimitedViewEditor::update_text_loc(EditorTextLoc loc) {
     scroll_to_cursor();
 }
 
-void LimitedViewEditor::reset(QString &text, bool swap) {
+void Editor::reset(QString &text, bool swap) {
     if (d->engine->preedit) { cancel_preedit(); }
 
     QStringList blocks{};
@@ -212,7 +200,7 @@ void LimitedViewEditor::reset(QString &text, bool swap) {
     request_update();
 }
 
-void LimitedViewEditor::cancel_preedit() {
+void Editor::cancel_preedit() {
     Q_ASSERT(d->engine->preedit);
     const auto &cursor                = d->engine->cursor;
     const auto &saved_cursor          = d->engine->saved_cursor;
@@ -222,12 +210,12 @@ void LimitedViewEditor::cancel_preedit() {
     d->engine->commit_preedit();
 }
 
-void LimitedViewEditor::scroll_to_cursor() {
+void Editor::scroll_to_cursor() {
     d->edit_op_happens = true;
     request_update();
 }
 
-void LimitedViewEditor::scroll(double delta, bool smooth) {
+void Editor::scroll(double delta, bool smooth) {
     const auto e            = d->engine;
     const auto line_spacing = e->line_spacing_ratio * e->line_height;
     double     max_scroll   = line_spacing + e->block_spacing;
@@ -241,7 +229,7 @@ void LimitedViewEditor::scroll(double delta, bool smooth) {
     update();
 }
 
-void LimitedViewEditor::scoll_to_start() {
+void Editor::scoll_to_start() {
     const auto   e            = d->engine;
     const auto   line_spacing = e->line_spacing_ratio * e->line_height;
     const double max_scroll   = line_spacing + e->block_spacing;
@@ -250,7 +238,7 @@ void LimitedViewEditor::scoll_to_start() {
     request_update();
 }
 
-void LimitedViewEditor::scroll_to_end() {
+void Editor::scroll_to_end() {
     const auto e            = d->engine;
     const auto line_spacing = e->line_spacing_ratio * e->line_height;
     double     min_scroll   = 0;
@@ -263,7 +251,7 @@ void LimitedViewEditor::scroll_to_end() {
     request_update();
 }
 
-void LimitedViewEditor::insert_raw_text(const QString &text) {
+void Editor::insert_raw_text(const QString &text) {
     auto text_list             = text.split('\n');
     d->inserted_filter_enabled = false;
     for (int i = 0; i < text_list.size(); ++i) {
@@ -275,7 +263,7 @@ void LimitedViewEditor::insert_raw_text(const QString &text) {
     d->inserted_filter_enabled = true;
 }
 
-bool LimitedViewEditor::inserted_pair_filter(const QString &text) {
+bool Editor::inserted_pair_filter(const QString &text) {
     static QMap<QString, QString> QUOTE_PAIRS{
         {"“", "”"},
         {"‘", "’"},
@@ -307,7 +295,7 @@ bool LimitedViewEditor::inserted_pair_filter(const QString &text) {
     return false;
 }
 
-void LimitedViewEditor::move(int offset, bool extend_sel) {
+void Editor::move(int offset, bool extend_sel) {
     //! FIXME: remove patch
     d->vertical_move = false;
 
@@ -344,7 +332,7 @@ void LimitedViewEditor::move(int offset, bool extend_sel) {
     if (cursor_moved) { request_update(); }
 }
 
-void LimitedViewEditor::move_to(int pos, bool extend_sel) {
+void Editor::move_to(int pos, bool extend_sel) {
     //! FIXME: remove patch
     d->vertical_move = false;
 
@@ -363,7 +351,7 @@ void LimitedViewEditor::move_to(int pos, bool extend_sel) {
     request_update();
 }
 
-void LimitedViewEditor::insert(const QString &text) {
+void Editor::insert(const QString &text) {
     Q_ASSERT(d->engine->is_cursor_available());
 
     if (has_sel()) { del(1); }
@@ -381,7 +369,7 @@ void LimitedViewEditor::insert(const QString &text) {
     request_update();
 }
 
-void LimitedViewEditor::del(int times) {
+void Editor::del(int times) {
     //! NOTE: times means delete |times| chars, and the sign indicates the del direction
 
     int  deleted  = 0;
@@ -403,7 +391,7 @@ void LimitedViewEditor::del(int times) {
     request_update();
 }
 
-void LimitedViewEditor::copy() {
+void Editor::copy() {
     if (!d->engine->is_cursor_available()) { return; }
     auto clipboard = QGuiApplication::clipboard();
     if (has_sel()) {
@@ -417,7 +405,7 @@ void LimitedViewEditor::copy() {
     }
 }
 
-void LimitedViewEditor::cut() {
+void Editor::cut() {
     copy();
     if (has_sel()) {
         del(1);
@@ -428,18 +416,18 @@ void LimitedViewEditor::cut() {
     }
 }
 
-void LimitedViewEditor::paste() {
+void Editor::paste() {
     auto clipboard = QGuiApplication::clipboard();
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
     insert_raw_text(clipboard->text());
 }
 
-bool LimitedViewEditor::has_sel() const {
+bool Editor::has_sel() const {
     return d->selected_from != -1 && d->selected_to != -1 && d->selected_from != d->selected_to;
 }
 
-void LimitedViewEditor::unset_sel() {
+void Editor::unset_sel() {
     if (has_sel()) {
         d->selected_from = -1;
         d->selected_to   = -1;
@@ -447,19 +435,19 @@ void LimitedViewEditor::unset_sel() {
     }
 }
 
-QPair<int, int> LimitedViewEditor::sel_region() const {
+QPair<int, int> Editor::sel_region() const {
     if (!has_sel()) { return {d->cursor_pos, d->cursor_pos}; }
     const int sel_left  = qMin(d->selected_from, d->selected_to);
     const int sel_right = qMax(d->selected_from, d->selected_to);
     return {sel_left, sel_right};
 }
 
-void LimitedViewEditor::break_into_newline() {
+void Editor::break_into_newline() {
     d->engine->break_block_at_cursor_pos();
     request_update();
 }
 
-void LimitedViewEditor::visual_vertical_move(bool up) {
+void Editor::visual_vertical_move(bool up) {
     const int direction_hint = up ? -1 : 1;
     if (has_sel()) { move(direction_hint, false); }
 
@@ -540,7 +528,7 @@ void LimitedViewEditor::visual_vertical_move(bool up) {
     request_update();
 }
 
-EditorTextLoc LimitedViewEditor::get_text_loc_at_vpos(const QPoint &pos) {
+EditorTextLoc Editor::get_text_loc_at_vpos(const QPoint &pos) {
     EditorTextLoc loc{.block_index = -1, .row = 0, .col = 0};
 
     const auto &area = get_text_area();
@@ -592,7 +580,7 @@ EditorTextLoc LimitedViewEditor::get_text_loc_at_vpos(const QPoint &pos) {
     return loc;
 }
 
-void LimitedViewEditor::request_update() {
+void Editor::request_update() {
     d->blink_cursor_should_paint = true;
     d->edit_op_happens           = true;
     d->blink_timer.stop();
@@ -600,23 +588,37 @@ void LimitedViewEditor::request_update() {
     d->blink_timer.start();
 }
 
-void LimitedViewEditor::set_cursor_shape(Qt::CursorShape shape) {
+void Editor::set_cursor_shape(Qt::CursorShape shape) {
     d->cursor_shape[1] = d->cursor_shape[0];
     d->cursor_shape[0] = shape;
     setCursor(shape);
 }
 
-void LimitedViewEditor::restore_cursor_shape() {
+void Editor::restore_cursor_shape() {
     set_cursor_shape(d->cursor_shape[1]);
 }
 
-void LimitedViewEditor::resizeEvent(QResizeEvent *e) {
+QSize Editor::sizeHint() const {
+    return minimumSizeHint();
+}
+
+QSize Editor::minimumSizeHint() const {
+    const auto margins      = contentsMargins() + d->margins;
+    const auto line_spacing = d->engine->line_height * d->engine->line_spacing_ratio;
+    const auto hori_margin  = margins.left() + margins.right();
+    const auto vert_margin  = margins.top() + margins.bottom();
+    const auto min_width    = d->min_text_line_chars * d->engine->standard_char_width + hori_margin;
+    const auto min_height   = line_spacing * 3 + d->engine->block_spacing * 2 + vert_margin;
+    return QSize(min_width, min_height);
+}
+
+void Editor::resizeEvent(QResizeEvent *e) {
     QWidget::resizeEvent(e);
     if (d->align_center) { set_soft_center_mode(true); }
     emit textAreaChanged(get_text_area());
 }
 
-void LimitedViewEditor::paintEvent(QPaintEvent *e) {
+void Editor::paintEvent(QPaintEvent *e) {
     jwrite_profiler_start(FrameRenderCost);
 
     jwrite_profiler_start(TextEngineRenderCost);
@@ -844,7 +846,7 @@ void LimitedViewEditor::paintEvent(QPaintEvent *e) {
     jwrite_profiler_record(FrameRenderCost);
 }
 
-void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
+void Editor::focusInEvent(QFocusEvent *e) {
     QWidget::focusInEvent(e);
     if (auto e = d->engine; e->is_empty()) {
         e->set_text_ref_unsafe(&d->text, 0);
@@ -856,7 +858,7 @@ void LimitedViewEditor::focusInEvent(QFocusEvent *e) {
     request_update();
 }
 
-void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
+void Editor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
     unset_sel();
     d->blink_timer.stop();
@@ -864,7 +866,7 @@ void LimitedViewEditor::focusOutEvent(QFocusEvent *e) {
     emit focusLost();
 }
 
-void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
+void Editor::keyPressEvent(QKeyEvent *e) {
     if (!d->engine->is_cursor_available()) { return; }
 
     //! ATTENTION: normally this branch is unreachable, but when IME events are too frequent and
@@ -1083,7 +1085,7 @@ void LimitedViewEditor::keyPressEvent(QKeyEvent *e) {
     e->accept();
 }
 
-void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
+void Editor::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
 
     bool cancel_auto_scroll = false;
@@ -1137,11 +1139,11 @@ void LimitedViewEditor::mousePressEvent(QMouseEvent *e) {
     request_update();
 }
 
-void LimitedViewEditor::mouseReleaseEvent(QMouseEvent *e) {
+void Editor::mouseReleaseEvent(QMouseEvent *e) {
     QWidget::mouseReleaseEvent(e);
 }
 
-void LimitedViewEditor::mouseDoubleClickEvent(QMouseEvent *e) {
+void Editor::mouseDoubleClickEvent(QMouseEvent *e) {
     QWidget::mouseDoubleClickEvent(e);
     unset_sel();
 
@@ -1155,7 +1157,7 @@ void LimitedViewEditor::mouseDoubleClickEvent(QMouseEvent *e) {
     }
 }
 
-void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
+void Editor::mouseMoveEvent(QMouseEvent *e) {
     QWidget::mouseMoveEvent(e);
 
     if (d->auto_scroll_mode) {
@@ -1197,7 +1199,7 @@ void LimitedViewEditor::mouseMoveEvent(QMouseEvent *e) {
     }
 }
 
-void LimitedViewEditor::wheelEvent(QWheelEvent *e) {
+void Editor::wheelEvent(QWheelEvent *e) {
     const auto engine = d->engine;
     if (engine->is_empty()) { return; }
     const auto ratio = 1.0 / 180 * 3;
@@ -1205,7 +1207,7 @@ void LimitedViewEditor::wheelEvent(QWheelEvent *e) {
     scroll((e->modifiers() & Qt::ControlModifier) ? delta * 8 : delta, true);
 }
 
-void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
+void Editor::inputMethodEvent(QInputMethodEvent *e) {
     if (!d->engine->is_cursor_available()) { return; }
 
     const auto &cursor                = d->engine->cursor;
@@ -1233,7 +1235,7 @@ void LimitedViewEditor::inputMethodEvent(QInputMethodEvent *e) {
     }
 }
 
-void LimitedViewEditor::dragEnterEvent(QDragEnterEvent *e) {
+void Editor::dragEnterEvent(QDragEnterEvent *e) {
     if (e->mimeData()->hasUrls()) {
         e->acceptProposedAction();
     } else {
@@ -1241,8 +1243,10 @@ void LimitedViewEditor::dragEnterEvent(QDragEnterEvent *e) {
     }
 }
 
-void LimitedViewEditor::dropEvent(QDropEvent *e) {
+void Editor::dropEvent(QDropEvent *e) {
     QWidget::dropEvent(e);
     const auto urls = e->mimeData()->urls();
     //! TODO: filter plain text files and handle open action
 }
+
+} // namespace jwrite::Ui

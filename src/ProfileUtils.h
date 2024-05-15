@@ -18,6 +18,8 @@
 
 #ifndef NDEBUG
 
+namespace jwrite {
+
 enum class ProfileTarget {
     IME2UpdateDelay,
     FrameRenderCost,
@@ -55,6 +57,8 @@ private:
     QTimer        *timer_ = nullptr;
 };
 
-extern Profiler JwriteProfiler;
+} // namespace jwrite
+
+extern jwrite::Profiler JwriteProfiler;
 
 #endif

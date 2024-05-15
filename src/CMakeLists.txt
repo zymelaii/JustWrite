@@ -1,5 +1,7 @@
 aux_source_directory(. SOURCE_FILES)
+aux_source_directory(ui UI_SOURCE_FILES)
 
+list(APPEND SOURCE_FILES ${UI_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/res.qrc)
 
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCE_FILES})

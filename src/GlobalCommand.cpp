@@ -1,5 +1,7 @@
 #include "GlobalCommand.h"
 
+namespace jwrite {
+
 void GlobalCommandManager::load_default() {
     clear();
 
@@ -26,3 +28,5 @@ std::optional<GlobalCommand> GlobalCommandManager::match(QKeyEvent* e) const {
     if (shortcuts_.contains(key)) { return {shortcuts_[key]}; }
     return std::nullopt;
 }
+
+} // namespace jwrite

@@ -1,9 +1,10 @@
-#include "JustWrite.h"
+#include "ui/JustWrite.h"
 #include "ProfileUtils.h"
 #include <QGuiApplication>
 #include <QApplication>
 #include <QScreen>
 #include <QFontDatabase>
+#include <memory>
 
 constexpr QSize PREFERRED_CLIENT_SIZE(1000, 600);
 
@@ -32,9 +33,9 @@ int main(int argc, char *argv[]) {
 
     setup_jwrite_profiler();
 
-    JustWrite client;
-    client.setGeometry(compute_preferred_geometry(screen_geo));
-    client.show();
+    auto client = std::make_unique<jwrite::Ui::JustWrite>();
+    client->setGeometry(compute_preferred_geometry(screen_geo));
+    client->show();
 
     return app.exec();
 }

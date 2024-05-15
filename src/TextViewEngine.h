@@ -21,6 +21,7 @@ struct TextLine {
 
     void        mark_as_dirty() const;
     QStringView text() const;
+    int         text_len() const;
     int         text_offset() const;
     double      char_spacing() const;
     bool        is_first_line() const;

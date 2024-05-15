@@ -1,5 +1,7 @@
 #include "TextInputCommand.h"
 
+namespace jwrite {
+
 static QKeySequence
     get_default_keybinding(QKeySequence::StandardKey cmd, QKeySequence default_key) {
     const auto bindings = QKeySequence::keyBindings(cmd);
@@ -179,13 +181,11 @@ QChar TextInputCommandManager::translate_printable_char(QKeyEvent *e) {
     return e->text().at(0);
 }
 
-namespace jwrite {
-
-TextInputCommandManager::TextInputCommandManager(const TextViewEngine &engine)
+GeneralTextInputCommandManager::GeneralTextInputCommandManager(const TextViewEngine &engine)
     : engine_(engine) {}
 
-TextInputCommand TextInputCommandManager::match(QKeyEvent *e) const {
-    const auto cmd = ::TextInputCommandManager::match(e);
+TextInputCommand GeneralTextInputCommandManager::match(QKeyEvent *e) const {
+    const auto cmd = TextInputCommandManager::match(e);
     switch (cmd) {
         case TextInputCommand::MoveToStartOfLine: {
             if (engine_.cursor.col == 0) { return TextInputCommand::MoveToStartOfBlock; }

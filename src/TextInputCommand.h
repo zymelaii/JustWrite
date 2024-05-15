@@ -5,6 +5,8 @@
 #include <optional>
 #include "TextViewEngine.h"
 
+namespace jwrite {
+
 enum class TextInputCommand {
     Reject,
     InsertPrintable,
@@ -80,11 +82,9 @@ private:
     QMap<TextInputCommand, QKeySequence> cmd_to_key_;
 };
 
-namespace jwrite {
-
-class TextInputCommandManager : public ::TextInputCommandManager {
+class GeneralTextInputCommandManager : public TextInputCommandManager {
 public:
-    TextInputCommandManager(const TextViewEngine &engine);
+    GeneralTextInputCommandManager(const TextViewEngine &engine);
     TextInputCommand match(QKeyEvent *e) const override;
 
 private:

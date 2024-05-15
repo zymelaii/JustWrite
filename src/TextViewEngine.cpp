@@ -10,6 +10,10 @@ QStringView TextLine::text() const {
     return parent->text_of_line(line_nr);
 }
 
+int TextLine::text_len() const {
+    return text().length();
+}
+
 int TextLine::text_offset() const {
     return parent->offset_of_line(line_nr);
 }

@@ -1,11 +1,10 @@
 #pragma once
 
 #include <QWidget>
+#include <QHBoxLayout>
 #include <QLabel>
 
-namespace jwrite {
-
-struct StatusBarPrivate;
+namespace jwrite::Ui {
 
 class StatusBar : public QWidget {
     Q_OBJECT
@@ -14,14 +13,21 @@ public:
     explicit StatusBar(QWidget *parent = nullptr);
     virtual ~StatusBar();
 
+public:
+    void    setSpacing(int spacing);
+    QLabel *addItem(const QString &text, bool right_side);
+
+public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
 
-    void    set_spacing(int spacing);
-    QLabel *add_item(const QString &text, bool right_side);
+protected:
+    void setupUi();
 
 private:
-    StatusBarPrivate *d;
+    int total_left_side_items_;
+
+    QHBoxLayout *ui_layout_;
 };
 
-} // namespace jwrite
+} // namespace jwrite::Ui

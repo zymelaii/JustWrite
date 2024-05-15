@@ -3,6 +3,8 @@
 #include "ProfileUtils.h"
 #include <QDebug>
 
+namespace jwrite {
+
 void Profiler::setup() {
     timer_ = new QTimer(this);
     timer_->setInterval(30000);
@@ -60,6 +62,8 @@ void Profiler::clear(ProfileTarget target) {
     profile_data_[indexof(target)].clear();
 }
 
-Profiler JwriteProfiler;
+} // namespace jwrite
+
+jwrite::Profiler JwriteProfiler;
 
 #endif

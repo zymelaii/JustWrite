@@ -1,6 +1,8 @@
 #include <QThread>
 #include <atomic>
 
+namespace jwrite {
+
 class MessyInputWorker : public QThread {
 public:
     explicit MessyInputWorker(QObject *parent = nullptr)
@@ -21,3 +23,5 @@ protected:
 private:
     std::atomic_bool enabled_;
 };
+
+} // namespace jwrite

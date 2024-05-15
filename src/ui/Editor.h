@@ -2,6 +2,8 @@
 
 #include <QWidget>
 
+namespace jwrite::Ui {
+
 struct EditorTextLoc {
     int block_index;
     //! NOTE: only one of the {row, col}/{pos} is valid
@@ -10,17 +12,14 @@ struct EditorTextLoc {
     int pos;
 };
 
-struct LimitedViewEditorPrivate;
+struct EditorPrivate;
 
-class LimitedViewEditor : public QWidget {
+class Editor : public QWidget {
     Q_OBJECT
 
 public:
-    explicit LimitedViewEditor(QWidget *parent = nullptr);
-    virtual ~LimitedViewEditor();
-
-    QSize minimumSizeHint() const override;
-    QSize sizeHint() const override;
+    explicit Editor(QWidget *parent = nullptr);
+    virtual ~Editor();
 
 signals:
     void textAreaChanged(QRect area);
@@ -70,6 +69,10 @@ protected:
     void          set_cursor_shape(Qt::CursorShape shape);
     void          restore_cursor_shape();
 
+public:
+    QSize minimumSizeHint() const override;
+    QSize sizeHint() const override;
+
 protected:
     void resizeEvent(QResizeEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
@@ -86,5 +89,7 @@ protected:
     void dropEvent(QDropEvent *e) override;
 
 private:
-    LimitedViewEditorPrivate *d;
+    EditorPrivate *d;
 };
+
+} // namespace jwrite::Ui

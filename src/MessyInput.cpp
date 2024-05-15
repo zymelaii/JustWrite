@@ -5,6 +5,8 @@
 #include <windows.h>
 #endif
 
+namespace jwrite {
+
 void MessyInputWorker::start() {
     enabled_ = true;
     QThread::start();
@@ -53,3 +55,5 @@ void MessyInputWorker::run() {
         }
     }
 }
+
+} // namespace jwrite
