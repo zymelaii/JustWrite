@@ -91,7 +91,7 @@ struct VisualTextEditContext {
     void quit_preedit();
     void commit_preedit();
 
-    bool has_sel() {
+    bool has_sel() const {
         return !sel.empty();
     }
 

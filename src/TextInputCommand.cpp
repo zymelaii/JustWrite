@@ -51,6 +51,8 @@ void TextInputCommandManager::load_default() {
     const auto SelectNextChar          = QKeySequence::fromString("Shift+Right");
     const auto SelectPrevWord          = QKeySequence::fromString("Ctrl+Shift+Left");
     const auto SelectNextWord          = QKeySequence::fromString("Ctrl+Shift+Right");
+    const auto SelectToPrevLine        = QKeySequence::fromString("Shift+Up");
+    const auto SelectToNextLine        = QKeySequence::fromString("Shift+Down");
     const auto SelectToStartOfLine     = QKeySequence::fromString("Shift+Home");
     const auto SelectToEndOfLine       = QKeySequence::fromString("Shift+End");
     const auto SelectToStartOfBlock    = QKeySequence{};
@@ -112,6 +114,8 @@ void TextInputCommandManager::load_default() {
     KEYBINDING(SelectNextChar, SelectNextChar);
     KEYBINDING(SelectPreviousWord, SelectPrevWord);
     KEYBINDING(SelectNextWord, SelectNextWord);
+    KEYBINDING(SelectPreviousLine, SelectToPrevLine);
+    KEYBINDING(SelectNextLine, SelectToNextLine);
     KEYBINDING(SelectStartOfLine, SelectToStartOfLine);
     KEYBINDING(SelectEndOfLine, SelectToEndOfLine);
     // KEYBINDING(SelectToStartOfBlock);

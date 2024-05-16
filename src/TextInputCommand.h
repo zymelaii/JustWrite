@@ -52,6 +52,8 @@ enum class TextInputCommand {
     SelectNextChar,
     SelectPrevWord,
     SelectNextWord,
+    SelectToPrevLine,
+    SelectToNextLine,
     SelectToStartOfLine,
     SelectToEndOfLine,
     SelectToStartOfBlock,

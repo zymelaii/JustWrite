@@ -740,18 +740,16 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         } break;
         case TextInputCommand::MoveToPrevBlock: {
             if (engine.active_block_index > 0) {
-                --engine.active_block_index;
-                cursor.reset();
-                context_->edit_cursor_pos = engine.current_block()->text_pos;
-                requestUpdate();
+                const auto block      = engine.current_block();
+                const auto prev_block = engine.active_blocks[engine.active_block_index - 1];
+                move(prev_block->text_pos - block->text_pos - cursor.pos - 1, false);
             }
         } break;
         case TextInputCommand::MoveToNextBlock: {
             if (engine.active_block_index + 1 < engine.active_blocks.size()) {
-                ++engine.active_block_index;
-                cursor.reset();
-                context_->edit_cursor_pos = engine.current_block()->text_pos;
-                requestUpdate();
+                const auto block      = engine.current_block();
+                const auto next_block = engine.active_blocks[engine.active_block_index + 1];
+                move(next_block->text_pos - block->text_pos - cursor.pos + 1, false);
             }
         } break;
         case TextInputCommand::DeletePrevChar: {
@@ -805,6 +803,22 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::SelectPrevWord: {
         } break;
         case TextInputCommand::SelectNextWord: {
+        } break;
+        case TextInputCommand::SelectToPrevLine: {
+            auto     &c        = *context_;
+            const int sel_from = c.has_sel() ? c.sel.from : c.edit_cursor_pos;
+            if (c.has_sel()) { c.unset_sel(); }
+            verticalMove(true);
+            c.sel.from = sel_from;
+            c.sel.to   = c.edit_cursor_pos;
+        } break;
+        case TextInputCommand::SelectToNextLine: {
+            auto     &c        = *context_;
+            const int sel_from = c.has_sel() ? c.sel.from : c.edit_cursor_pos;
+            if (c.has_sel()) { c.unset_sel(); }
+            verticalMove(false);
+            c.sel.from = sel_from;
+            c.sel.to   = c.edit_cursor_pos;
         } break;
         case TextInputCommand::SelectToStartOfLine: {
             move(-cursor.col, true);
@@ -885,7 +899,7 @@ void Editor::mousePressEvent(QMouseEvent *e) {
     if (cancel_auto_scroll) { return; }
 
     if (e->button() != Qt::LeftButton) {
-        Q_ASSERT(!drag_sel_flag_);
+        drag_sel_flag_ = false;
         return;
     }
 
