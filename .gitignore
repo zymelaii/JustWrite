@@ -49,3 +49,8 @@ install/
 # Understand project files
 /*.und
 /id.txt
+
+# Log files
+*.log
+*.trace
+*.dump
