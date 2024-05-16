@@ -64,6 +64,9 @@ JustWrite::JustWrite(QWidget *parent)
 }
 
 JustWrite::~JustWrite() {
+    jwrite_profiler_dump(QStringLiteral("jwrite-profiler.%1.log")
+                             .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
+
     messy_input_->kill();
     delete messy_input_;
 }

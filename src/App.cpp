@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     auto       screen     = get_current_screen();
     const auto screen_geo = screen->geometry();
 
-    setup_jwrite_profiler();
+    setup_jwrite_profiler(10);
 
     auto client = std::make_unique<jwrite::Ui::JustWrite>();
     client->setGeometry(compute_preferred_geometry(screen_geo));
