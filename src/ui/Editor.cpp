@@ -324,9 +324,19 @@ void Editor::del(int times) {
 void Editor::copy() {
     auto clipboard = QGuiApplication::clipboard();
     if (context_->has_sel()) {
-        const int  pos         = qMin(context_->sel.from, context_->sel.to);
-        const auto copied_text = context_->edit_text.mid(pos, context_->sel.len());
-        clipboard->setText(copied_text);
+        const auto &e        = context_->engine;
+        const int   pos_from = qMin(context_->sel.from, context_->sel.to);
+        const int   pos_to   = qMax(context_->sel.from, context_->sel.to);
+        const auto  loc_from = context_->get_textloc_at_pos(pos_from, -1);
+        const auto  loc_to   = context_->get_textloc_at_pos(pos_to, 1);
+        QStringList copied_text{};
+        for (int index = loc_from.block_index; index <= loc_to.block_index; ++index) {
+            const auto block = e.active_blocks[index];
+            const int  from  = index == loc_from.block_index ? loc_from.pos : 0;
+            const int  to    = index == loc_to.block_index ? loc_to.pos : block->text_len();
+            copied_text << block->text().mid(from, to - from).toString();
+        }
+        clipboard->setText(copied_text.join('\n'));
     } else if (const auto &e = context_->engine; e.is_cursor_available()) {
         //! copy the current block if has no sel
         const auto copied_text = e.current_block()->text();
