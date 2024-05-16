@@ -533,9 +533,11 @@ void Editor::paintEvent(QPaintEvent *e) {
     auto     pal = palette();
 
     //! smooth scroll
-    context_->scroll_to(context_->viewport_y_pos * 0.45 + expected_scroll_ * 0.55);
+    context_->scroll_to(context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51);
     if (qAbs(context_->viewport_y_pos - expected_scroll_) > 1e-3) {
-        update();
+        QTimer::singleShot(10, [this]() {
+            update();
+        });
     } else {
         context_->scroll_to(expected_scroll_);
     }
@@ -631,10 +633,10 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             paste();
         } break;
         case TextInputCommand::ScrollUp: {
-            scroll(line_spacing, true);
+            scroll(-line_spacing, true);
         } break;
         case TextInputCommand::ScrollDown: {
-            scroll(-line_spacing, true);
+            scroll(line_spacing, true);
         } break;
         case TextInputCommand::MoveToPrevChar: {
             move(-1, false);
@@ -679,10 +681,10 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             scrollToEnd();
         } break;
         case TextInputCommand::MoveToPrevPage: {
-            scroll(textArea().height() * 0.5, true);
+            scroll(-textArea().height() * 0.5, true);
         } break;
         case TextInputCommand::MoveToNextPage: {
-            scroll(-textArea().height() * 0.5, true);
+            scroll(textArea().height() * 0.5, true);
         } break;
         case TextInputCommand::MoveToPrevBlock: {
             if (engine.active_block_index > 0) {
