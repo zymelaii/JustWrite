@@ -581,14 +581,17 @@ void Editor::paintEvent(QPaintEvent *e) {
     auto     pal = palette();
 
     //! smooth scroll
-    //! FIXME: skip if scroll is not avaiable
-    context_->scroll_to(context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51);
     if (qAbs(context_->viewport_y_pos - expected_scroll_) > 1e-3) {
-        QTimer::singleShot(10, [this]() {
-            update();
-        });
-    } else {
-        context_->scroll_to(expected_scroll_);
+        const double new_scroll_pos = context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51;
+        const double scroll_delta   = new_scroll_pos - context_->viewport_y_pos;
+        if (qAbs(scroll_delta) < 10) {
+            context_->scroll_to(expected_scroll_);
+        } else {
+            context_->scroll_to(new_scroll_pos);
+            QTimer::singleShot(10, [this]() {
+                update();
+            });
+        }
     }
 
     //! prepare render data
