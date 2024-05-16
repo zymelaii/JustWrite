@@ -279,8 +279,9 @@ bool Editor::insertedPairFilter(const QString &text) {
 void Editor::select(int start_pos, int end_pos) {
     auto &sel = context_->sel;
     sel.clear();
-    sel.from = qBound(0, start_pos, context_->edit_text.length());
-    sel.to   = qBound(0, end_pos, context_->edit_text.length());
+    sel.from                           = qBound(0, start_pos, context_->edit_text.length());
+    sel.to                             = qBound(0, end_pos, context_->edit_text.length());
+    context_->cached_render_data_ready = false;
     requestUpdate();
 }
 
