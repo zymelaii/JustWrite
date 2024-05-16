@@ -20,7 +20,7 @@ signals:
     void textAreaChanged(QRect area);
     void textChanged(const QString &text);
     void focusLost();
-    void requireEmptyChapter();
+    void activated();
 
 public:
     bool softCenterMode() const;

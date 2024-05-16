@@ -623,7 +623,7 @@ void Editor::focusInEvent(QFocusEvent *e) {
         e.insert_block(0);
         //! TODO: move it into a safe method
         e.active_block_index = 0;
-        emit requireEmptyChapter();
+        emit activated();
     }
     requestUpdate();
 }

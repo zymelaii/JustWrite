@@ -40,18 +40,25 @@ JustWrite::JustWrite(QWidget *parent)
     ui_editor->installEventFilter(this);
     ui_editor->setFocus();
 
-    connect(ui_editor, &Editor::requireEmptyChapter, this, &JustWrite::openEmptyChapter);
+    connect(ui_editor, &Editor::activated, this, [this] {
+        Q_ASSERT(ui_book_dir->totalTopItems() == 0);
+        addVolume(0, "默认卷");
+        const int cid = addChapter(0, "");
+        current_cid_  = cid;
+    });
     connect(ui_editor, &Editor::textChanged, this, [this](const QString &text) {
         ui_total_words->setText(QString("全本共 %1 字").arg(text.length()));
     });
-    connect(ui_book_dir, &TwoLevelTree::subItemSelected, this, [this](int vid) {
-        openChapter(vid);
+    connect(ui_book_dir, &TwoLevelTree::subItemSelected, this, [this](int vid, int cid) {
+        openChapter(cid);
     });
     connect(ui_new_volume, &FlatButton::pressed, this, [this] {
-        createNewVolume(-1, "");
+        addVolume(ui_book_dir->totalTopItems(), "");
     });
     connect(ui_new_chapter, &FlatButton::pressed, this, [this] {
-        createAndOpenNewChapter(-1, "");
+        const int volume_index = ui_book_dir->totalTopItems() - 1;
+        const int cid          = addChapter(volume_index, "");
+        openChapter(cid);
     });
     connect(&sec_timer_, &QTimer::timeout, this, [this] {
         ui_datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
@@ -71,24 +78,17 @@ JustWrite::~JustWrite() {
     delete messy_input_;
 }
 
-void JustWrite::createNewVolume(int index, const QString &title) {
-    if (index == -1) { index = ui_book_dir->totalTopItems(); }
-    ui_book_dir->addTopItem(index, title);
+int JustWrite::addVolume(int index, const QString &title) {
+    Q_ASSERT(index >= 0 && index <= ui_book_dir->totalTopItems());
+    return ui_book_dir->addTopItem(index, title);
 }
 
-void JustWrite::createAndOpenNewChapter(int volume_index, const QString &title) {
-    if (volume_index == -1) { volume_index = ui_book_dir->totalTopItems() - 1; }
+int JustWrite::addChapter(int volume_index, const QString &title) {
+    Q_ASSERT(volume_index >= 0 && volume_index < ui_book_dir->totalTopItems());
     const auto vid = ui_book_dir->topItemAt(volume_index);
     Q_ASSERT(vid != -1);
     const int chap_index = ui_book_dir->totalSubItemsUnderTopItem(vid);
-    const int cid        = ui_book_dir->addSubItem(vid, chap_index, title);
-    openChapter(cid);
-}
-
-void JustWrite::openEmptyChapter() {
-    const auto vid = ui_book_dir->topItemAt(0);
-    if (vid == -1) { createNewVolume(0, ""); }
-    createAndOpenNewChapter(-1, "");
+    return ui_book_dir->addSubItem(vid, chap_index, title);
 }
 
 void JustWrite::openChapter(int cid) {

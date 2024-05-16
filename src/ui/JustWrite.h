@@ -25,9 +25,8 @@ public:
     virtual ~JustWrite();
 
 public slots:
-    void createNewVolume(int index, const QString &title);
-    void createAndOpenNewChapter(int volume_index, const QString &title);
-    void openEmptyChapter();
+    int  addVolume(int index, const QString &title);
+    int  addChapter(int volume_index, const QString &title);
     void openChapter(int cid);
 
 protected:
