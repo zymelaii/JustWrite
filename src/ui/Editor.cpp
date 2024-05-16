@@ -859,14 +859,15 @@ void Editor::mouseReleaseEvent(QMouseEvent *e) {
 void Editor::mouseDoubleClickEvent(QMouseEvent *e) {
     QWidget::mouseDoubleClickEvent(e);
 
+    if (context_->engine.preedit) { return; }
+
     context_->unset_sel();
 
     if (e->button() == Qt::LeftButton) {
         const auto loc = context_->get_textloc_at_vpos(e->pos() - textArea().topLeft());
         if (loc.block_index != -1) {
             const auto block = context_->engine.active_blocks[loc.block_index];
-            moveTo(block->text_pos, false);
-            move(block->text_len(), true);
+            select(block->text_pos, block->text_pos + block->text_len());
         }
     }
 }
