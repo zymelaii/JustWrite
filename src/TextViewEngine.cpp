@@ -42,11 +42,6 @@ void TextBlock::reset(const QString *ref, int pos) {
     mark_as_dirty(0);
 }
 
-void TextBlock::release() {
-    //! ATTENTION: callee must remove block from active_blocks
-    parent->block_pool.append(this);
-}
-
 void TextBlock::mark_as_dirty(int line_nr) {
     Q_ASSERT(line_nr >= 0 && line_nr < lines.size());
     dirty_line_nr = !is_dirty() ? line_nr : qMin(dirty_line_nr, line_nr);
@@ -170,6 +165,16 @@ TextBlock *TextViewEngine::alloc_block() {
     }
     Q_ASSERT(ptr);
     return ptr;
+}
+
+void TextViewEngine::release(TextBlock *block) {
+    Q_ASSERT(block && block->parent == this);
+    const int max_size = 64;
+    if (block_pool.size() == max_size) {
+        delete block;
+    } else {
+        block_pool.append(block);
+    }
 }
 
 bool TextViewEngine::is_empty() const {
@@ -391,6 +396,7 @@ int TextViewEngine::commit_deletion(int times, int &deleted, bool hard_del) {
         block->lines.back().endp_offset += len - next_block_del_len;
         total_shift                     += next_block_del_len;
     }
+    for (int i = active_block_index + 1; i <= tail_block_index; ++i) { release(active_blocks[i]); }
     active_blocks.remove(active_block_index + 1, tail_block_index - active_block_index);
 
     //! stage 4: sync following lines & blocks

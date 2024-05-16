@@ -37,7 +37,6 @@ struct TextBlock {
     int dirty_line_nr;
 
     void            reset(const QString *ref, int pos);
-    void            release();
     void            mark_as_dirty(int line_nr);
     bool            is_dirty() const;
     void            join_dirty_lines();
@@ -91,6 +90,7 @@ struct TextViewEngine {
 
     void             reset(const QFontMetrics &metrics, int width);
     TextBlock       *alloc_block();
+    void             release(TextBlock *block);
     bool             is_empty() const;
     bool             is_dirty() const;
     bool             is_cursor_available() const;
