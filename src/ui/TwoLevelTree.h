@@ -49,6 +49,9 @@ public:
     int addTopItem(int index, const QString &value);
     int addSubItem(int top_item_id, int index, const QString &value);
 
+    QString itemValue(int id) const;
+    void    setItemValue(int id, const QString &value);
+
     void setItemRenderProxy(ItemRenderProxy *proxy);
 
 public:

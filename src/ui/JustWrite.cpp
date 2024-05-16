@@ -8,6 +8,9 @@
 #include <QDateTime>
 #include <QFrame>
 #include <QPainter>
+#include <QMenu>
+#include <QFileDialog>
+#include <QMessageBox>
 
 namespace jwrite::Ui {
 
@@ -60,12 +63,22 @@ JustWrite::JustWrite(QWidget *parent)
         const int cid          = addChapter(volume_index, "");
         openChapter(cid);
     });
+    connect(ui_export_to_local, &FlatButton::pressed, this, [this] {
+        const auto caption      = "导出到本地";
+        const auto default_name = (book_name_.isEmpty() ? "未命名书籍" : book_name_) + ".txt";
+        const auto filter       = "文本文件 (*.txt)";
+        auto       path         = QFileDialog::getSaveFileName(this, caption, default_name, filter);
+        if (path.isEmpty()) { return; }
+        if (QFileInfo(path).suffix().isEmpty()) { path.append(".txt"); }
+        exportToLocal(path);
+    });
     connect(&sec_timer_, &QTimer::timeout, this, [this] {
         ui_datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
     });
     connect(ui_editor, &Editor::focusLost, this, [this] {
         messy_input_->kill();
     });
+    connect(ui_book_dir, &TwoLevelTree::contextMenuRequested, this, &JustWrite::popupBookDirMenu);
 
     sec_timer_.start();
 }
@@ -118,6 +131,35 @@ void JustWrite::openChapter(int cid) {
     jwrite_profiler_record(SwitchChapter);
 }
 
+void JustWrite::renameBookDirItem(int id, const QString &title) {
+    ui_book_dir->setItemValue(id, title);
+}
+
+void JustWrite::exportToLocal(const QString &path) {
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "导出失败", "无法打开文件：" + path);
+        return;
+    }
+
+    QTextStream out(&file);
+
+    const int total_volumes = ui_book_dir->totalTopItems();
+    int       chap_index    = 0;
+    for (int i = 0; i < total_volumes; ++i) {
+        const int vid = ui_book_dir->topItemAt(i);
+        out << QStringLiteral("【第 %1 卷 %2】\n\n").arg(i + 1).arg(ui_book_dir->itemValue(vid));
+        const auto chaps = ui_book_dir->getSubItems(vid);
+        for (const auto cid : chaps) {
+            const auto content = current_cid_ == cid ? ui_editor->text() : chapters_.value(cid, "");
+            out << QStringLiteral("第 %1 章 %2\n")
+                       .arg(++chap_index)
+                       .arg(ui_book_dir->itemValue(cid))
+                << content << "\n\n";
+        }
+    }
+}
+
 void JustWrite::setupUi() {
     auto layout         = new QVBoxLayout(this);
     auto content        = new QWidget;
@@ -131,10 +173,11 @@ void JustWrite::setupUi() {
     auto pal  = palette();
 
     //! setup left sidebar
-    ui_sidebar     = new QWidget;
-    ui_new_volume  = new FlatButton;
-    ui_new_chapter = new FlatButton;
-    ui_book_dir    = new jwrite::Ui::TwoLevelTree;
+    ui_sidebar         = new QWidget;
+    ui_new_volume      = new FlatButton;
+    ui_new_chapter     = new FlatButton;
+    ui_export_to_local = new FlatButton;
+    ui_book_dir        = new jwrite::Ui::TwoLevelTree;
 
     auto btn_line        = new QWidget;
     auto btn_line_layout = new QHBoxLayout(btn_line);
@@ -143,6 +186,8 @@ void JustWrite::setupUi() {
     btn_line_layout->addWidget(ui_new_volume);
     btn_line_layout->addStretch();
     btn_line_layout->addWidget(ui_new_chapter);
+    btn_line_layout->addStretch();
+    btn_line_layout->addWidget(ui_export_to_local);
     btn_line_layout->addStretch();
 
     auto sep_line = new QFrame;
@@ -171,6 +216,11 @@ void JustWrite::setupUi() {
     ui_new_chapter->setText("新建章");
     ui_new_chapter->setTextAlignment(Qt::AlignCenter);
     ui_new_chapter->setRadius(6);
+
+    ui_export_to_local->setContentsMargins(10, 0, 10, 0);
+    ui_export_to_local->setText("导出");
+    ui_export_to_local->setTextAlignment(Qt::AlignCenter);
+    ui_export_to_local->setRadius(6);
 
     ui_sidebar->setAutoFillBackground(true);
     ui_sidebar->setMinimumWidth(200);
@@ -262,6 +312,10 @@ void JustWrite::setupUi() {
     ui_book_dir->setItemRenderProxy(new BookDirItemRenderProxy(this));
 
     setAutoFillBackground(true);
+}
+
+void JustWrite::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
+    //! TODO: menu style & popup input to edit the new title
 }
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {

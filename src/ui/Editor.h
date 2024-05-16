@@ -31,6 +31,10 @@ public:
     void reset(QString &text, bool swap);
     void scrollToCursor();
 
+    QString text() const {
+        return context_->edit_text;
+    }
+
     VisualTextEditContext::TextLoc currentTextLoc() const;
     void                           setCursorToTextLoc(const VisualTextEditContext::TextLoc &loc);
 

@@ -11,6 +11,7 @@
 #include <QWidget>
 #include <QTimer>
 #include <QLabel>
+#include <QAction>
 #include <QWKWidgets/widgetwindowagent.h>
 
 namespace jwrite::Ui {
@@ -29,8 +30,12 @@ public slots:
     int  addChapter(int volume_index, const QString &title);
     void openChapter(int cid);
 
+    void renameBookDirItem(int id, const QString &title);
+    void exportToLocal(const QString &path);
+
 protected:
     void setupUi();
+    void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
 
     bool eventFilter(QObject *obj, QEvent *event) override;
 
@@ -41,12 +46,14 @@ private:
     int                                       current_cid_;
     QMap<int, QString>                        chapters_;
     QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;
+    QString                                   book_name_;
 
     jwrite::Ui::TitleBar     *ui_title_bar;
     jwrite::Ui::Editor       *ui_editor;
     jwrite::Ui::StatusBar    *ui_status_bar;
     jwrite::Ui::FlatButton   *ui_new_volume;
     jwrite::Ui::FlatButton   *ui_new_chapter;
+    jwrite::Ui::FlatButton   *ui_export_to_local;
     jwrite::Ui::TwoLevelTree *ui_book_dir;
     QLabel                   *ui_total_words;
     QLabel                   *ui_datetime;

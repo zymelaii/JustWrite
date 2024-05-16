@@ -45,6 +45,16 @@ int TwoLevelTree::addSubItem(int top_item_id, int index, const QString &value) {
     return id;
 }
 
+QString TwoLevelTree::itemValue(int id) const {
+    Q_ASSERT(id >= 0 && id < title_list_.size());
+    return title_list_[id];
+}
+
+void TwoLevelTree::setItemValue(int id, const QString &value) {
+    Q_ASSERT(id >= 0 && id < title_list_.size());
+    title_list_[id] = value;
+}
+
 void TwoLevelTree::setItemRenderProxy(ItemRenderProxy *proxy) {
     render_proxy_ = proxy;
     if (render_proxy_) {
