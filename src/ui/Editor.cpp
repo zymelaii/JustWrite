@@ -155,9 +155,11 @@ QPair<double, double> Editor::scrollBound() const {
     const auto  &e            = context_->engine;
     const double line_spacing = e.line_spacing_ratio * e.line_height;
 
-    const double slack     = line_spacing + e.block_spacing;
-    const double min_y_pos = -slack;
-    double       max_y_pos = -slack;
+    //! see drawHighlightedText(QPainter *p)
+    const double line_gap  = line_spacing + e.block_spacing;
+    const double slack     = e.block_spacing * 0.75;
+    const double min_y_pos = -line_gap;
+    double       max_y_pos = -line_gap - slack;
     for (auto block : e.active_blocks) {
         max_y_pos += block->lines.size() * line_spacing + e.block_spacing;
     }
