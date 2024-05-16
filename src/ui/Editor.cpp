@@ -129,8 +129,44 @@ void Editor::reset(QString &text, bool swap) {
 }
 
 void Editor::scrollToCursor() {
-    context_->cursor_moved = true;
-    requestUpdate();
+    const auto &d = context_->cached_render_state;
+    const auto &e = context_->engine;
+    Q_ASSERT(context_->cached_render_data_ready);
+    Q_ASSERT(context_->cursor_moved);
+
+    const auto   viewport     = textArea();
+    const auto  &line         = e.current_line();
+    const auto  &cursor       = e.cursor;
+    const double line_spacing = e.line_height * e.line_spacing_ratio;
+
+    double y_pos = 0.0;
+    if (d.active_block_visible) {
+        y_pos = d.active_block_y_start;
+    } else if (e.active_block_index < d.visible_block.first) {
+        y_pos = d.cached_block_y_pos[d.visible_block.first];
+        for (int index = d.visible_block.first; index > e.active_block_index; --index) {
+            y_pos -= e.block_spacing + line_spacing * e.active_blocks[index]->lines.size();
+        }
+    } else if (e.active_block_index > d.visible_block.last) {
+        y_pos = d.cached_block_y_pos[d.visible_block.last];
+        for (int index = d.visible_block.last; index < e.active_block_index; ++index) {
+            y_pos += e.block_spacing + line_spacing * e.active_blocks[index]->lines.size();
+        }
+    }
+    y_pos += cursor.row * line_spacing;
+
+    const double slack       = e.block_spacing * 0.75;
+    const double y_pos_start = y_pos - slack;
+    const double y_pos_end   = y_pos + line_spacing + slack;
+
+    if (const double top = context_->viewport_y_pos; y_pos_start < top) {
+        scrollTo(y_pos_start, true);
+    } else if (const double bottom = context_->viewport_y_pos + context_->viewport_height;
+               y_pos_end > bottom) {
+        scrollTo(y_pos_end - context_->viewport_height, true);
+    }
+
+    context_->cursor_moved = false;
 }
 
 VisualTextEditContext::TextLoc Editor::currentTextLoc() const {
@@ -314,7 +350,6 @@ void Editor::paste() {
 }
 
 void Editor::breakIntoNewLine() {
-    context_->cursor_moved = true;
     context_->remove_sel_region();
     context_->engine.break_block_at_cursor_pos();
     context_->cursor_moved = true;
@@ -498,7 +533,8 @@ void Editor::drawHighlightBlock(QPainter *p) {
 void Editor::drawCursor(QPainter *p) {
     const auto &d = context_->cached_render_state;
     const auto &e = context_->engine;
-    if (!e.is_cursor_available()) { return; }
+    if (!(e.is_cursor_available() && blink_cursor_should_paint_)) { return; }
+    if (!d.active_block_visible) { return; }
 
     jwrite_profiler_start(CursorRenderCost);
 
@@ -508,43 +544,26 @@ void Editor::drawCursor(QPainter *p) {
     const double line_spacing = e.line_height * e.line_spacing_ratio;
     const double y_pos        = d.active_block_y_start + cursor.row * line_spacing;
 
-    if (blink_cursor_should_paint_ && d.active_block_visible) {
-        //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)`
-        //! directly, and the reason is that the text_width calcualated by that has a few
-        //! difference with the render result of the text, and the cursor will seems not in the
-        //! correct place, and this problem was extremely serious in pure latin texts
-        const double leading_space = line.is_first_line() ? e.standard_char_width * 2 : 0;
-        double       cursor_x_pos  = leading_space + line.char_spacing() * cursor.col;
-        for (const auto &c : line.text().left(cursor.col)) {
-            cursor_x_pos += e.fm.horizontalAdvance(c);
-        }
-        const double cursor_y_pos = y_pos - context_->viewport_y_pos;
-        const auto   cursor_pos   = QPoint(cursor_x_pos, cursor_y_pos) + viewport.topLeft();
-
-        p->save();
-
-        //! NOTE: set pen width less than 1 to ensure a single pixel cursor
-        p->setPen(QPen(palette().text(), 0.8));
-
-        p->drawLine(cursor_pos, cursor_pos + QPoint(0, e.fm.height()));
-
-        p->restore();
+    //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)`
+    //! directly, and the reason is that the text_width calcualated by that has a few
+    //! difference with the render result of the text, and the cursor will seems not in the
+    //! correct place, and this problem was extremely serious in pure latin texts
+    const double leading_space = line.is_first_line() ? e.standard_char_width * 2 : 0;
+    double       cursor_x_pos  = leading_space + line.char_spacing() * cursor.col;
+    for (const auto &c : line.text().left(cursor.col)) {
+        cursor_x_pos += e.fm.horizontalAdvance(c);
     }
+    const double cursor_y_pos = y_pos - context_->viewport_y_pos;
+    const auto   cursor_pos   = QPoint(cursor_x_pos, cursor_y_pos) + viewport.topLeft();
 
-    if (context_->cursor_moved) {
-        const double slack       = e.block_spacing * 0.75;
-        const double y_pos_start = y_pos - slack;
-        const double y_pos_end   = y_pos + line_spacing + slack;
+    p->save();
 
-        if (const double top = context_->viewport_y_pos; y_pos_start < top) {
-            scrollTo(y_pos_start, true);
-        } else if (const double bottom = context_->viewport_y_pos + context_->viewport_height;
-                   y_pos_end > bottom) {
-            scrollTo(y_pos_end - context_->viewport_height, true);
-        }
+    //! NOTE: set pen width less than 1 to ensure a single pixel cursor
+    p->setPen(QPen(palette().text(), 0.8));
 
-        context_->cursor_moved = false;
-    }
+    p->drawLine(cursor_pos, cursor_pos + QPoint(0, e.fm.height()));
+
+    p->restore();
 
     jwrite_profiler_record(CursorRenderCost);
 }
@@ -588,6 +607,7 @@ void Editor::paintEvent(QPaintEvent *e) {
 
     //! draw cursor
     drawCursor(&p);
+    if (context_->cursor_moved) { scrollToCursor(); }
 
     jwrite_profiler_record(IME2UpdateDelay);
     jwrite_profiler_record(FrameRenderCost);
