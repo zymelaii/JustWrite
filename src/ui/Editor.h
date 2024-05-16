@@ -87,19 +87,23 @@ protected:
 private:
     VisualTextEditContext           *context_;
     jwrite::TextInputCommandManager *input_manager_;
-    int                              min_text_line_chars_;
-    bool                             soft_center_mode_;
-    double                           expected_scroll_;
-    bool                             blink_cursor_should_paint_;
-    QTimer                           blink_timer_;
-    QTimer                           auto_scroll_timer_;
-    QMargins                         margins_;
-    bool                             inserted_filter_enabled_;
-    bool                             auto_scroll_mode_;
-    double                           scroll_base_y_pos_;
-    double                           scroll_ref_y_pos_;
 
-    Qt::CursorShape cursor_shape_[2];
+    int    min_text_line_chars_;
+    bool   soft_center_mode_;
+    bool   inserted_filter_enabled_;
+    double expected_scroll_;
+    bool   drag_sel_flag_;
+
+    QTimer blink_timer_;
+    bool   blink_cursor_should_paint_;
+
+    bool   auto_scroll_mode_;
+    QTimer auto_scroll_timer_;
+    double scroll_base_y_pos_;
+    double scroll_ref_y_pos_;
+
+    QMargins        ui_margins_;
+    Qt::CursorShape ui_cursor_shape_[2];
 };
 
 } // namespace jwrite::Ui

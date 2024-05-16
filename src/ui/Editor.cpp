@@ -36,8 +36,9 @@ Editor::Editor(QWidget *parent)
     expected_scroll_           = 0.0;
     blink_cursor_should_paint_ = true;
     inserted_filter_enabled_   = true;
-    cursor_shape_[0]           = Qt::ArrowCursor;
-    cursor_shape_[1]           = Qt::ArrowCursor;
+    drag_sel_flag_             = false;
+    ui_cursor_shape_[0]        = Qt::ArrowCursor;
+    ui_cursor_shape_[1]        = Qt::ArrowCursor;
 
     setSoftCenterMode(true);
 
@@ -86,15 +87,15 @@ void Editor::setSoftCenterMode(bool value) {
         const auto mean_width     = qMax(0, width() - min_margin * 2);
         const auto text_width     = qMin<int>(mean_width * 0.8, max_text_width);
         const auto margin         = (width() - text_width) / 2;
-        margins_                  = QMargins(margin, 4, margin, 4);
+        ui_margins_               = QMargins(margin, 4, margin, 4);
     } else {
-        margins_ = QMargins(4, 4, 4, 4);
+        ui_margins_ = QMargins(4, 4, 4, 4);
     }
     emit textAreaChanged(textArea());
 }
 
 QRect Editor::textArea() const {
-    return contentsRect() - margins_;
+    return contentsRect() - ui_margins_;
 }
 
 void Editor::reset(QString &text, bool swap) {
@@ -370,13 +371,13 @@ void Editor::requestUpdate() {
 }
 
 void Editor::setCursorShape(Qt::CursorShape shape) {
-    cursor_shape_[1] = cursor_shape_[0];
-    cursor_shape_[0] = shape;
+    ui_cursor_shape_[1] = ui_cursor_shape_[0];
+    ui_cursor_shape_[0] = shape;
     setCursor(shape);
 }
 
 void Editor::restoreCursorShape() {
-    setCursorShape(cursor_shape_[1]);
+    setCursorShape(ui_cursor_shape_[1]);
 }
 
 QSize Editor::sizeHint() const {
@@ -384,7 +385,7 @@ QSize Editor::sizeHint() const {
 }
 
 QSize Editor::minimumSizeHint() const {
-    const auto margins      = contentsMargins() + margins_;
+    const auto margins      = contentsMargins() + ui_margins_;
     const auto line_spacing = context_->engine.line_height * context_->engine.line_spacing_ratio;
     const auto hori_margin  = margins.left() + margins.right();
     const auto vert_margin  = margins.top() + margins.bottom();
@@ -883,7 +884,10 @@ void Editor::mousePressEvent(QMouseEvent *e) {
     //! mode, so that user could have more choices when they scroll to a different view pos
     if (cancel_auto_scroll) { return; }
 
-    if (e->button() != Qt::LeftButton) { return; }
+    if (e->button() != Qt::LeftButton) {
+        Q_ASSERT(!drag_sel_flag_);
+        return;
+    }
 
     context_->unset_sel();
 
@@ -899,10 +903,14 @@ void Editor::mousePressEvent(QMouseEvent *e) {
     Q_ASSERT(success);
 
     requestUpdate();
+
+    drag_sel_flag_ = true;
 }
 
 void Editor::mouseReleaseEvent(QMouseEvent *e) {
     QWidget::mouseReleaseEvent(e);
+
+    if (e->buttons() & Qt::LeftButton) { drag_sel_flag_ = false; }
 }
 
 void Editor::mouseDoubleClickEvent(QMouseEvent *e) {
@@ -929,7 +937,7 @@ void Editor::mouseMoveEvent(QMouseEvent *e) {
         return;
     }
 
-    if (e->buttons() & Qt::LeftButton) {
+    if ((e->buttons() & Qt::LeftButton) && drag_sel_flag_) {
         do {
             auto &engine = context_->engine;
             if (!engine.is_cursor_available()) { break; }
