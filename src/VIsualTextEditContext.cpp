@@ -186,15 +186,16 @@ VisualTextEditContext::TextLoc VisualTextEditContext::get_textloc_at_vpos(const 
     TextLoc loc{};
 
     const double line_spacing = engine.line_height * engine.line_spacing_ratio;
-    const double target_y_pos = pos.y() + viewport_y_pos;
+    const double target_y_pos = qBound(0, pos.y(), viewport_height) + viewport_y_pos;
 
     int    index     = -1;
     double rel_y_pos = 0.0;
 
-    if (cached_render_data_ready) {
-        const auto &d = cached_render_state;
-        if (!d.found_visible_block) { return loc; }
-        if (!(pos.y() >= 0 && pos.y() <= viewport_height)) { return loc; }
+    const auto &d               = cached_render_state;
+    const bool  use_cached_data = cached_render_data_ready && d.found_visible_block && pos.y() >= 0
+                              && pos.y() <= viewport_height;
+
+    if (use_cached_data) {
         index = d.visible_block.first;
         while (index < d.visible_block.last) {
             const auto block = engine.active_blocks[index];
@@ -220,11 +221,12 @@ VisualTextEditContext::TextLoc VisualTextEditContext::get_textloc_at_vpos(const 
         rel_y_pos = target_y_pos - y_pos;
     }
 
-    const auto block     = engine.active_blocks[index];
-    const int  last_line = block->lines.size() - 1;
-    const int  row       = qBound(0, static_cast<int>(rel_y_pos / line_spacing), last_line);
-    const auto line      = block->lines[row];
-    const int  col       = get_column_at_vpos(line, pos.x());
+    const int  row_stride = static_cast<int>(rel_y_pos / line_spacing);
+    const auto block      = engine.active_blocks[index];
+    const int  last_line  = block->lines.size() - 1;
+    const int  row        = qBound(0, row_stride, last_line);
+    const auto line       = block->lines[row];
+    const int  col        = get_column_at_vpos(line, pos.x());
 
     loc.block_index = index;
     loc.row         = row;

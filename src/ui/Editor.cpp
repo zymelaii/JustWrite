@@ -295,6 +295,7 @@ void Editor::cut() {
         context_->move(-e.cursor.pos, false);
         context_->del(e.current_block()->text_len() + 1, false);
     }
+    requestUpdate();
 }
 
 void Editor::paste() {
@@ -302,6 +303,7 @@ void Editor::paste() {
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
     insertRawText(clipboard->text());
+    requestUpdate();
 }
 
 void Editor::breakIntoNewLine() {
@@ -535,6 +537,7 @@ void Editor::paintEvent(QPaintEvent *e) {
     auto     pal = palette();
 
     //! smooth scroll
+    //! FIXME: skip if scroll is not avaiable
     context_->scroll_to(context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51);
     if (qAbs(context_->viewport_y_pos - expected_scroll_) > 1e-3) {
         QTimer::singleShot(10, [this]() {
@@ -885,15 +888,18 @@ void Editor::mouseMoveEvent(QMouseEvent *e) {
             auto &engine = context_->engine;
             if (!engine.is_cursor_available()) { break; }
             if (engine.preedit) { break; }
-            const auto   bb = textArea();
-            const QPoint pos{
-                qBound(bb.left(), e->pos().x(), bb.right()),
-                qBound(bb.top(), e->pos().y(), bb.bottom()),
-            };
-            const auto loc = context_->get_textloc_at_vpos(pos - bb.topLeft());
+            const auto bb   = textArea();
+            const auto vpos = e->globalPosition().toPoint() - mapToGlobal(bb.topLeft());
+            const auto loc  = context_->get_textloc_at_vpos(vpos);
             Q_ASSERT(loc.block_index != -1);
             const auto block = engine.active_blocks[loc.block_index];
             moveTo(block->text_pos + loc.pos, true);
+            const double line_spacing = engine.line_height * engine.line_spacing_ratio;
+            if (vpos.y() < 0) {
+                scroll(-line_spacing * 0.5, true);
+            } else if (vpos.y() > context_->viewport_height) {
+                scroll(line_spacing * 0.5, true);
+            }
         } while (0);
     }
 
@@ -908,9 +914,9 @@ void Editor::mouseMoveEvent(QMouseEvent *e) {
 void Editor::wheelEvent(QWheelEvent *e) {
     const auto &engine = context_->engine;
     if (engine.is_empty()) { return; }
-    const auto   ratio        = 1.0 / 180 * 3;
+    const double ratio        = 1.0 / 180 * 3;
     const double line_spacing = engine.line_height * engine.line_spacing_ratio;
-    auto         delta        = -e->angleDelta().y() * line_spacing * ratio;
+    const double delta        = -e->angleDelta().y() * line_spacing * ratio;
     scroll((e->modifiers() & Qt::ControlModifier) ? delta * 8 : delta, true);
 }
 
