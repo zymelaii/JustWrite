@@ -143,6 +143,10 @@ void Editor::scrollToCursor() {
     double y_pos = 0.0;
     if (d.active_block_visible) {
         y_pos = d.active_block_y_start;
+    } else if (!d.found_visible_block) {
+        for (int index = 0; index < e.active_block_index; ++index) {
+            y_pos += e.block_spacing + line_spacing * e.active_blocks[index]->lines.size();
+        }
     } else if (e.active_block_index < d.visible_block.first) {
         y_pos = d.cached_block_y_pos[d.visible_block.first];
         for (int index = d.visible_block.first; index > e.active_block_index; --index) {
