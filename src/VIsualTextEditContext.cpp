@@ -251,6 +251,7 @@ void VisualTextEditContext::update_preedit(const QString &text) {
     preedit_text.remove(saved_cursor.pos, last_preedit_text_len);
     preedit_text.insert(saved_cursor.pos, text);
     engine.update_preedit_text(text.length());
+    cursor_moved = true;
 }
 
 void VisualTextEditContext::quit_preedit() {

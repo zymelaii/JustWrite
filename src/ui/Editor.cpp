@@ -155,7 +155,7 @@ QPair<double, double> Editor::scrollBound() const {
     const auto  &e            = context_->engine;
     const double line_spacing = e.line_spacing_ratio * e.line_height;
 
-    //! see drawHighlightedText(QPainter *p)
+    //! see drawHighlightBlock(QPainter *p)
     const double line_gap  = line_spacing + e.block_spacing;
     const double slack     = e.block_spacing * 0.75;
     const double min_y_pos = -line_gap;
@@ -170,6 +170,13 @@ QPair<double, double> Editor::scrollBound() const {
 void Editor::scroll(double delta, bool smooth) {
     const auto [min_y_pos, max_y_pos] = scrollBound();
     expected_scroll_ = qBound(min_y_pos, context_->viewport_y_pos + delta, max_y_pos);
+    if (!smooth) { context_->scroll_to(expected_scroll_); }
+    update();
+}
+
+void Editor::scrollTo(double pos_y, bool smooth) {
+    const auto [min_y_pos, max_y_pos] = scrollBound();
+    expected_scroll_                  = qBound(min_y_pos, pos_y, max_y_pos);
     if (!smooth) { context_->scroll_to(expected_scroll_); }
     update();
 }
@@ -307,8 +314,10 @@ void Editor::paste() {
 }
 
 void Editor::breakIntoNewLine() {
+    context_->cursor_moved = true;
     context_->remove_sel_region();
     context_->engine.break_block_at_cursor_pos();
+    context_->cursor_moved = true;
     requestUpdate();
 }
 
@@ -453,44 +462,6 @@ void Editor::drawSelection(QPainter *p) {
     jwrite_profiler_record(SelectionAreaRenderCost);
 }
 
-void Editor::drawCursor(QPainter *p) {
-    const auto &d = context_->cached_render_state;
-    const auto &e = context_->engine;
-    if (!e.is_cursor_available() || !blink_cursor_should_paint_) { return; }
-    if (!d.active_block_visible) { return; }
-
-    jwrite_profiler_start(CursorRenderCost);
-
-    p->save();
-
-    //! NOTE: set pen width less than 1 to ensure a single pixel cursor
-    p->setPen(QPen(palette().text(), 0.8));
-
-    const auto   viewport      = textArea();
-    const auto  &line          = e.current_line();
-    const auto  &cursor        = e.cursor;
-    const double line_spacing  = e.line_height * e.line_spacing_ratio;
-    const double stride        = cursor.row * line_spacing;
-    const double cursor_y_pos  = d.active_block_y_start - context_->viewport_y_pos + stride;
-    const double leading_space = line.is_first_line() ? e.standard_char_width * 2 : 0;
-
-    //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)`
-    //! directly, and the reason is that the text_width calcualated by that has a few
-    //! difference with the render result of the text, and the cursor will seems not in the
-    //! correct place, and this problem was extremely serious in pure latin texts
-    double cursor_x_pos = leading_space + line.char_spacing() * cursor.col;
-    for (const auto &c : line.text().left(cursor.col)) {
-        cursor_x_pos += e.fm.horizontalAdvance(c);
-    }
-
-    const auto cursor_pos = QPoint(cursor_x_pos, cursor_y_pos) + viewport.topLeft();
-    p->drawLine(cursor_pos, cursor_pos + QPoint(0, e.fm.height()));
-
-    p->restore();
-
-    jwrite_profiler_record(CursorRenderCost);
-}
-
 void Editor::drawHighlightBlock(QPainter *p) {
     const auto &d = context_->cached_render_state;
     const auto &e = context_->engine;
@@ -522,6 +493,60 @@ void Editor::drawHighlightBlock(QPainter *p) {
     p->drawRoundedRect(bb, radius, radius);
 
     p->restore();
+}
+
+void Editor::drawCursor(QPainter *p) {
+    const auto &d = context_->cached_render_state;
+    const auto &e = context_->engine;
+    if (!e.is_cursor_available()) { return; }
+
+    jwrite_profiler_start(CursorRenderCost);
+
+    const auto   viewport     = textArea();
+    const auto  &line         = e.current_line();
+    const auto  &cursor       = e.cursor;
+    const double line_spacing = e.line_height * e.line_spacing_ratio;
+    const double y_pos        = d.active_block_y_start + cursor.row * line_spacing;
+
+    if (blink_cursor_should_paint_ && d.active_block_visible) {
+        //! NOTE: you may question about why it doesn't call `fm.horizontalAdvance(text)`
+        //! directly, and the reason is that the text_width calcualated by that has a few
+        //! difference with the render result of the text, and the cursor will seems not in the
+        //! correct place, and this problem was extremely serious in pure latin texts
+        const double leading_space = line.is_first_line() ? e.standard_char_width * 2 : 0;
+        double       cursor_x_pos  = leading_space + line.char_spacing() * cursor.col;
+        for (const auto &c : line.text().left(cursor.col)) {
+            cursor_x_pos += e.fm.horizontalAdvance(c);
+        }
+        const double cursor_y_pos = y_pos - context_->viewport_y_pos;
+        const auto   cursor_pos   = QPoint(cursor_x_pos, cursor_y_pos) + viewport.topLeft();
+
+        p->save();
+
+        //! NOTE: set pen width less than 1 to ensure a single pixel cursor
+        p->setPen(QPen(palette().text(), 0.8));
+
+        p->drawLine(cursor_pos, cursor_pos + QPoint(0, e.fm.height()));
+
+        p->restore();
+    }
+
+    if (context_->cursor_moved) {
+        const double slack       = e.block_spacing * 0.75;
+        const double y_pos_start = y_pos - slack;
+        const double y_pos_end   = y_pos + line_spacing + slack;
+
+        if (const double top = context_->viewport_y_pos; y_pos_start < top) {
+            scrollTo(y_pos_start, true);
+        } else if (const double bottom = context_->viewport_y_pos + context_->viewport_height;
+                   y_pos_end > bottom) {
+            scrollTo(y_pos_end - context_->viewport_height, true);
+        }
+
+        context_->cursor_moved = false;
+    }
+
+    jwrite_profiler_record(CursorRenderCost);
 }
 
 void Editor::resizeEvent(QResizeEvent *e) {
@@ -563,9 +588,6 @@ void Editor::paintEvent(QPaintEvent *e) {
 
     //! draw cursor
     drawCursor(&p);
-
-    //! TODO: auto scroll
-    context_->cursor_moved = false;
 
     jwrite_profiler_record(IME2UpdateDelay);
     jwrite_profiler_record(FrameRenderCost);

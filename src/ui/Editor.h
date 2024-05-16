@@ -36,6 +36,7 @@ public:
 
     QPair<double, double> scrollBound() const;
     void                  scroll(double delta, bool smooth);
+    void                  scrollTo(double pos_y, bool smooth);
     void                  scrollToStart();
     void                  scrollToEnd();
 
@@ -66,8 +67,8 @@ public:
 protected:
     void drawTextArea(QPainter *p);
     void drawSelection(QPainter *p);
-    void drawCursor(QPainter *p);
     void drawHighlightBlock(QPainter *p);
+    void drawCursor(QPainter *p);
 
     void resizeEvent(QResizeEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
