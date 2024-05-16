@@ -81,8 +81,9 @@ void VisualTextEditContext::prepare_render_data() {
 
     if (has_sel()) {
         jwrite_profiler_start(SelectionLocatingCost);
-        d.sel_loc_from      = get_textloc_at_pos(qMin(sel.from, sel.to));
-        d.sel_loc_to        = get_textloc_at_pos(qMax(sel.from, sel.to));
+        const int hint      = sel.from < sel.to ? -1 : 1;
+        d.sel_loc_from      = get_textloc_at_pos(qMin(sel.from, sel.to), hint);
+        d.sel_loc_to        = get_textloc_at_pos(qMax(sel.from, sel.to), -hint);
         d.visible_sel.first = qMax(d.sel_loc_from.block_index, d.visible_block.first);
         d.visible_sel.last  = qMin(d.sel_loc_to.block_index, d.visible_block.last);
         if (d.visible_sel.first > d.visible_sel.last) {
@@ -104,9 +105,10 @@ VisualTextEditContext::TextLoc VisualTextEditContext::current_textloc() const {
     };
 }
 
-VisualTextEditContext::TextLoc VisualTextEditContext::get_textloc_at_pos(int pos) const {
-    TextLoc loc{.block_index = -1};
-    for (int i = 0; i < engine.active_blocks.size(); ++i) {
+VisualTextEditContext::TextLoc VisualTextEditContext::get_textloc_at_pos(int pos, int hint) const {
+    TextLoc   loc{.block_index = -1};
+    const int total_blocks = engine.active_blocks.size();
+    for (int i = 0; i < total_blocks; ++i) {
         const auto block = engine.active_blocks[i];
         if (!(pos >= block->text_pos && pos <= block->text_pos + block->text_len())) { continue; }
         const int relpos = pos - block->text_pos;
@@ -114,10 +116,17 @@ VisualTextEditContext::TextLoc VisualTextEditContext::get_textloc_at_pos(int pos
             const auto line = block->lines[j];
             const int  col  = relpos - line.text_offset();
             if (col > line.text_len()) { continue; }
-            loc.block_index = i;
-            loc.pos         = relpos;
-            loc.row         = j;
-            loc.col         = col;
+            if (hint < 0 && i + 1 < total_blocks && relpos == block->text_len()) {
+                loc.block_index = i + 1;
+                loc.pos         = 0;
+                loc.row         = 0;
+                loc.col         = 0;
+            } else {
+                loc.block_index = i;
+                loc.pos         = relpos;
+                loc.row         = j;
+                loc.col         = col;
+            }
             return loc;
         }
     }
@@ -270,7 +279,7 @@ int VisualTextEditContext::move_within_sel_region(int hint) {
     Q_ASSERT(!engine.preedit);
     if (!has_sel() || hint == 0) { return hint; }
     const int  pos = hint > 0 ? qMax(sel.from, sel.to) : qMin(sel.from, sel.to);
-    const auto loc = get_textloc_at_pos(pos);
+    const auto loc = get_textloc_at_pos(pos, -1);
     set_cursor_to_textloc(loc, hint);
     unset_sel();
     cursor_moved = true;

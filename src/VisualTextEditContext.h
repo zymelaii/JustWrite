@@ -75,7 +75,7 @@ struct VisualTextEditContext {
     void prepare_render_data();
 
     TextLoc current_textloc() const;
-    TextLoc get_textloc_at_pos(int pos) const;
+    TextLoc get_textloc_at_pos(int pos, int hint) const;
 
     /*!
      * \param [in] hint specify hint = 0 to use (row, col) member, otherwise use (pos) member and

@@ -42,6 +42,7 @@ public:
     void insertRawText(const QString &text);
     bool insertedPairFilter(const QString &text);
 
+    void select(int start_pos, int end_pos);
     void move(int offset, bool extend_sel);
     void moveTo(int pos, bool extend_sel);
     void insert(const QString &text);

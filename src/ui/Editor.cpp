@@ -231,6 +231,14 @@ bool Editor::insertedPairFilter(const QString &text) {
     return false;
 }
 
+void Editor::select(int start_pos, int end_pos) {
+    auto &sel = context_->sel;
+    sel.clear();
+    sel.from = qBound(0, start_pos, context_->edit_text.length());
+    sel.to   = qBound(0, end_pos, context_->edit_text.length());
+    requestUpdate();
+}
+
 void Editor::move(int offset, bool extend_sel) {
     context_->move(offset, extend_sel);
     requestUpdate();
@@ -759,8 +767,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         } break;
         case TextInputCommand::SelectBlock: {
             const auto block = engine.current_block();
-            moveTo(block->text_pos, false);
-            moveTo(block->text_pos + block->text_len(), true);
+            select(block->text_pos, block->text_pos + block->text_len());
         } break;
         case TextInputCommand::SelectPrevPage: {
         } break;
@@ -773,8 +780,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             moveTo(engine.text_ref->length(), true);
         } break;
         case TextInputCommand::SelectAll: {
-            moveTo(0, false);
-            moveTo(engine.text_ref->length(), true);
+            select(0, context_->engine.text_ref->length());
         } break;
         case TextInputCommand::InsertBeforeBlock: {
             engine.insert_block(engine.active_block_index);
@@ -883,19 +889,6 @@ void Editor::mouseMoveEvent(QMouseEvent *e) {
             Q_ASSERT(loc.block_index != -1);
             const auto block = engine.active_blocks[loc.block_index];
             moveTo(block->text_pos + loc.pos, true);
-            // auto &active_block_index = engine.active_block_index;
-            // auto &cursor             = engine.cursor;
-            // auto &sel                = context_->sel;
-            // active_block_index       = loc.block_index;
-            // cursor.row               = loc.row;
-            // cursor.col               = loc.col;
-            // const auto block         = engine.current_block();
-            // const auto line          = block->current_line();
-            // cursor.pos               = line.text_offset() + cursor.col;
-            // if (!context_->has_sel()) { sel.from = context_->edit_cursor_pos; }
-            // context_->edit_cursor_pos = block->text_pos + cursor.pos;
-            // sel.to                    = context_->edit_cursor_pos;
-            // requestUpdate();
         } while (0);
     }
 
