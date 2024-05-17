@@ -132,8 +132,8 @@ void Editor::reset(QString &text, bool swap) {
 void Editor::scrollToCursor() {
     const auto &d = context_->cached_render_state;
     const auto &e = context_->engine;
+    Q_ASSERT(e.is_cursor_available());
     Q_ASSERT(context_->cached_render_data_ready);
-    Q_ASSERT(context_->cursor_moved);
 
     const auto   viewport     = textArea();
     const auto  &line         = e.current_line();
@@ -170,8 +170,6 @@ void Editor::scrollToCursor() {
                y_pos_end > bottom) {
         scrollTo(y_pos_end - context_->viewport_height, true);
     }
-
-    context_->cursor_moved = false;
 }
 
 VisualTextEditContext::TextLoc Editor::currentTextLoc() const {
@@ -626,7 +624,10 @@ void Editor::paintEvent(QPaintEvent *e) {
 
     //! draw cursor
     drawCursor(&p);
-    if (context_->cursor_moved) { scrollToCursor(); }
+    if (context_->engine.is_cursor_available() && context_->cursor_moved) {
+        scrollToCursor();
+        context_->cursor_moved = false;
+    }
 
     jwrite_profiler_record(IME2UpdateDelay);
     jwrite_profiler_record(FrameRenderCost);

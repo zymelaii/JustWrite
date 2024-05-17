@@ -162,6 +162,7 @@ TextBlock *TextViewEngine::alloc_block() {
     } else {
         ptr = block_pool.front();
         block_pool.pop_front();
+        Q_ASSERT(ptr->lines.isEmpty());
     }
     Q_ASSERT(ptr);
     return ptr;
@@ -173,6 +174,7 @@ void TextViewEngine::release(TextBlock *block) {
     if (block_pool.size() == max_size) {
         delete block;
     } else {
+        block->lines.clear();
         block_pool.append(block);
     }
 }
@@ -274,6 +276,7 @@ void TextViewEngine::set_text_ref_unsafe(const QString *ref, int ref_origin) {
 }
 
 void TextViewEngine::clear_all() {
+    for (auto block : active_blocks) { release(block); }
     active_blocks.clear();
     active_block_index = -1;
     cursor.reset();
@@ -396,8 +399,12 @@ int TextViewEngine::commit_deletion(int times, int &deleted, bool hard_del) {
         block->lines.back().endp_offset += len - next_block_del_len;
         total_shift                     += next_block_del_len;
     }
-    for (int i = active_block_index + 1; i <= tail_block_index; ++i) { release(active_blocks[i]); }
-    active_blocks.remove(active_block_index + 1, tail_block_index - active_block_index);
+    if (const int total_release = tail_block_index - active_block_index; total_release > 0) {
+        for (int i = active_block_index + 1; i <= tail_block_index; ++i) {
+            release(active_blocks[i]);
+        }
+        active_blocks.remove(active_block_index + 1, total_release);
+    }
 
     //! stage 4: sync following lines & blocks
     block->mark_as_dirty(cursor.row);
@@ -506,6 +513,15 @@ void TextViewEngine::commit_preedit() {
     block->mark_as_dirty(cursor.row);
     block->join_dirty_lines();
     block->lines.back().endp_offset = saved_text_length;
+}
+
+int TextViewEngine::get_runtime_memory_cost() const {
+    int mem  = 0;
+    mem     += sizeof(TextViewEngine);
+    mem     += (block_pool.capacity() + active_blocks.capacity()) * sizeof(void *);
+    mem     += (block_pool.size() + active_blocks.size()) * sizeof(TextBlock);
+    for (const auto block : active_blocks) { mem += block->lines.capacity() * sizeof(TextLine); }
+    return mem;
 }
 
 int TextViewEngine::get_bounding_text_len(const QFontMetrics &fm, QStringView text, int &width) {

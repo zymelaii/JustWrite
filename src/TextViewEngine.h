@@ -118,6 +118,8 @@ struct TextViewEngine {
     void update_preedit_text(int text_length);
     void commit_preedit();
 
+    int get_runtime_memory_cost() const;
+
     static int get_bounding_text_len(const QFontMetrics &fm, QStringView text, int &width);
 };
 

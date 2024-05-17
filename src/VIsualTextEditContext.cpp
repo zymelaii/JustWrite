@@ -363,6 +363,8 @@ void VisualTextEditContext::insert(const QString &text) {
 }
 
 bool VisualTextEditContext::vertical_move(bool up) {
+    if (!engine.is_cursor_available()) { return false; }
+
     const int move_hint = up ? -1 : 1;
     if (has_sel()) { move_within_sel_region(move_hint); }
 
