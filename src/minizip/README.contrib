@@ -1,0 +1,5 @@
+Authored by Gilles Vollant <info@winimage.com>
+
+Mini zip and unzip based on zlib
+Includes Zip64 support by Mathias Svensson <mathias@result42.com>
+See http://www.winimage.com/zLibDll/minizip.html

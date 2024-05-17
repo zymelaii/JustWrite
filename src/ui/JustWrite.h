@@ -21,6 +21,12 @@ struct JustWritePrivate;
 class JustWrite : public QWidget {
     Q_OBJECT
 
+protected:
+    enum class ExportType {
+        PlainText,
+        ePub,
+    };
+
 public:
     explicit JustWrite(QWidget *parent = nullptr);
     virtual ~JustWrite();
@@ -31,11 +37,12 @@ public slots:
     void openChapter(int cid);
 
     void renameBookDirItem(int id, const QString &title);
-    void exportToLocal(const QString &path);
+    void exportToLocal(const QString &path, ExportType type);
 
 protected:
     void setupUi();
     void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
+    void requestExportToLocal();
 
     bool eventFilter(QObject *obj, QEvent *event) override;
 
@@ -47,6 +54,7 @@ private:
     QMap<int, QString>                        chapters_;
     QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;
     QString                                   book_name_;
+    QString                                   author_;
 
     jwrite::Ui::TitleBar     *ui_title_bar;
     jwrite::Ui::Editor       *ui_editor;

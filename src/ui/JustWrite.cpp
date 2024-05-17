@@ -1,6 +1,7 @@
 #include "JustWrite.h"
 #include "../TextInputCommand.h"
 #include "../ProfileUtils.h"
+#include "../epub/EpubBuilder.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -63,15 +64,7 @@ JustWrite::JustWrite(QWidget *parent)
         const int cid          = addChapter(volume_index, "");
         openChapter(cid);
     });
-    connect(ui_export_to_local, &FlatButton::pressed, this, [this] {
-        const auto caption      = "导出到本地";
-        const auto default_name = (book_name_.isEmpty() ? "未命名书籍" : book_name_) + ".txt";
-        const auto filter       = "文本文件 (*.txt)";
-        auto       path         = QFileDialog::getSaveFileName(this, caption, default_name, filter);
-        if (path.isEmpty()) { return; }
-        if (QFileInfo(path).suffix().isEmpty()) { path.append(".txt"); }
-        exportToLocal(path);
-    });
+    connect(ui_export_to_local, &FlatButton::pressed, this, &JustWrite::requestExportToLocal);
     connect(&sec_timer_, &QTimer::timeout, this, [this] {
         ui_datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
     });
@@ -135,28 +128,61 @@ void JustWrite::renameBookDirItem(int id, const QString &title) {
     ui_book_dir->setItemValue(id, title);
 }
 
-void JustWrite::exportToLocal(const QString &path) {
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, "导出失败", "无法打开文件：" + path);
-        return;
-    }
+void JustWrite::exportToLocal(const QString &path, ExportType type) {
+    switch (type) {
+        case ExportType::PlainText: {
+            QFile file(path);
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                QMessageBox::warning(this, "导出失败", "无法打开文件：" + path);
+                return;
+            }
 
-    QTextStream out(&file);
+            QTextStream out(&file);
 
-    const int total_volumes = ui_book_dir->totalTopItems();
-    int       chap_index    = 0;
-    for (int i = 0; i < total_volumes; ++i) {
-        const int vid = ui_book_dir->topItemAt(i);
-        out << QStringLiteral("【第 %1 卷 %2】\n\n").arg(i + 1).arg(ui_book_dir->itemValue(vid));
-        const auto chaps = ui_book_dir->getSubItems(vid);
-        for (const auto cid : chaps) {
-            const auto content = current_cid_ == cid ? ui_editor->text() : chapters_.value(cid, "");
-            out << QStringLiteral("第 %1 章 %2\n")
-                       .arg(++chap_index)
-                       .arg(ui_book_dir->itemValue(cid))
-                << content << "\n\n";
-        }
+            const int total_volumes = ui_book_dir->totalTopItems();
+            int       chap_index    = 0;
+            for (int i = 0; i < total_volumes; ++i) {
+                const int vid = ui_book_dir->topItemAt(i);
+                out << QStringLiteral("【第 %1 卷 %2】\n\n")
+                           .arg(i + 1)
+                           .arg(ui_book_dir->itemValue(vid));
+                const auto chaps = ui_book_dir->getSubItems(vid);
+                for (const auto cid : chaps) {
+                    const auto content =
+                        current_cid_ == cid ? ui_editor->text() : chapters_.value(cid, "");
+                    out << QStringLiteral("第 %1 章 %2\n")
+                               .arg(++chap_index)
+                               .arg(ui_book_dir->itemValue(cid))
+                        << content << "\n\n";
+                }
+            }
+        } break;
+        case ExportType::ePub: {
+            jwrite::epub::EpubBuilder builder(path);
+            for (int i = 0; i < ui_book_dir->totalTopItems(); ++i) {
+                const int vid = ui_book_dir->topItemAt(i);
+                builder.with_volume(
+                    QString("第 %1 卷 %2").arg(i + 1).arg(ui_book_dir->itemValue(vid)),
+                    ui_book_dir->totalSubItemsUnderTopItem(vid));
+            }
+            int global_chap_index = 0;
+            builder.with_name(book_name_.isEmpty() ? "未命名" : book_name_)
+                .with_author(author_.isEmpty() ? "佚名" : author_)
+                .feed([this, &global_chap_index](
+                          int      vol_index,
+                          int      chap_index,
+                          QString &out_chap_title,
+                          QString &out_content) {
+                    const int vid  = ui_book_dir->topItemAt(vol_index);
+                    const int cid  = ui_book_dir->getSubItem(vid, chap_index);
+                    out_chap_title = QString("第 %1 章 %2")
+                                         .arg(++global_chap_index)
+                                         .arg(ui_book_dir->itemValue(cid));
+                    out_content =
+                        current_cid_ == cid ? ui_editor->text() : chapters_.value(cid, "");
+                })
+                .build();
+        } break;
     }
 }
 
@@ -316,6 +342,36 @@ void JustWrite::setupUi() {
 
 void JustWrite::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
     //! TODO: menu style & popup input to edit the new title
+}
+
+void JustWrite::requestExportToLocal() {
+    const auto caption      = "导出到本地";
+    const auto default_name = book_name_.isEmpty() ? "未命名书籍" : book_name_;
+
+    QMap<QString, ExportType> types;
+    types[QStringLiteral("文本文件 (*.txt)")]     = ExportType::PlainText;
+    types[QStringLiteral("EPUB 电子书 (*.epub)")] = ExportType::ePub;
+
+    QString selected_type;
+    auto    path = QFileDialog::getSaveFileName(
+        this, caption, default_name, types.keys().join("\n"), &selected_type);
+
+    if (path.isEmpty()) { return; }
+
+    const auto type = types[selected_type];
+
+    if (QFileInfo(path).suffix().isEmpty()) {
+        switch (type) {
+            case ExportType::PlainText: {
+                path.append(".txt");
+            } break;
+            case ExportType::ePub: {
+                path.append(".epub");
+            } break;
+        }
+    }
+
+    exportToLocal(path, type);
 }
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {

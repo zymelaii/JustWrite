@@ -15,7 +15,7 @@ project(
     VERSION "${APP_VERSION}"
     DESCRIPTION "One of the most focused novel writer in the world!"
     HOMEPAGE_URL "https://github.com/zymelaii/JustWrite"
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -48,6 +48,10 @@ if(NOT QWindowKit_FOUND)
     set(QWINDOWKIT_BUILD_EXAMPLES OFF)
     add_subdirectory(deps/qwindowskit)
 endif()
+
+set(ZLIB_BUILD_EXAMPLES OFF)
+set(SKIP_INSTALL_ALL ON)
+add_subdirectory(deps/zlib)
 
 if(JWRITE_BUILD_TESTS)
     find_package(GTest)

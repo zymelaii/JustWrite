@@ -24,12 +24,13 @@
         "--header-insertion=never",
         "--background-index",
         "--pch-storage=disk",
-        "-j=8"
+        "-j=8",
     ],
     "git.ignoredRepositories": [
         "deps/magic_enum",
         "deps/qwindowskit",
         "deps/qwindowskit/qmsetup",
         "deps/qwindowskit/syscmdline",
+        "deps/zlib",
     ],
 }

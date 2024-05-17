@@ -10,5 +10,6 @@
         <file>res/icons/dark/book-2-line.png</file>
         <file>res/icons/dark/folder-2-line.png</file>
         <file>res/icons/dark/article-line.png</file>
+        <file>res/template/epub/style.css</file>
     </qresource>
 </RCC>

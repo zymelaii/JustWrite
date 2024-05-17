@@ -42,8 +42,13 @@ public:
     int totalSubItemsUnderTopItem(int top_item_id) const;
     int totalSubItems() const;
 
-    QList<int> getSubItems(int top_item_id) {
+    QList<int> getSubItems(int top_item_id) const {
         return sub_item_id_list_set_.value(top_item_id, {});
+    }
+
+    int getSubItem(int top_item_id, int index) const {
+        if (!sub_item_id_list_set_.contains(top_item_id)) { return -1; }
+        return sub_item_id_list_set_[top_item_id].value(index, -1);
     }
 
     int addTopItem(int index, const QString &value);
