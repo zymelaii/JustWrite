@@ -37,6 +37,7 @@ Editor::Editor(QWidget *parent)
     blink_cursor_should_paint_ = true;
     inserted_filter_enabled_   = true;
     drag_sel_flag_             = false;
+    oob_drag_sel_flag_         = false;
     ui_cursor_shape_[0]        = Qt::ArrowCursor;
     ui_cursor_shape_[1]        = Qt::ArrowCursor;
 
@@ -71,6 +72,8 @@ Editor::Editor(QWidget *parent)
             scroll((scroll_ref_y_pos_ - scroll_base_y_pos_) / 10, false);
             update_requested_ = true;
         }
+
+        if (drag_sel_flag_ && oob_drag_sel_flag_) { updateTextLocToVisualPos(oob_drag_sel_vpos_); }
 
         if (update_requested_) {
             update();
@@ -169,6 +172,7 @@ void Editor::scrollToCursor() {
             y_pos += e.block_spacing + line_spacing * e.active_blocks[index]->lines.size();
         }
     }
+
     y_pos += cursor.row * line_spacing;
 
     const double slack       = e.block_spacing * 0.75;
@@ -387,6 +391,21 @@ void Editor::verticalMove(bool up) {
     requestUpdate(true);
 }
 
+QSize Editor::sizeHint() const {
+    return minimumSizeHint();
+}
+
+QSize Editor::minimumSizeHint() const {
+    const auto margins      = contentsMargins() + ui_margins_;
+    const auto line_spacing = context_->engine.line_height * context_->engine.line_spacing_ratio;
+    const auto hori_margin  = margins.left() + margins.right();
+    const auto vert_margin  = margins.top() + margins.bottom();
+    const auto min_width =
+        min_text_line_chars_ * context_->engine.standard_char_width + hori_margin;
+    const auto min_height = line_spacing * 3 + context_->engine.block_spacing * 2 + vert_margin;
+    return QSize(min_width, min_height);
+}
+
 void Editor::requestUpdate(bool sync) {
     if (sync) {
         update_requested_          = true;
@@ -407,21 +426,6 @@ void Editor::setCursorShape(Qt::CursorShape shape) {
 
 void Editor::restoreCursorShape() {
     setCursorShape(ui_cursor_shape_[1]);
-}
-
-QSize Editor::sizeHint() const {
-    return minimumSizeHint();
-}
-
-QSize Editor::minimumSizeHint() const {
-    const auto margins      = contentsMargins() + ui_margins_;
-    const auto line_spacing = context_->engine.line_height * context_->engine.line_spacing_ratio;
-    const auto hori_margin  = margins.left() + margins.right();
-    const auto vert_margin  = margins.top() + margins.bottom();
-    const auto min_width =
-        min_text_line_chars_ * context_->engine.standard_char_width + hori_margin;
-    const auto min_height = line_spacing * 3 + context_->engine.block_spacing * 2 + vert_margin;
-    return QSize(min_width, min_height);
 }
 
 void Editor::drawTextArea(QPainter *p) {
@@ -467,6 +471,29 @@ void Editor::drawTextArea(QPainter *p) {
     p->restore();
 
     jwrite_profiler_record(TextBodyRenderCost);
+}
+
+bool Editor::updateTextLocToVisualPos(const QPoint &vpos) {
+    const auto &e   = context_->engine;
+    const auto  loc = context_->get_textloc_at_vpos(vpos);
+    Q_ASSERT(loc.block_index != -1);
+    const auto block = e.active_blocks[loc.block_index];
+    moveTo(block->text_pos + loc.pos, true);
+    const double line_spacing  = e.line_height * e.line_spacing_ratio;
+    bool         out_of_bounds = true;
+    if (vpos.y() < 0) {
+        scroll(-line_spacing * 0.5, true);
+    } else if (vpos.y() > context_->viewport_height) {
+        scroll(line_spacing * 0.5, true);
+    } else {
+        out_of_bounds = false;
+    }
+    return out_of_bounds;
+}
+
+void Editor::stopDragAndSelect() {
+    drag_sel_flag_     = false;
+    oob_drag_sel_flag_ = false;
 }
 
 void Editor::drawSelection(QPainter *p) {
@@ -927,7 +954,7 @@ void Editor::mousePressEvent(QMouseEvent *e) {
     if (cancel_auto_scroll) { return; }
 
     if (e->button() != Qt::LeftButton) {
-        drag_sel_flag_ = false;
+        stopDragAndSelect();
         return;
     }
 
@@ -952,7 +979,7 @@ void Editor::mousePressEvent(QMouseEvent *e) {
 void Editor::mouseReleaseEvent(QMouseEvent *e) {
     QWidget::mouseReleaseEvent(e);
 
-    if (e->buttons() & Qt::LeftButton) { drag_sel_flag_ = false; }
+    stopDragAndSelect();
 }
 
 void Editor::mouseDoubleClickEvent(QMouseEvent *e) {
@@ -984,18 +1011,11 @@ void Editor::mouseMoveEvent(QMouseEvent *e) {
             auto &engine = context_->engine;
             if (!engine.is_cursor_available()) { break; }
             if (engine.preedit) { break; }
-            const auto bb   = textArea();
-            const auto vpos = e->globalPosition().toPoint() - mapToGlobal(bb.topLeft());
-            const auto loc  = context_->get_textloc_at_vpos(vpos);
-            Q_ASSERT(loc.block_index != -1);
-            const auto block = engine.active_blocks[loc.block_index];
-            moveTo(block->text_pos + loc.pos, true);
-            const double line_spacing = engine.line_height * engine.line_spacing_ratio;
-            if (vpos.y() < 0) {
-                scroll(-line_spacing * 0.5, true);
-            } else if (vpos.y() > context_->viewport_height) {
-                scroll(line_spacing * 0.5, true);
-            }
+            const auto bb            = textArea();
+            const auto vpos          = e->globalPosition().toPoint() - mapToGlobal(bb.topLeft());
+            const bool out_of_bounds = updateTextLocToVisualPos(vpos);
+            oob_drag_sel_flag_       = out_of_bounds;
+            if (oob_drag_sel_flag_) { oob_drag_sel_vpos_ = vpos; }
         } while (0);
     }
 

@@ -59,16 +59,18 @@ public:
     void breakIntoNewLine();
     void verticalMove(bool up);
 
-protected:
-    void requestUpdate(bool sync);
-    void setCursorShape(Qt::CursorShape shape);
-    void restoreCursorShape();
-
 public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
 
 protected:
+    void requestUpdate(bool sync);
+    void setCursorShape(Qt::CursorShape shape);
+    void restoreCursorShape();
+
+    bool updateTextLocToVisualPos(const QPoint &vpos);
+    void stopDragAndSelect();
+
     void drawTextArea(QPainter *p);
     void drawSelection(QPainter *p);
     void drawHighlightBlock(QPainter *p);
@@ -96,7 +98,10 @@ private:
     bool   soft_center_mode_;
     bool   inserted_filter_enabled_;
     double expected_scroll_;
+
     bool   drag_sel_flag_;
+    int    oob_drag_sel_flag_;
+    QPoint oob_drag_sel_vpos_;
 
     bool   update_requested_;
     QTimer stable_timer_;
