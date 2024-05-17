@@ -43,6 +43,7 @@ protected:
     void setupUi();
     void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
     void requestExportToLocal();
+    void updateWordsCount(const QString &text);
 
     bool eventFilter(QObject *obj, QEvent *event) override;
 
@@ -53,6 +54,8 @@ private:
     int                                       current_cid_;
     QMap<int, QString>                        chapters_;
     QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;
+    int                                       chap_words_;
+    int                                       total_words_;
     QString                                   book_name_;
     QString                                   author_;
 

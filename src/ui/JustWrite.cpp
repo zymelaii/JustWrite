@@ -34,6 +34,8 @@ public:
 JustWrite::JustWrite(QWidget *parent)
     : QWidget(parent)
     , current_cid_{-1}
+    , chap_words_{0}
+    , total_words_{0}
     , messy_input_{new MessyInputWorker(this)} {
     command_manager_.load_default();
     sec_timer_.setInterval(1000);
@@ -50,9 +52,7 @@ JustWrite::JustWrite(QWidget *parent)
         const int cid = addChapter(0, "");
         current_cid_  = cid;
     });
-    connect(ui_editor, &Editor::textChanged, this, [this](const QString &text) {
-        ui_total_words->setText(QString("全本共 %1 字").arg(text.length()));
-    });
+    connect(ui_editor, &Editor::textChanged, this, &JustWrite::updateWordsCount);
     connect(ui_book_dir, &TwoLevelTree::subItemSelected, this, [this](int vid, int cid) {
         openChapter(cid);
     });
@@ -106,6 +106,7 @@ void JustWrite::openChapter(int cid) {
 
     QString  tmp{};
     QString &text = chapters_.contains(cid) ? chapters_[cid] : tmp;
+    chap_words_   = text.length();
 
     if (current_cid_ != -1) {
         const auto loc = ui_editor->currentTextLoc();
@@ -324,7 +325,7 @@ void JustWrite::setupUi() {
     ui_status_bar->setFont(font);
     ui_status_bar->setSpacing(20);
     ui_status_bar->setContentsMargins(12, 4, 12, 4);
-    ui_total_words = ui_status_bar->addItem("全本共 0 字", false);
+    ui_total_words = ui_status_bar->addItem("全书共 0 字 本章 0 字", false);
     ui_datetime    = ui_status_bar->addItem("0000-00-00", true);
 
     content->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
@@ -372,6 +373,13 @@ void JustWrite::requestExportToLocal() {
     }
 
     exportToLocal(path, type);
+}
+
+void JustWrite::updateWordsCount(const QString &text) {
+    const int words_diff  = text.length() - chap_words_;
+    chap_words_          += words_diff;
+    total_words_         += words_diff;
+    ui_total_words->setText(QString("全书共 %1 字 本章 %2 字").arg(total_words_).arg(chap_words_));
 }
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
