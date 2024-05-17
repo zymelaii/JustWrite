@@ -44,6 +44,7 @@ protected:
     void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
     void requestExportToLocal();
     void updateWordsCount(const QString &text);
+    void createAndOpenNewChapter();
 
     bool eventFilter(QObject *obj, QEvent *event) override;
 

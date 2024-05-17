@@ -60,9 +60,7 @@ JustWrite::JustWrite(QWidget *parent)
         addVolume(ui_book_dir->totalTopItems(), "");
     });
     connect(ui_new_chapter, &FlatButton::pressed, this, [this] {
-        const int volume_index = ui_book_dir->totalTopItems() - 1;
-        const int cid          = addChapter(volume_index, "");
-        openChapter(cid);
+        createAndOpenNewChapter();
     });
     connect(ui_export_to_local, &FlatButton::pressed, this, &JustWrite::requestExportToLocal);
     connect(&sec_timer_, &QTimer::timeout, this, [this] {
@@ -382,6 +380,12 @@ void JustWrite::updateWordsCount(const QString &text) {
     ui_total_words->setText(QString("全书共 %1 字 本章 %2 字").arg(total_words_).arg(chap_words_));
 }
 
+void JustWrite::createAndOpenNewChapter() {
+    const int volume_index = ui_book_dir->totalTopItems() - 1;
+    const int cid          = addChapter(volume_index, "");
+    openChapter(cid);
+}
+
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto e = static_cast<QKeyEvent *>(event);
@@ -403,6 +407,9 @@ bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
                 } break;
                 case GlobalCommand::ToggleSoftCenterMode: {
                     ui_editor->setSoftCenterMode(!ui_editor->softCenterMode());
+                } break;
+                case GlobalCommand::CreateNewChapter: {
+                    createAndOpenNewChapter();
                 } break;
                 case GlobalCommand::DEV_EnableMessyInput: {
                     ui_editor->setFocus();

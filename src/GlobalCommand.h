@@ -9,6 +9,7 @@ namespace jwrite {
 enum class GlobalCommand {
     ToggleSidebar,
     ToggleSoftCenterMode,
+    CreateNewChapter,
     DEV_EnableMessyInput,
 };
 

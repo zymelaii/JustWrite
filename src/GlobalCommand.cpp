@@ -10,6 +10,7 @@ void GlobalCommandManager::load_default() {
 
     KEYBINDING(ToggleSidebar, "Ctrl+Alt+B");
     KEYBINDING(ToggleSoftCenterMode, "Ctrl+E");
+    KEYBINDING(CreateNewChapter, "Ctrl+N");
     KEYBINDING(DEV_EnableMessyInput, "F12");
 
 #undef KEYBINDING
