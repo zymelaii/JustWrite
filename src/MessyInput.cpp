@@ -25,6 +25,7 @@ void MessyInputWorker::send_ime_key(int key) {
     keybd_event(key, 0, 0, 0);
     keybd_event(key, 0, KEYEVENTF_KEYUP, 0);
 #endif
+    msleep(10);
 }
 
 void MessyInputWorker::run() {
@@ -39,20 +40,15 @@ void MessyInputWorker::run() {
         for (int j = 0; enabled_ && j < type_times; ++j) {
             const auto ch = char_dist(rng);
             send_ime_key(ch);
-            msleep(1);
         }
 
         if (!enabled_) { break; }
 
         send_ime_key(Qt::Key_Space);
-        msleep(10);
 
         if (!enabled_) { break; }
 
-        if (nl_dist(rng) == 0) {
-            send_ime_key(Qt::Key_Return);
-            msleep(10);
-        }
+        if (nl_dist(rng) == 0) { send_ime_key(Qt::Key_Return); }
     }
 }
 
