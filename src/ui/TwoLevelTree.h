@@ -57,6 +57,8 @@ public:
     QString itemValue(int id) const;
     void    setItemValue(int id, const QString &value);
 
+    bool setSubItemSelected(int top_item_id, int sub_item_id);
+
     void setItemRenderProxy(ItemRenderProxy *proxy);
 
 public:
@@ -78,6 +80,7 @@ private:
     QList<QString>        item_values_;
     QList<QString>        title_list_;
     QSet<int>             expanded_top_items_;
+    int                   selected_sub_item_;
     ItemRenderProxy      *render_proxy_;
 
     std::function<void(QPainter *, const QRect &, const ItemInfo &)> render_func_;

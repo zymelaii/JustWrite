@@ -7,7 +7,9 @@ namespace jwrite::Ui {
 
 TwoLevelTree::TwoLevelTree(QWidget *parent)
     : QWidget(parent)
-    , ui_hover_on_{-1} {
+    , ui_hover_on_{-1}
+    , selected_sub_item_{-1}
+    , render_proxy_{nullptr} {
     setupUi();
     setMouseTracking(true);
     setItemRenderProxy(nullptr);
@@ -53,6 +55,16 @@ QString TwoLevelTree::itemValue(int id) const {
 void TwoLevelTree::setItemValue(int id, const QString &value) {
     Q_ASSERT(id >= 0 && id < title_list_.size());
     title_list_[id] = value;
+}
+
+bool TwoLevelTree::setSubItemSelected(int top_item_id, int sub_item_id) {
+    if (selected_sub_item_ == sub_item_id) { return true; }
+    if (!sub_item_id_list_set_.contains(top_item_id)) { return false; }
+    if (!sub_item_id_list_set_[top_item_id].contains(sub_item_id)) { return false; }
+    selected_sub_item_ = sub_item_id;
+    emit subItemSelected(top_item_id, sub_item_id);
+    update();
+    return true;
 }
 
 void TwoLevelTree::setItemRenderProxy(ItemRenderProxy *proxy) {
@@ -107,7 +119,8 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     clip_bb.translate(0, fm.descent());
     clip_bb.setHeight(row_height);
 
-    const auto hover_color     = pal.color(QPalette::Highlight);
+    const auto hover_color     = pal.color(QPalette::Shadow);
+    const auto selected_color  = pal.color(QPalette::Highlight);
     const int  sub_item_indent = 16;
 
     ItemInfo item_info{};
@@ -116,6 +129,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     int level_index[2] = {0, 0};
 
     QRect hover_item_bb{};
+    QRect selected_item_bb{};
     bool  should_draw_hover_highlight = false;
 
     for (auto topid : top_item_id_list_) {
@@ -138,6 +152,8 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
             if (!should_draw_hover_highlight && ui_hover_on_ == item_info.global_index) {
                 should_draw_hover_highlight = true;
                 hover_item_bb               = clip_bb.adjusted(-sub_item_indent, 0, 0, 0);
+            } else if (selected_sub_item_ == item_info.id) {
+                selected_item_bb = clip_bb.adjusted(-sub_item_indent, 0, 0, 0);
             }
             clip_bb.translate(0, row_height);
             ++level_index[1];
@@ -148,6 +164,8 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     }
 
     if (should_draw_hover_highlight) { p.fillRect(hover_item_bb, hover_color); }
+
+    if (selected_sub_item_ != -1) { p.fillRect(selected_item_bb, selected_color); }
 }
 
 void TwoLevelTree::mouseMoveEvent(QMouseEvent *e) {
@@ -220,7 +238,10 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
     }
 
     if (e->button() == Qt::LeftButton) {
-        if (sub_item_id != -1) { emit subItemSelected(top_item_id, sub_item_id); }
+        if (sub_item_id != -1) {
+            selected_sub_item_ = sub_item_id;
+            emit subItemSelected(top_item_id, sub_item_id);
+        }
     } else if (e->button() == Qt::RightButton) {
         emit contextMenuRequested(e->pos(), item_info);
     }

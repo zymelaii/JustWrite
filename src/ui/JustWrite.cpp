@@ -48,9 +48,10 @@ JustWrite::JustWrite(QWidget *parent)
 
     connect(ui_editor, &Editor::activated, this, [this] {
         Q_ASSERT(ui_book_dir->totalTopItems() == 0);
-        addVolume(0, "默认卷");
+        const int vid = addVolume(0, "默认卷");
         const int cid = addChapter(0, "");
         current_cid_  = cid;
+        ui_book_dir->setSubItemSelected(vid, cid);
     });
     connect(ui_editor, &Editor::textChanged, this, &JustWrite::updateWordsCount);
     connect(ui_book_dir, &TwoLevelTree::subItemSelected, this, [this](int vid, int cid) {
@@ -305,7 +306,8 @@ void JustWrite::setupUi() {
     ui_sidebar->setPalette(pal);
 
     pal = ui_book_dir->palette();
-    pal.setColor(QPalette::Highlight, Palette.Hover);
+    pal.setColor(QPalette::Shadow, Palette.Hover);
+    pal.setColor(QPalette::Highlight, Palette.HighlightedText);
     ui_book_dir->setPalette(pal);
 
     pal = palette();
@@ -384,6 +386,7 @@ void JustWrite::createAndOpenNewChapter() {
     const int volume_index = ui_book_dir->totalTopItems() - 1;
     const int cid          = addChapter(volume_index, "");
     openChapter(cid);
+    ui_book_dir->setSubItemSelected(ui_book_dir->topItemAt(volume_index), cid);
 }
 
 bool JustWrite::eventFilter(QObject *obj, QEvent *event) {
