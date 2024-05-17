@@ -46,10 +46,12 @@ Editor::Editor(QWidget *parent)
     context_             = new jwrite::VisualTextEditContext(fontMetrics(), text_area.width());
     context_->resize_viewport(context_->viewport_width, text_area.height());
 
+    update_requested_ = false;
+    stable_timer_.setInterval(16);
+    stable_timer_.setSingleShot(false);
+
     blink_timer_.setInterval(500);
     blink_timer_.setSingleShot(false);
-    auto_scroll_timer_.setInterval(10);
-    auto_scroll_timer_.setSingleShot(false);
 
     input_manager_ = new jwrite::GeneralTextInputCommandManager(context_->engine);
     input_manager_->load_default();
@@ -58,16 +60,25 @@ Editor::Editor(QWidget *parent)
 
     connect(this, &Editor::textAreaChanged, this, [this](QRect area) {
         context_->resize_viewport(area.width(), area.height());
-        update();
+        requestUpdate(false);
     });
     connect(&blink_timer_, &QTimer::timeout, this, [this] {
         blink_cursor_should_paint_ = !blink_cursor_should_paint_;
-        update();
+        requestUpdate(false);
     });
-    connect(&auto_scroll_timer_, &QTimer::timeout, this, [this] {
-        scroll((scroll_ref_y_pos_ - scroll_base_y_pos_) / 10, false);
-        update();
+    connect(&stable_timer_, &QTimer::timeout, this, [this] {
+        if (auto_scroll_mode_) {
+            scroll((scroll_ref_y_pos_ - scroll_base_y_pos_) / 10, false);
+            update_requested_ = true;
+        }
+
+        if (update_requested_) {
+            update();
+            update_requested_ = false;
+        }
     });
+
+    stable_timer_.start();
 }
 
 Editor::~Editor() {
@@ -126,7 +137,7 @@ void Editor::reset(QString &text, bool swap) {
 
     if (swap) { text.swap(text_out); }
 
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::scrollToCursor() {
@@ -210,28 +221,28 @@ void Editor::scroll(double delta, bool smooth) {
     const auto [min_y_pos, max_y_pos] = scrollBound();
     expected_scroll_ = qBound(min_y_pos, context_->viewport_y_pos + delta, max_y_pos);
     if (!smooth) { context_->scroll_to(expected_scroll_); }
-    update();
+    requestUpdate(true);
 }
 
 void Editor::scrollTo(double pos_y, bool smooth) {
     const auto [min_y_pos, max_y_pos] = scrollBound();
     expected_scroll_                  = qBound(min_y_pos, pos_y, max_y_pos);
     if (!smooth) { context_->scroll_to(expected_scroll_); }
-    update();
+    requestUpdate(true);
 }
 
 void Editor::scrollToStart() {
     const auto [min_y_pos, _] = scrollBound();
     expected_scroll_          = min_y_pos;
     context_->scroll_to(expected_scroll_);
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::scrollToEnd() {
     const auto [_, max_y_pos] = scrollBound();
     expected_scroll_          = max_y_pos;
     context_->scroll_to(expected_scroll_);
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::insertRawText(const QString &text) {
@@ -285,17 +296,17 @@ void Editor::select(int start_pos, int end_pos) {
     sel.from                           = qBound(0, start_pos, context_->edit_text.length());
     sel.to                             = qBound(0, end_pos, context_->edit_text.length());
     context_->cached_render_data_ready = false;
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::move(int offset, bool extend_sel) {
     context_->move(offset, extend_sel);
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::moveTo(int pos, bool extend_sel) {
     context_->move_to(pos, extend_sel);
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::insert(const QString &text) {
@@ -310,13 +321,13 @@ void Editor::insert(const QString &text) {
     jwrite_profiler_record(GeneralTextEdit);
 
     emit textChanged(context_->edit_text);
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::del(int times) {
     context_->del(times, false);
     emit textChanged(context_->edit_text);
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::copy() {
@@ -352,7 +363,7 @@ void Editor::cut() {
         context_->move(-e.cursor.pos, false);
         context_->del(e.current_block()->text_len() + 1, false);
     }
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::paste() {
@@ -360,26 +371,32 @@ void Editor::paste() {
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
     insertRawText(clipboard->text());
-    requestUpdate();
+    scrollToCursor();
+    requestUpdate(true);
 }
 
 void Editor::breakIntoNewLine() {
     context_->remove_sel_region();
     context_->engine.break_block_at_cursor_pos();
     context_->cursor_moved = true;
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::verticalMove(bool up) {
     context_->vertical_move(up);
-    requestUpdate();
+    requestUpdate(true);
 }
 
-void Editor::requestUpdate() {
-    blink_cursor_should_paint_ = true;
-    blink_timer_.stop();
-    update();
-    blink_timer_.start();
+void Editor::requestUpdate(bool sync) {
+    if (sync) {
+        update_requested_          = true;
+        blink_cursor_should_paint_ = true;
+        blink_timer_.stop();
+        blink_timer_.start();
+    } else {
+        update_requested_ = false;
+        update();
+    }
 }
 
 void Editor::setCursorShape(Qt::CursorShape shape) {
@@ -602,9 +619,7 @@ void Editor::paintEvent(QPaintEvent *e) {
             context_->scroll_to(expected_scroll_);
         } else {
             context_->scroll_to(new_scroll_pos);
-            QTimer::singleShot(10, [this]() {
-                update();
-            });
+            update_requested_ = true;
         }
     }
 
@@ -641,7 +656,7 @@ void Editor::focusInEvent(QFocusEvent *e) {
         e.active_block_index = 0;
         emit activated();
     }
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::focusOutEvent(QFocusEvent *e) {
@@ -684,7 +699,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         } break;
         case TextInputCommand::Cancel: {
             context_->unset_sel();
-            update();
+            requestUpdate(false);
         } break;
         case TextInputCommand::Undo: {
         } break;
@@ -870,7 +885,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             --engine.active_block_index;
             cursor.reset();
             context_->edit_cursor_pos = engine.current_block()->text_pos;
-            requestUpdate();
+            requestUpdate(true);
         } break;
         case TextInputCommand::InsertAfterBlock: {
             engine.insert_block(engine.active_block_index + 1);
@@ -901,11 +916,9 @@ void Editor::mousePressEvent(QMouseEvent *e) {
         auto_scroll_mode_  = true;
         scroll_base_y_pos_ = e->pos().y();
         scroll_ref_y_pos_  = scroll_base_y_pos_;
-        auto_scroll_timer_.start();
         return;
     } else {
         auto_scroll_mode_ = false;
-        auto_scroll_timer_.stop();
         restoreCursorShape();
     }
 
@@ -931,7 +944,7 @@ void Editor::mousePressEvent(QMouseEvent *e) {
     const bool success = context_->set_cursor_to_textloc(loc, 0);
     Q_ASSERT(success);
 
-    requestUpdate();
+    requestUpdate(true);
 
     drag_sel_flag_ = true;
 }
@@ -1013,7 +1026,7 @@ void Editor::inputMethodEvent(QInputMethodEvent *e) {
     } else {
         insert(e->commitString());
     }
-    requestUpdate();
+    requestUpdate(true);
 }
 
 void Editor::dragEnterEvent(QDragEnterEvent *e) {

@@ -60,7 +60,7 @@ public:
     void verticalMove(bool up);
 
 protected:
-    void requestUpdate();
+    void requestUpdate(bool sync);
     void setCursorShape(Qt::CursorShape shape);
     void restoreCursorShape();
 
@@ -98,11 +98,13 @@ private:
     double expected_scroll_;
     bool   drag_sel_flag_;
 
+    bool   update_requested_;
+    QTimer stable_timer_;
+
     QTimer blink_timer_;
     bool   blink_cursor_should_paint_;
 
     bool   auto_scroll_mode_;
-    QTimer auto_scroll_timer_;
     double scroll_base_y_pos_;
     double scroll_ref_y_pos_;
 
