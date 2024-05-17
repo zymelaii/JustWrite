@@ -23,18 +23,16 @@ static const char *CONTENT_TEMPLATE = R"(<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="generator" content="pandoc" />
-  <title>ch001.xhtml</title>
-  <style>
-  </style>
-  <link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css" />
+    <meta charset="utf-8" />
+    <meta name="generator" content="pandoc" />
+    <title>ch1.xhtml</title>
+    <style></style>
+    <link rel="stylesheet" type="text/css" href="../styles/stylesheet1.css" />
 </head>
 <body epub:type="bodymatter">
-<section id="%1" class="level1">
-<h1>%1</h1>
-%2
-</section>
+    <section id="%1" class="level1">
+        <h1>%1</h1>%2
+    </section>
 </body>
 </html>)";
 
@@ -236,10 +234,11 @@ EpubBuilder &EpubBuilder::feed(FeedCallback request) {
             QString chapter{};
             request(vol_index, chap_index, title, chapter);
             chap_titles << title;
-
-            content += QString("<section id=\"%1\" class=\"level2\">\n<h2>%1</h2>\n").arg(title);
+            content += QString("\n        <section id=\"%1\" class=\"level2\">\n            "
+                               "<h2>%1</h2>\n        <p></p>")
+                           .arg(title);
             for (const auto &para : chapter.split('\n')) {
-                content += QString("<p>%1</p>\n").arg(para);
+                content += QString("\n            <p>%1</p>").arg(para);
             }
             content += "</section>\n";
         }
