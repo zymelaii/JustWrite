@@ -115,9 +115,7 @@ QRect Editor::textArea() const {
 void Editor::reset(QString &text, bool swap) {
     context_->quit_preedit();
 
-    QStringList blocks{};
-    for (auto block : context_->engine.active_blocks) { blocks << block->text().toString(); }
-    auto text_out = blocks.join("\n");
+    auto text_out = this->text();
     context_->edit_text.clear();
 
     context_->engine.clear_all();
@@ -185,6 +183,12 @@ void Editor::scrollToCursor() {
                y_pos_end > bottom) {
         scrollTo(y_pos_end - context_->viewport_height, true);
     }
+}
+
+QString Editor::text() const {
+    QStringList blocks{};
+    for (auto block : context_->engine.active_blocks) { blocks << block->text().toString(); }
+    return blocks.join("\n");
 }
 
 VisualTextEditContext::TextLoc Editor::currentTextLoc() const {
