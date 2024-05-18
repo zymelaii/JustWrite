@@ -25,7 +25,7 @@ void MessyInputWorker::send_ime_key(int key) {
     keybd_event(key, 0, 0, 0);
     keybd_event(key, 0, KEYEVENTF_KEYUP, 0);
 #endif
-    msleep(10);
+    msleep(20); //<! about 600 CPM on average
 }
 
 void MessyInputWorker::run() {

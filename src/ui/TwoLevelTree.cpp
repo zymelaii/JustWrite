@@ -108,7 +108,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     QPainter   p(this);
     const auto pal = palette();
 
-    p.setPen(pal.color(QPalette::Text));
+    p.setPen(pal.color(QPalette::WindowText));
     p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
 
     const auto fm         = fontMetrics();
@@ -119,7 +119,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     clip_bb.translate(0, fm.descent());
     clip_bb.setHeight(row_height);
 
-    const auto hover_color     = pal.color(QPalette::Shadow);
+    const auto hover_color     = pal.color(QPalette::HighlightedText);
     const auto selected_color  = pal.color(QPalette::Highlight);
     const int  sub_item_indent = 16;
 

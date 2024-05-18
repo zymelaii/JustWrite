@@ -33,6 +33,15 @@ void StatusBar::setupUi() {
     ui_layout_->setContentsMargins({});
     ui_layout_->addStretch();
 
+    auto font = this->font();
+    font.setPointSize(10);
+    setFont(font);
+
+    setSpacing(20);
+    setContentsMargins(12, 4, 12, 4);
+
+    setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
+
     setAutoFillBackground(true);
 }
 

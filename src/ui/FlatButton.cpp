@@ -7,7 +7,9 @@ FlatButton::FlatButton(QWidget *parent)
     : QWidget(parent)
     , ui_radius_{0}
     , ui_alignment_{Qt::AlignLeft}
-    , ui_mouse_entered_{false} {}
+    , ui_mouse_entered_{false} {
+    setupUi();
+}
 
 FlatButton::~FlatButton() {}
 
@@ -40,6 +42,14 @@ QSize FlatButton::sizeHint() const {
     return minimumSize();
 }
 
+void FlatButton::setupUi() {
+    setContentsMargins(10, 0, 10, 0);
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+
+    setTextAlignment(Qt::AlignCenter);
+    setRadius(6);
+}
+
 void FlatButton::paintEvent(QPaintEvent *e) {
     QPainter   p(this);
     const auto pal = palette();
@@ -48,7 +58,7 @@ void FlatButton::paintEvent(QPaintEvent *e) {
 
     p.save();
     p.setBrush(brush);
-    p.setPen(brush.color());
+    p.setPen(Qt::transparent);
     p.drawRoundedRect(rect(), ui_radius_, ui_radius_);
     p.restore();
 

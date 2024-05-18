@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <QWidget>
@@ -39,6 +38,8 @@ public:
     QSize sizeHint() const override;
 
 protected:
+    void setupUi();
+
     void paintEvent(QPaintEvent *e) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;

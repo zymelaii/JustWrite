@@ -118,6 +118,8 @@ void Editor::reset(QString &text, bool swap) {
     auto text_out = this->text();
     context_->edit_text.clear();
 
+    int active_block_index = context_->engine.active_block_index != -1 ? 0 : -1;
+
     context_->engine.clear_all();
     context_->engine.insert_block(0);
     context_->engine.active_block_index = 0;
@@ -132,7 +134,7 @@ void Editor::reset(QString &text, bool swap) {
 
     insertRawText(text);
 
-    context_->engine.active_block_index = 0;
+    context_->engine.active_block_index = active_block_index;
     context_->edit_cursor_pos           = 0;
     context_->engine.cursor.reset();
 
@@ -324,9 +326,7 @@ void Editor::insert(const QString &text) {
         if (insertedPairFilter(text)) { return; }
     }
 
-    jwrite_profiler_start(GeneralTextEdit);
     context_->insert(text);
-    jwrite_profiler_record(GeneralTextEdit);
 
     emit textChanged(context_->edit_text);
     requestUpdate(true);
@@ -550,7 +550,7 @@ void Editor::drawSelection(QPainter *p) {
 
             QRectF bb(x_pos, y_pos, sel_width, e.line_height);
             bb.translate(viewport.topLeft());
-            p->fillRect(bb, pal.highlightedText());
+            p->fillRect(bb, pal.highlight());
 
             y_pos += line_spacing;
         }
@@ -569,7 +569,7 @@ void Editor::drawHighlightBlock(QPainter *p) {
 
     p->save();
     p->setPen(Qt::transparent);
-    p->setBrush(pal.highlight());
+    p->setBrush(pal.highlightedText());
 
     const auto viewport = textArea();
 
@@ -675,7 +675,6 @@ void Editor::paintEvent(QPaintEvent *e) {
         context_->cursor_moved = false;
     }
 
-    jwrite_profiler_record(IME2UpdateDelay);
     jwrite_profiler_record(FrameRenderCost);
 }
 
@@ -1043,14 +1042,15 @@ void Editor::wheelEvent(QWheelEvent *e) {
 void Editor::inputMethodEvent(QInputMethodEvent *e) {
     auto &engine = context_->engine;
     if (!engine.is_cursor_available()) { return; }
+    jwrite_profiler_start(InputMethodEditorResponse);
     if (const auto preedit_text = e->preeditString(); !preedit_text.isEmpty()) {
         if (!engine.preedit) { context_->begin_preedit(); }
         context_->update_preedit(e->preeditString());
-        jwrite_profiler_start(IME2UpdateDelay);
     } else {
         insert(e->commitString());
     }
     requestUpdate(true);
+    jwrite_profiler_record(InputMethodEditorResponse);
 }
 
 void Editor::dragEnterEvent(QDragEnterEvent *e) {

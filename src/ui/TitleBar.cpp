@@ -32,6 +32,10 @@ QSize TitleBar::sizeHint() const {
 }
 
 void TitleBar::setupUi() {
+    auto font = this->font();
+    font.setPointSize(10);
+    setFont(font);
+
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
 }
 

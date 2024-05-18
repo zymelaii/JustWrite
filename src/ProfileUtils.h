@@ -22,7 +22,7 @@
 namespace jwrite {
 
 enum class ProfileTarget {
-    IME2UpdateDelay,
+    InputMethodEditorResponse,
     FrameRenderCost,
     PrepareRenderData,
     TextEngineRenderCost,
