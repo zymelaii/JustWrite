@@ -1,5 +1,5 @@
-#include "VisualTextEditContext.h"
-#include "ProfileUtils.h"
+#include <jwrite/VisualTextEditContext.h>
+#include <jwrite/ProfileUtils.h>
 
 namespace jwrite {
 

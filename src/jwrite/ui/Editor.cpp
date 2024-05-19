@@ -1,7 +1,7 @@
-#include "Editor.h"
-#include "../TextViewEngine.h"
-#include "../TextInputCommand.h"
-#include "../ProfileUtils.h"
+#include <jwrite/ui/Editor.h>
+#include <jwrite/TextViewEngine.h>
+#include <jwrite/TextInputCommand.h>
+#include <jwrite/ProfileUtils.h>
 #include <QResizeEvent>
 #include <QPaintEvent>
 #include <QFocusEvent>

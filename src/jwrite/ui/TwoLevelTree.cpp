@@ -1,4 +1,4 @@
-#include "TwoLevelTree.h"
+#include <jwrite/ui/TwoLevelTree.h>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QMouseEvent>

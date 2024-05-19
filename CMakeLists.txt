@@ -20,7 +20,7 @@ project(
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_AUTOUIC ON)
@@ -62,6 +62,8 @@ if(JWRITE_BUILD_TESTS)
 endif()
 
 set(INSTALL_TARGETS ${CMAKE_PROJECT_NAME})
+
+include_directories(${CMAKE_SOURCE_DIR}/src)
 
 add_subdirectory(src)
 

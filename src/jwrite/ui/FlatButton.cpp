@@ -1,4 +1,4 @@
-#include "FlatButton.h"
+#include <jwrite/ui/FlatButton.h>
 #include <QPainter>
 
 namespace jwrite::Ui {

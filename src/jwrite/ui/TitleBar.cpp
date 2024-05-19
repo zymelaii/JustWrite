@@ -1,4 +1,4 @@
-#include "TitleBar.h"
+#include <jwrite/ui/TitleBar.h>
 #include <QPainter>
 
 namespace jwrite::Ui {

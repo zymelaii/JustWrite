@@ -1,7 +1,7 @@
-#include "EditPage.h"
-#include "../TextInputCommand.h"
-#include "../ProfileUtils.h"
-#include "../epub/EpubBuilder.h"
+#include <jwrite/ui/EditPage.h>
+#include <jwrite/TextInputCommand.h>
+#include <jwrite/ProfileUtils.h>
+#include <jwrite/epub/EpubBuilder.h>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>

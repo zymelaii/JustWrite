@@ -1,5 +1,5 @@
-#include "ui/JustWrite.h"
-#include "ProfileUtils.h"
+#include <jwrite/ui/JustWrite.h>
+#include <jwrite/ProfileUtils.h>
 #include <QGuiApplication>
 #include <QApplication>
 #include <QScreen>

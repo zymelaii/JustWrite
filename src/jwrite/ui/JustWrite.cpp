@@ -1,6 +1,6 @@
-#include "JustWrite.h"
-#include "../ColorTheme.h"
-#include "../ProfileUtils.h"
+#include <jwrite/ui/JustWrite.h>
+#include <jwrite/ColorTheme.h>
+#include <jwrite/ProfileUtils.h>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>

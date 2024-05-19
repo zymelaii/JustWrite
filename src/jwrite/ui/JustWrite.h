@@ -1,8 +1,8 @@
 #pragma once
 
-#include "TitleBar.h"
-#include "EditPage.h"
-#include "Gallery.h"
+#include <jwrite/ui/TitleBar.h>
+#include <jwrite/ui/EditPage.h>
+#include <jwrite/ui/Gallery.h>
 #include <QWidget>
 #include <QStackedWidget>
 #include <QStackedLayout>

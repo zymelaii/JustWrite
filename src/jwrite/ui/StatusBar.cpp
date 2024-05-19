@@ -1,4 +1,4 @@
-#include "StatusBar.h"
+#include <jwrite/ui/StatusBar.h>
 
 namespace jwrite::Ui {
 

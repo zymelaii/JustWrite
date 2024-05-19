@@ -1,4 +1,4 @@
-#include "GlobalCommand.h"
+#include <jwrite/GlobalCommand.h>
 
 namespace jwrite {
 

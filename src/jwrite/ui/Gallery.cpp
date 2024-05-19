@@ -1,4 +1,4 @@
-#include "Gallery.h"
+#include <jwrite/ui/Gallery.h>
 
 namespace jwrite::Ui {
 

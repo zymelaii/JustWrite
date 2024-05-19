@@ -1,4 +1,4 @@
-#include "TextInputCommand.h"
+#include <jwrite/TextInputCommand.h>
 
 namespace jwrite {
 

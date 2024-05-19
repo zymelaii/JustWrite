@@ -1,9 +1,9 @@
 #pragma once
 
+#include <jwrite/TextViewEngine.h>
 #include <QKeyEvent>
 #include <QMap>
 #include <optional>
-#include "TextViewEngine.h"
 
 namespace jwrite {
 

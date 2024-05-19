@@ -1,6 +1,6 @@
 #ifndef NDEBUG
 
-#include "ProfileUtils.h"
+#include <jwrite/ProfileUtils.h>
 #include <QDebug>
 #include <QFile>
 #include <QJsonDocument>

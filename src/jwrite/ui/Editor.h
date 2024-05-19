@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../VisualTextEditContext.h"
-#include "../TextInputCommand.h"
+#include <jwrite/VisualTextEditContext.h>
+#include <jwrite/TextInputCommand.h>
 #include <QTimer>
 #include <QWidget>
 
