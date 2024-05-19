@@ -1,13 +1,14 @@
 #include <jwrite/ui/JustWrite.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/ProfileUtils.h>
+#include <jwrite/ui/ScrollArea.h>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QPainter>
-#include <QStackedLayout>
 #include <QMessageBox>
+#include <QScrollArea>
 
 namespace jwrite::Ui {
 
@@ -15,7 +16,7 @@ JustWrite::JustWrite(QWidget *parent)
     : QWidget(parent) {
     setupUi();
 
-    switchToPage(PageType::Edit);
+    switchToPage(PageType::Gallery);
     setTheme(Theme::Dark);
 }
 
@@ -62,6 +63,7 @@ void JustWrite::setTheme(Theme theme) {
     pal.setColor(QPalette::ButtonText, color_theme.WindowText);
     setPalette(pal);
 
+    ui_gallery->updateColorTheme(color_theme);
     ui_edit_page->updateColorTheme(color_theme);
 }
 
@@ -80,9 +82,11 @@ void JustWrite::setupUi() {
     ui_edit_page   = new jwrite::Ui::EditPage;
     ui_popup_layer = new QWidget;
 
-    ui_page_stack->addWidget(ui_gallery);
+    auto gallery_page = new jwrite::ui::ScrollArea;
+    gallery_page->setWidget(ui_gallery);
+
+    ui_page_stack->addWidget(gallery_page);
     ui_page_stack->addWidget(ui_edit_page);
-    ui_page_stack->addWidget(ui_popup_layer);
 
     ui_top_most_layout->addWidget(ui_page_stack);
     ui_top_most_layout->addWidget(ui_popup_layer);
@@ -98,14 +102,12 @@ void JustWrite::setupUi() {
 
     ui_top_most_layout->setStackingMode(QStackedLayout::StackAll);
 
-    page_map_[PageType::Gallery] = ui_gallery;
+    page_map_[PageType::Gallery] = gallery_page;
     page_map_[PageType::Edit]    = ui_edit_page;
 
     ui_popup_layer->hide();
 
     ui_title_bar->setTitle("只写 丶 阐释你的梦");
-
-    setAutoFillBackground(true);
 }
 
 void JustWrite::switchToPage(PageType page) {
