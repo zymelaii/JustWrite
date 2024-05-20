@@ -55,12 +55,12 @@
 #ifndef SKIPSET_H
 #define SKIPSET_H
 
-#include <stdlib.h>     // realloc(), free(), NULL, size_t
-#include <setjmp.h>     // jmp_buf, longjmp()
-#include <errno.h>      // ENOMEM
-#include <stdint.h>     // int16_t, uint32_t, uint64_t
-#include <time.h>       // time(), clock()
-#include <assert.h>     // assert.h
+#include <stdlib.h> // realloc(), free(), NULL, size_t
+#include <setjmp.h> // jmp_buf, longjmp()
+#include <errno.h>  // ENOMEM
+#include <stdint.h> // int16_t, uint32_t, uint64_t
+#include <time.h>   // time(), clock()
+#include <assert.h> // assert.h
 
 // Structures and functions below noted as "--private--" should not be used by
 // the application. set_t is partially private and partially public -- see the
@@ -74,47 +74,50 @@
 // Licensed under Apache License 2.0 (NO WARRANTY, etc. see website)
 // --private-- Random number generator state.
 typedef struct {
-    uint64_t state;     // 64-bit generator state
-    uint64_t inc;       // 63-bit sequence id
+    uint64_t state; // 64-bit generator state
+    uint64_t inc;   // 63-bit sequence id
 } set_rand_t;
+
 // --private-- Initialize the state *gen using seed and seq. seed seeds the
 // advancing 64-bit state. seq is a sequence selection constant.
 void set_seed(set_rand_t *gen, uint64_t seed, uint64_t seq) {
-    gen->inc = (seq << 1) | 1;
+    gen->inc   = (seq << 1) | 1;
     gen->state = (seed + gen->inc) * 6364136223846793005ULL + gen->inc;
 }
+
 // Return 32 random bits, advancing the state *gen.
 uint32_t set_rand(set_rand_t *gen) {
     uint64_t state = gen->state;
-    gen->state = state * 6364136223846793005ULL + gen->inc;
-    uint32_t mix = (uint32_t)(((state >> 18) ^ state) >> 27);
-    int rot = state >> 59;
+    gen->state     = state * 6364136223846793005ULL + gen->inc;
+    uint32_t mix   = (uint32_t)(((state >> 18) ^ state) >> 27);
+    int      rot   = state >> 59;
     return (mix >> rot) | (mix << ((-rot) & 31));
 }
 // End of PCG32 code.
 
 // --private-- Linked-list node.
 typedef struct set_node_s set_node_t;
+
 struct set_node_s {
-    set_key_t key;          // the key (not used for head or path)
-    int16_t size;           // number of allocated pointers in right[]
-    int16_t fill;           // number of pointers in right[] filled in
-    set_node_t **right;     // pointer for each level, each to the right
+    set_key_t    key;   // the key (not used for head or path)
+    int16_t      size;  // number of allocated pointers in right[]
+    int16_t      fill;  // number of pointers in right[] filled in
+    set_node_t **right; // pointer for each level, each to the right
 };
 
 // A set. The application sets env, may use gen with set_rand(), and may read
 // allocs and memory. The remaining variables are --private-- .
 typedef struct set_s {
-    set_node_t *head;       // skiplist head -- no key, just links
-    set_node_t *path;       // right[] is path to key from set_found()
-    set_node_t *node;       // node under construction, in case of longjmp()
-    int16_t depth;          // maximum depth of the skiplist
-    uint64_t ran;           // a precious trove of random bits
-    set_rand_t gen;         // random number generator state
-    jmp_buf env;            // setjmp() environment for allocation errors
+    set_node_t *head;  // skiplist head -- no key, just links
+    set_node_t *path;  // right[] is path to key from set_found()
+    set_node_t *node;  // node under construction, in case of longjmp()
+    int16_t     depth; // maximum depth of the skiplist
+    uint64_t    ran;   // a precious trove of random bits
+    set_rand_t  gen;   // random number generator state
+    jmp_buf     env;   // setjmp() environment for allocation errors
 #ifdef SET_TRACK
-    size_t allocs;          // number of allocations
-    size_t memory;          // total amount of allocated memory (>= requests)
+    size_t allocs; // number of allocations
+    size_t memory; // total amount of allocated memory (>= requests)
 #endif
 } set_t;
 
@@ -125,34 +128,34 @@ typedef struct set_s {
 // used by the application. e.g. if allocation tracking is desired.
 #ifdef SET_TRACK
 // Track the number of allocations and the total backing memory size.
-#  if defined(_WIN32)
-#    include <malloc.h>
-#    define SET_ALLOC_SIZE(ptr) _msize(ptr)
-#  elif defined(__MACH__)
-#    include <malloc/malloc.h>
-#    define SET_ALLOC_SIZE(ptr) malloc_size(ptr)
-#  elif defined(__linux__)
-#    include <malloc.h>
-#    define SET_ALLOC_SIZE(ptr) malloc_usable_size(ptr)
-#  elif defined(__FreeBSD__)
-#    include <malloc_np.h>
-#    define SET_ALLOC_SIZE(ptr) malloc_usable_size(ptr)
-#  elif defined(__NetBSD__)
-#    include <jemalloc/jemalloc.h>
-#    define SET_ALLOC_SIZE(ptr) malloc_usable_size(ptr)
-#  else     // e.g. OpenBSD
-#    define SET_ALLOC_SIZE(ptr) 0
-#  endif
+#if defined(_WIN32)
+#include <malloc.h>
+#define SET_ALLOC_SIZE(ptr) _msize(ptr)
+#elif defined(__MACH__)
+#include <malloc/malloc.h>
+#define SET_ALLOC_SIZE(ptr) malloc_size(ptr)
+#elif defined(__linux__)
+#include <malloc.h>
+#define SET_ALLOC_SIZE(ptr) malloc_usable_size(ptr)
+#elif defined(__FreeBSD__)
+#include <malloc_np.h>
+#define SET_ALLOC_SIZE(ptr) malloc_usable_size(ptr)
+#elif defined(__NetBSD__)
+#include <jemalloc/jemalloc.h>
+#define SET_ALLOC_SIZE(ptr) malloc_usable_size(ptr)
+#else // e.g. OpenBSD
+#define SET_ALLOC_SIZE(ptr) 0
+#endif
 // With tracking.
 void *set_alloc(set_t *set, void *ptr, size_t size) {
     size_t had = ptr == NULL ? 0 : SET_ALLOC_SIZE(ptr);
-    void *mem = realloc(ptr, size);
-    if (mem == NULL)
-        longjmp(set->env, ENOMEM);
+    void  *mem = realloc(ptr, size);
+    if (mem == NULL) longjmp(set->env, ENOMEM);
     set->allocs += ptr == NULL;
     set->memory += SET_ALLOC_SIZE(mem) - had;
     return mem;
 }
+
 void set_free(set_t *set, void *ptr) {
     if (ptr != NULL) {
         set->allocs--;
@@ -164,10 +167,10 @@ void set_free(set_t *set, void *ptr) {
 // Without tracking.
 void *set_alloc(set_t *set, void *ptr, size_t size) {
     void *mem = realloc(ptr, size);
-    if (mem == NULL)
-        longjmp(set->env, ENOMEM);
+    if (mem == NULL) longjmp(set->env, ENOMEM);
     return mem;
 }
+
 void set_free(set_t *set, void *ptr) {
     (void)set;
     free(ptr);
@@ -181,24 +184,22 @@ void set_free(set_t *set, void *ptr) {
 void set_grow(set_t *set, set_node_t *node, int want, int fill) {
     if (node->size < want) {
         int more = node->size ? node->size : 1;
-        while (more < want)
-            more <<= 1;
+        while (more < want) more <<= 1;
         node->right = set_alloc(set, node->right, more * sizeof(set_node_t *));
-        node->size = (int16_t)more;
+        node->size  = (int16_t)more;
     }
     int i;
     if (fill)
-        for (i = node->fill; i < want; i++)
-            node->right[i] = set->head;
+        for (i = node->fill; i < want; i++) node->right[i] = set->head;
     node->fill = (int16_t)want;
 }
 
 // --private-- Return a new node. key is left uninitialized.
 set_node_t *set_node(set_t *set) {
     set_node_t *node = set_alloc(set, NULL, sizeof(set_node_t));
-    node->size = 0;
-    node->fill = 0;
-    node->right = NULL;
+    node->size       = 0;
+    node->fill       = 0;
+    node->right      = NULL;
     return node;
 }
 
@@ -206,7 +207,7 @@ set_node_t *set_node(set_t *set) {
 void set_sweep(set_t *set) {
     set_node_t *step = set->head->right[0];
     while (step != set->head) {
-        set_node_t *next = step->right[0];      // save link to next node
+        set_node_t *next = step->right[0]; // save link to next node
         set_drop(set, step->key);
         set_free(set, step->right);
         set_free(set, step);
@@ -225,23 +226,22 @@ void set_start(set_t *set) {
     set->allocs = 0;
     set->memory = 0;
 #endif
-    set->head = set->path = set->node = NULL;   // in case set_node() fails
-    set->path = set_node(set);
-    set->head = set_node(set);
-    set_grow(set, set->head, 1, 1); // one link back to head for an empty set
-    *(unsigned char *)&set->head->key = 137;    // set id
-    set->depth = 0;
-    set_seed(&set->gen, ((uint64_t)(uintptr_t)set << 32) ^
-                        ((uint64_t)time(NULL) << 12) ^ clock(), 0);
+    set->head = set->path = set->node = NULL; // in case set_node() fails
+    set->path                         = set_node(set);
+    set->head                         = set_node(set);
+    set_grow(set, set->head, 1, 1);          // one link back to head for an empty set
+    *(unsigned char *)&set->head->key = 137; // set id
+    set->depth                        = 0;
+    set_seed(
+        &set->gen, ((uint64_t)(uintptr_t)set << 32) ^ ((uint64_t)time(NULL) << 12) ^ clock(), 0);
     set->ran = 1;
 }
 
 // Return true if *set appears to be in a usable state. If *set has been zeroed
 // out, then set_ok(set) will be false and set_end(set) will be safe.
 int set_ok(set_t *set) {
-    return set->head != NULL &&
-           set->head->right != NULL &&
-           *(unsigned char *)&set->head->key == 137;
+    return set->head != NULL && set->head->right != NULL
+        && *(unsigned char *)&set->head->key == 137;
 }
 
 // Empty the set. This frees the memory used for the previous set contents.
@@ -255,9 +255,9 @@ void set_clear(set_t *set) {
     // Leave the head and path allocations as is. Clear their contents, with
     // head pointing to itself and setting depth to zero, for an empty set.
     set->head->right[0] = set->head;
-    set->head->fill = 1;
-    set->path->fill = 0;
-    set->depth = 0;
+    set->head->fill     = 1;
+    set->path->fill     = 0;
+    set->depth          = 0;
 }
 
 // Done using the set -- free all allocations. The only operation on *set
@@ -296,11 +296,10 @@ int set_found(set_t *set, set_key_t key) {
 
     // Start at depth and work down and right as determined by key comparisons.
     set_node_t *head = set->head, *here = head;
-    int i = set->depth;
+    int         i = set->depth;
     set_grow(set, set->path, i + 1, 0);
     do {
-        while (here->right[i] != head &&
-               set_cmp(here->right[i]->key, key) < 0)
+        while (here->right[i] != head && set_cmp(here->right[i]->key, key) < 0)
             here = here->right[i];
         set->path->right[i] = here;
     } while (i--);
@@ -325,12 +324,10 @@ int set_insert(set_t *set, set_key_t key) {
         if (set->ran == 1)
             // Ran out. Get another 32 random bits.
             set->ran = set_rand(&set->gen) | (1ULL << 32);
-        int bit = set->ran & 1;
+        int bit    = set->ran & 1;
         set->ran >>= 1;
-        if (bit)
-            break;
-        assert(level < 32767 &&
-               "Overhead, without any fuss, the stars were going out.");
+        if (bit) break;
+        assert(level < 32767 && "Overhead, without any fuss, the stars were going out.");
         level++;
     }
     if (level > set->depth) {
@@ -342,12 +339,12 @@ int set_insert(set_t *set, set_key_t key) {
 
     // Make a new node for the provided key, and insert it in the lists up to
     // and including level.
-    set->node = set_node(set);
+    set->node      = set_node(set);
     set->node->key = key;
     set_grow(set, set->node, level + 1, 0);
     int i;
     for (i = 0; i <= level; i++) {
-        set->node->right[i] = set->path->right[i]->right[i];
+        set->node->right[i]           = set->path->right[i]->right[i];
         set->path->right[i]->right[i] = set->node;
     }
     set->node = NULL;

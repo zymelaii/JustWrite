@@ -6,8 +6,7 @@
 
 class QtMaterialTextFieldPrivate;
 
-class QtMaterialTextField : public QLineEdit
-{
+class QtMaterialTextField : public QLineEdit {
     Q_OBJECT
 
     Q_PROPERTY(QColor textColor WRITE setTextColor READ textColor)
@@ -24,22 +23,22 @@ public:
     void setShowLabel(bool value);
     bool hasLabel() const;
 
-    void setLabelFontSize(qreal size);
+    void  setLabelFontSize(qreal size);
     qreal labelFontSize() const;
 
-    void setLabel(const QString &label);
+    void    setLabel(const QString &label);
     QString label() const;
 
-    void setTextColor(const QColor &color);
+    void   setTextColor(const QColor &color);
     QColor textColor() const;
 
-    void setLabelColor(const QColor &color);
+    void   setLabelColor(const QColor &color);
     QColor labelColor() const;
 
-    void setInkColor(const QColor &color);
+    void   setInkColor(const QColor &color);
     QColor inkColor() const;
 
-    void setInputLineColor(const QColor &color);
+    void   setInputLineColor(const QColor &color);
     QColor inputLineColor() const;
 
     void setShowInputLine(bool value);

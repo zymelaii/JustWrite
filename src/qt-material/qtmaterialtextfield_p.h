@@ -8,8 +8,7 @@ class QtMaterialTextField;
 class QtMaterialTextFieldStateMachine;
 class QtMaterialTextFieldLabel;
 
-class QtMaterialTextFieldPrivate
-{
+class QtMaterialTextFieldPrivate {
     Q_DISABLE_COPY(QtMaterialTextFieldPrivate)
     Q_DECLARE_PUBLIC(QtMaterialTextField)
 
@@ -19,7 +18,7 @@ public:
 
     void init();
 
-    QtMaterialTextField             *const q_ptr;
+    QtMaterialTextField *const       q_ptr;
     QtMaterialTextFieldStateMachine *stateMachine;
     QtMaterialTextFieldLabel        *label;
     QColor                           textColor;

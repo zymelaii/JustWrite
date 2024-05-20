@@ -3,8 +3,7 @@
 
 #include <QtWidgets/QWidget>
 
-class QtMaterialOverlayWidget : public QWidget
-{
+class QtMaterialOverlayWidget : public QWidget {
     Q_OBJECT
 
 public:

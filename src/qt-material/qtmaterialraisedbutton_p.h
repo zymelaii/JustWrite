@@ -8,8 +8,7 @@ class QState;
 class QGraphicsDropShadowEffect;
 class QtMaterialRaisedButton;
 
-class QtMaterialRaisedButtonPrivate : public QtMaterialFlatButtonPrivate
-{
+class QtMaterialRaisedButtonPrivate : public QtMaterialFlatButtonPrivate {
     Q_DISABLE_COPY(QtMaterialRaisedButtonPrivate)
     Q_DECLARE_PUBLIC(QtMaterialRaisedButton)
 

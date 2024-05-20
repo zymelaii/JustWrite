@@ -14,22 +14,17 @@
  *  \internal
  */
 QtMaterialRaisedButtonPrivate::QtMaterialRaisedButtonPrivate(QtMaterialRaisedButton *q)
-    : QtMaterialFlatButtonPrivate(q)
-{
-}
+    : QtMaterialFlatButtonPrivate(q) {}
 
 /*!
  *  \internal
  */
-QtMaterialRaisedButtonPrivate::~QtMaterialRaisedButtonPrivate()
-{
-}
+QtMaterialRaisedButtonPrivate::~QtMaterialRaisedButtonPrivate() {}
 
 /*!
  *  \internal
  */
-void QtMaterialRaisedButtonPrivate::init()
-{
+void QtMaterialRaisedButtonPrivate::init() {
     Q_Q(QtMaterialRaisedButton);
 
     shadowStateMachine = new QStateMachine(q);
@@ -88,31 +83,25 @@ void QtMaterialRaisedButtonPrivate::init()
  */
 
 QtMaterialRaisedButton::QtMaterialRaisedButton(QWidget *parent)
-    : QtMaterialFlatButton(*new QtMaterialRaisedButtonPrivate(this), parent)
-{
+    : QtMaterialFlatButton(*new QtMaterialRaisedButtonPrivate(this), parent) {
     d_func()->init();
 }
 
 QtMaterialRaisedButton::QtMaterialRaisedButton(const QString &text, QWidget *parent)
-    : QtMaterialFlatButton(*new QtMaterialRaisedButtonPrivate(this), parent)
-{
+    : QtMaterialFlatButton(*new QtMaterialRaisedButtonPrivate(this), parent) {
     d_func()->init();
 
     setText(text);
 }
 
-QtMaterialRaisedButton::~QtMaterialRaisedButton()
-{
-}
+QtMaterialRaisedButton::~QtMaterialRaisedButton() {}
 
 QtMaterialRaisedButton::QtMaterialRaisedButton(QtMaterialRaisedButtonPrivate &d, QWidget *parent)
-    : QtMaterialFlatButton(d, parent)
-{
+    : QtMaterialFlatButton(d, parent) {
     d_func()->init();
 }
 
-bool QtMaterialRaisedButton::event(QEvent *event)
-{
+bool QtMaterialRaisedButton::event(QEvent *event) {
     Q_D(QtMaterialRaisedButton);
 
     if (QEvent::EnabledChange == event->type()) {

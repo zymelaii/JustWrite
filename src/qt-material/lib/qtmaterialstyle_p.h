@@ -6,8 +6,7 @@
 class QtMaterialStyle;
 class QtMaterialTheme;
 
-class QtMaterialStylePrivate
-{
+class QtMaterialStylePrivate {
     Q_DISABLE_COPY(QtMaterialStylePrivate)
     Q_DECLARE_PUBLIC(QtMaterialStyle)
 
@@ -18,7 +17,7 @@ public:
     void init();
 
     QtMaterialStyle *const q_ptr;
-    QtMaterialTheme *theme;
+    QtMaterialTheme       *theme;
 };
 
 #endif // QTMATERIALSTYLE_P_H

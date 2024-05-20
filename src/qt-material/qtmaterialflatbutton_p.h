@@ -9,8 +9,7 @@ class QtMaterialFlatButton;
 class QtMaterialRippleOverlay;
 class QtMaterialFlatButtonStateMachine;
 
-class QtMaterialFlatButtonPrivate
-{
+class QtMaterialFlatButtonPrivate {
     Q_DISABLE_COPY(QtMaterialFlatButtonPrivate)
     Q_DECLARE_PUBLIC(QtMaterialFlatButton)
 
@@ -20,7 +19,7 @@ public:
 
     void init();
 
-    QtMaterialFlatButton             *const q_ptr;
+    QtMaterialFlatButton *const       q_ptr;
     QtMaterialRippleOverlay          *rippleOverlay;
     QtMaterialFlatButtonStateMachine *stateMachine;
     Material::Role                    role;

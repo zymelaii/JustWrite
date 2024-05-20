@@ -4,8 +4,7 @@
 #include <QAbstractTransition>
 #include "lib/qtmaterialstatetransitionevent.h"
 
-class QtMaterialStateTransition : public QAbstractTransition
-{
+class QtMaterialStateTransition : public QAbstractTransition {
     Q_OBJECT
 
 public:

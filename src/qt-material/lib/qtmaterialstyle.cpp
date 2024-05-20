@@ -8,16 +8,11 @@
  */
 
 QtMaterialStylePrivate::QtMaterialStylePrivate(QtMaterialStyle *q)
-    : q_ptr(q)
-{
-}
+    : q_ptr(q) {}
 
-QtMaterialStylePrivate::~QtMaterialStylePrivate()
-{
-}
+QtMaterialStylePrivate::~QtMaterialStylePrivate() {}
 
-void QtMaterialStylePrivate::init()
-{
+void QtMaterialStylePrivate::init() {
     Q_Q(QtMaterialStyle);
 
     QFontDatabase::addApplicationFont(":/fonts/roboto_regular");
@@ -32,16 +27,14 @@ void QtMaterialStylePrivate::init()
  *  \internal
  */
 
-void QtMaterialStyle::setTheme(QtMaterialTheme *theme)
-{
+void QtMaterialStyle::setTheme(QtMaterialTheme *theme) {
     Q_D(QtMaterialStyle);
 
     d->theme = theme;
     theme->setParent(this);
 }
 
-QColor QtMaterialStyle::themeColor(const QString &key) const
-{
+QColor QtMaterialStyle::themeColor(const QString &key) const {
     Q_D(const QtMaterialStyle);
 
     Q_ASSERT(d->theme);
@@ -50,8 +43,7 @@ QColor QtMaterialStyle::themeColor(const QString &key) const
 }
 
 QtMaterialStyle::QtMaterialStyle()
-    : QCommonStyle(),
-      d_ptr(new QtMaterialStylePrivate(this))
-{
+    : QCommonStyle()
+    , d_ptr(new QtMaterialStylePrivate(this)) {
     d_func()->init();
 }

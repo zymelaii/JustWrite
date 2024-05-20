@@ -6,8 +6,7 @@
 
 class QtMaterialRipple;
 
-class QtMaterialRippleOverlay : public QtMaterialOverlayWidget
-{
+class QtMaterialRippleOverlay : public QtMaterialOverlayWidget {
     Q_OBJECT
 
 public:
@@ -39,25 +38,21 @@ private:
     bool                      m_useClip;
 };
 
-inline void QtMaterialRippleOverlay::setClipping(bool enable)
-{
+inline void QtMaterialRippleOverlay::setClipping(bool enable) {
     m_useClip = enable;
     update();
 }
 
-inline bool QtMaterialRippleOverlay::hasClipping() const
-{
+inline bool QtMaterialRippleOverlay::hasClipping() const {
     return m_useClip;
 }
 
-inline void QtMaterialRippleOverlay::setClipPath(const QPainterPath &path)
-{
+inline void QtMaterialRippleOverlay::setClipPath(const QPainterPath &path) {
     m_clipPath = path;
     update();
 }
 
-inline QList<QtMaterialRipple *> QtMaterialRippleOverlay::ripples() const
-{
+inline QList<QtMaterialRipple *> QtMaterialRippleOverlay::ripples() const {
     return m_ripples;
 }
 
