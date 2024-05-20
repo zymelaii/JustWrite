@@ -35,6 +35,11 @@ public:
     AbstractBookManager *resetBookSource(AbstractBookManager *book_manager);
     AbstractBookManager *takeBookSource();
 
+    const AbstractBookManager &bookSource() const {
+        Q_ASSERT(book_manager_);
+        return *book_manager_;
+    }
+
     int  addVolume(int index, const QString &title);
     int  addChapter(int volume_index, const QString &title);
     void openChapter(int cid);

@@ -31,6 +31,9 @@ public:
     JustWrite();
     ~JustWrite();
 
+signals:
+    void pageChanged(PageType page);
+
 public:
     void setTheme(Theme theme);
     void updateBookInfo(int index, const BookInfo &info);

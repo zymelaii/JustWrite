@@ -153,8 +153,6 @@ void JustWrite::setupUi() {
 
     page_map_[PageType::Gallery] = gallery_page;
     page_map_[PageType::Edit]    = ui_edit_page_;
-
-    ui_title_bar_->setTitle("只写 丶 阐释你的梦");
 }
 
 void JustWrite::setupConnections() {
@@ -162,6 +160,18 @@ void JustWrite::setupConnections() {
         if (index == ui_gallery_->totalItems()) { requestUpdateBookInfo(index); }
     });
     connect(ui_gallery_, &Gallery::menuClicked, this, &JustWrite::requestBookAction);
+    connect(this, &JustWrite::pageChanged, this, [this](PageType page) {
+        switch (page) {
+            case PageType::Gallery: {
+                ui_title_bar_->setTitle("只写 丶 阐释你的梦");
+            } break;
+            case PageType::Edit: {
+                const auto &info  = ui_edit_page_->bookSource().info_ref();
+                const auto  title = QString("%1\u3000%2 [著]").arg(info.title).arg(info.author);
+                ui_title_bar_->setTitle(title);
+            } break;
+        }
+    });
 }
 
 void JustWrite::requestUpdateBookInfo(int index) {
@@ -259,6 +269,7 @@ void JustWrite::switchToPage(PageType page) {
     if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
         closePopupLayer();
         ui_page_stack_->setCurrentWidget(w);
+        emit pageChanged(page);
     }
 }
 
