@@ -42,6 +42,9 @@ protected:
     QString getLikelyAuthor() const;
     void    updateLikelyAuthor(const QString &author);
 
+public:
+    void toggleMaximize();
+
 protected:
     void    setupUi();
     void    setupConnections();
@@ -54,9 +57,11 @@ protected:
     void closePopupLayer();
 
     void switchToPage(PageType page);
+    void closePage();
 
 private:
     QMap<PageType, QWidget *>            page_map_;
+    PageType                             current_page_;
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;
 

@@ -115,6 +115,15 @@ void JustWrite::setTheme(Theme theme) {
     ui_edit_page_->updateColorTheme(color_theme);
 }
 
+void JustWrite::toggleMaximize() {
+    if (isMinimized()) { return; }
+    if (isMaximized()) {
+        showNormal();
+    } else {
+        showMaximized();
+    }
+}
+
 void JustWrite::setupUi() {
     auto top_layout     = new QVBoxLayout(this);
     auto container      = new QWidget;
@@ -142,6 +151,12 @@ void JustWrite::setupUi() {
     ui_agent_ = new QWK::WidgetWindowAgent(this);
     ui_agent_->setup(this);
     ui_agent_->setTitleBar(ui_title_bar_);
+    ui_agent_->setSystemButton(
+        QWK::WidgetWindowAgent::Minimize, ui_title_bar_->systemButton(SystemButton::Minimize));
+    ui_agent_->setSystemButton(
+        QWK::WidgetWindowAgent::Maximize, ui_title_bar_->systemButton(SystemButton::Maximize));
+    ui_agent_->setSystemButton(
+        QWK::WidgetWindowAgent::Close, ui_title_bar_->systemButton(SystemButton::Close));
 
     top_layout->setContentsMargins({});
     top_layout->setSpacing(0);
@@ -172,6 +187,9 @@ void JustWrite::setupConnections() {
             } break;
         }
     });
+    connect(ui_title_bar_, &TitleBar::minimizeRequested, this, &QWidget::showMinimized);
+    connect(ui_title_bar_, &TitleBar::maximizeRequested, this, &JustWrite::toggleMaximize);
+    connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::closePage);
 }
 
 void JustWrite::requestUpdateBookInfo(int index) {
@@ -237,8 +255,6 @@ void JustWrite::requestStartEditBook(int index) {
     const auto  book_info = ui_gallery_->bookInfoAt(index);
     const auto &uuid      = book_info.uuid;
 
-    qDebug() << uuid;
-
     if (!books_.contains(uuid)) {
         auto bm        = new BookManager;
         bm->info_ref() = book_info;
@@ -269,7 +285,22 @@ void JustWrite::switchToPage(PageType page) {
     if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
         closePopupLayer();
         ui_page_stack_->setCurrentWidget(w);
-        emit pageChanged(page);
+    }
+    current_page_ = page;
+    emit pageChanged(page);
+}
+
+void JustWrite::closePage() {
+    switch (current_page_) {
+        case PageType::Edit: {
+            //! TODO: sync book content to local storage or elsewhere
+            switchToPage(PageType::Gallery);
+        } break;
+        case PageType::Gallery: {
+            //! TODO: throw a dialog to confirm quiting the jwrite
+            //! TODO: sync book content to local storage
+            close();
+        } break;
     }
 }
 

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <jwrite/ui/SystemButton.h>
 #include <QWidget>
+#include <magic_enum.hpp>
+#include <array>
 
 namespace jwrite::ui {
 
@@ -11,9 +14,16 @@ public:
     explicit TitleBar(QWidget *parent = nullptr);
     virtual ~TitleBar();
 
+signals:
+    void minimizeRequested();
+    void maximizeRequested();
+    void closeRequested();
+
 public:
     QString title() const;
     void    setTitle(const QString &title);
+
+    SystemButton *systemButton(SystemButton::SystemCommand command_type) const;
 
 public:
     QSize minimumSizeHint() const override;
@@ -21,12 +31,16 @@ public:
 
 protected:
     void setupUi();
+    void setupConnections();
 
     void paintEvent(QPaintEvent *event) override;
-    void resizeEvent(QResizeEvent *event) override;
 
 private:
-    QString title_;
+    using SystemButtonGroup =
+        std::array<SystemButton *, magic_enum::enum_count<SystemButton::SystemCommand>()>;
+
+    QString           title_;
+    SystemButtonGroup sys_buttons_;
 };
 
 } // namespace jwrite::ui
