@@ -8,6 +8,7 @@ set(SOURCE_FILES App.cpp)
 list(APPEND SOURCE_FILES ${UI_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${EPUB_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/res.qrc)
+list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/JustWrite.rc)
 
 add_library(jwrite-core STATIC ${CORE_SOURCE_FILES})
 target_link_libraries(
