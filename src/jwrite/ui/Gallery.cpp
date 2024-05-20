@@ -168,11 +168,12 @@ int Gallery::getItemIndex(const QPoint &pos, int *out_menu_index) const {
 
         const auto bb = getItemRect(row, col);
 
-        if (; !bb.contains(pos)) { break; }
+        if (!bb.contains(pos)) { break; }
 
         if (const int total_btn = 3; out_menu_index) {
             int  spacing = 0;
             auto menu_bb = getDisplayCaseMenuButtonRect(QRect(bb.topLeft(), item_size_), spacing);
+            *out_menu_index = -1;
             for (int i = 0; i < total_btn; ++i) {
                 if (menu_bb.contains(pos)) {
                     *out_menu_index = i;
