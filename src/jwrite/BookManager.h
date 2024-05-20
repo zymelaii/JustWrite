@@ -1,69 +1,134 @@
 #pragma once
 
-#include <jwrite/BookInfo.h>
 #include <QMap>
+#include <QUuid>
 
 namespace jwrite {
 
-struct BookManager {
-    virtual ~BookManager() = default;
+struct BookInfo {
+    QString uuid;
+    QString title;
+    QString author;
+    QString cover_url;
+};
 
-    const QList<int> &get_volumes() const {
-        return vid_list;
+class AbstractBookManager {
+protected:
+    using OptionalStringRef = std::optional<std::reference_wrapper<const QString>>;
+    using OptionalString    = std::optional<QString>;
+
+public:
+    static QString alloc_uuid();
+
+    virtual ~AbstractBookManager() = default;
+
+    virtual bool uuid_conflicts(const QString &uuid) const {
+        return false;
     }
 
-    const QList<int> &get_chapters_of_volume(int vid) const {
-        return const_cast<BookManager *>(this)->cid_list_set[vid];
+    virtual int alloc_toc_id() const = 0;
+
+    virtual BookInfo &info_ref() = 0;
+
+    virtual const BookInfo &info_ref() const {
+        return const_cast<AbstractBookManager *>(this)->info_ref();
     }
 
-    QList<int> get_all_chapters() const {
-        QList<int> results;
-        for (auto vid : vid_list) { results << get_chapters_of_volume(vid); }
-        return results;
+    BookInfo info() const {
+        return info_ref();
     }
 
-    int add_volume(int index, const QString &title) {
-        Q_ASSERT(index >= 0 && index <= vid_list.size());
-        const int id = title_pool.size();
-        title_pool.insert(id, title);
-        vid_list.insert(index, id);
-        cid_list_set.insert(id, {});
-        return id;
+    virtual const QList<int> &get_volumes() const                   = 0;
+    virtual const QList<int> &get_chapters_of_volume(int vid) const = 0;
+    virtual QList<int>        get_all_chapters() const              = 0;
+
+    virtual int add_volume(int index, const QString &title)           = 0;
+    virtual int add_chapter(int vid, int index, const QString &title) = 0;
+
+    virtual int  remove_volume(int vid)  = 0;
+    virtual bool remove_chapter(int cid) = 0;
+
+    virtual bool has_volume(int vid) const {
+        return get_volumes().contains(vid);
     }
 
-    int add_chapter(int vid, int index, const QString &title) {
-        Q_ASSERT(cid_list_set.contains(vid));
-        auto &cid_list = cid_list_set[vid];
-        Q_ASSERT(index >= 0 && index <= cid_list.size());
-        const int id = title_pool.size();
-        title_pool.insert(id, title);
-        cid_list.insert(index, id);
-        return id;
+    virtual bool has_chapter(int cid) const {
+        return get_all_chapters().contains(cid);
     }
 
-    bool has_chapter(int cid) const {
-        return title_pool.contains(cid) && !vid_list.contains(cid);
+    virtual bool has_toc_item(int id) const {
+        return has_volume(id) || has_chapter(id);
     }
 
-    const QString &get_title(int id) const {
-        Q_ASSERT(title_pool.contains(id));
-        return const_cast<BookManager *>(this)->title_pool[id];
+    virtual OptionalStringRef get_title(int id) const                    = 0;
+    virtual bool              update_title(int id, const QString &title) = 0;
+
+    virtual OptionalString fetch_chapter_content(int cid) = 0;
+
+    virtual bool sync_chapter_content(int cid, const QString &text) = 0;
+};
+
+class InMemoryBookManager : public AbstractBookManager {
+public:
+    InMemoryBookManager()
+        : next_toc_id_{0} {}
+
+    virtual ~InMemoryBookManager() = default;
+
+    int alloc_toc_id() const override {
+        return next_toc_id_++;
     }
 
-    void rename_title(int id, const QString &title) {
-        Q_ASSERT(title_pool.contains(id));
-        title_pool[id] = title;
+    BookInfo &info_ref() override {
+        return info_;
     }
 
-    virtual QString get_chapter(int cid) = 0;
+    const QList<int> &get_volumes() const override {
+        return vid_list_;
+    }
 
-    virtual void write_chapter(int cid, const QString &text) = 0;
+    const QList<int> &get_chapters_of_volume(int vid) const override {
+        return const_cast<InMemoryBookManager *>(this)->cid_list_set_[vid];
+    }
 
-    BookInfo              info;
-    int                   book_id;
-    QList<int>            vid_list;
-    QMap<int, QList<int>> cid_list_set;
-    QMap<int, QString>    title_pool;
+    QList<int> get_all_chapters() const override;
+
+    int add_volume(int index, const QString &title) override;
+    int add_chapter(int vid, int index, const QString &title) override;
+
+    int  remove_volume(int vid) override;
+    bool remove_chapter(int cid) override;
+
+    bool has_volume(int vid) const override {
+        return cid_list_set_.contains(vid);
+    }
+
+    bool has_chapter(int cid) const override {
+        return title_pool_.contains(cid) && !cid_list_set_.contains(cid);
+    }
+
+    bool has_toc_item(int id) const override {
+        return title_pool_.contains(id);
+    }
+
+    OptionalStringRef get_title(int id) const override {
+        Q_ASSERT(has_toc_item(id));
+        if (!has_toc_item(id)) { return std::nullopt; }
+        return {const_cast<InMemoryBookManager *>(this)->title_pool_[id]};
+    }
+
+    bool update_title(int id, const QString &title) override {
+        if (!has_toc_item(id)) { return false; }
+        title_pool_[id] = title;
+        return true;
+    }
+
+private:
+    BookInfo              info_;
+    QList<int>            vid_list_;
+    QMap<int, QList<int>> cid_list_set_;
+    QMap<int, QString>    title_pool_;
+    mutable int           next_toc_id_;
 };
 
 } // namespace jwrite

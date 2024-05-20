@@ -30,9 +30,11 @@ void Gallery::removeDisplayCase(int index) {
     resetHoverState();
 }
 
-void Gallery::updateDisplayCaseItem(int index, const QString &title, const QString &cover_url) {
+void Gallery::updateDisplayCaseItem(int index, const BookInfo &book_info) {
     Q_ASSERT(index >= 0 && index <= items_.size());
     const bool on_insert = index == items_.size();
+
+    const auto &cover_url = book_info.cover_url;
 
     if (cover_url.isEmpty()) { return; }
 
@@ -42,12 +44,12 @@ void Gallery::updateDisplayCaseItem(int index, const QString &title, const QStri
     cover = cover.scaled(item_size_, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
 
     DisplayCaseItem item{
-        .source = cover_url,
-        .cover  = QPixmap::fromImage(std::move(cover)),
-        .title  = title,
+        .book_info = book_info,
+        .cover     = QPixmap::fromImage(std::move(cover)),
     };
 
     if (on_insert) {
+        item.book_info.uuid = AbstractBookManager::alloc_uuid();
         items_.append(std::move(item));
         updateGeometry();
     } else {
@@ -63,6 +65,12 @@ void Gallery::updateColorTheme(const ColorTheme &color_theme) {
     pal.setColor(QPalette::Window, color_theme.Window);
     pal.setColor(QPalette::WindowText, color_theme.WindowText);
     setPalette(pal);
+}
+
+BookInfo Gallery::bookInfoAt(int index) const {
+    Q_ASSERT(index >= 0 && index < items_.size());
+    const auto &item = items_[index];
+    return item.book_info;
 }
 
 QSize Gallery::minimumSizeHint() const {
@@ -241,7 +249,7 @@ void Gallery::drawDisplayCase(QPainter *p, int index, int row, int col) {
 
         p->restore();
 
-        const auto title = fm.elidedText(item.title, Qt::ElideRight, title_bb.width());
+        const auto title = fm.elidedText(item.book_info.title, Qt::ElideRight, title_bb.width());
         p->setPen(pal.color(QPalette::WindowText));
         p->drawText(title_bb, Qt::AlignCenter, title);
     } else {

@@ -8,7 +8,6 @@
 #include <jwrite/VisualTextEditContext.h>
 #include <jwrite/GlobalCommand.h>
 #include <jwrite/ColorTheme.h>
-#include <jwrite/BookInfo.h>
 #include <jwrite/BookManager.h>
 #include <QWidget>
 #include <QTimer>
@@ -33,8 +32,8 @@ public:
 public:
     void updateColorTheme(const ColorTheme &color_theme);
 
-    BookManager *resetBookSource(BookManager *book_manager);
-    BookManager *takeBookSource();
+    AbstractBookManager *resetBookSource(AbstractBookManager *book_manager);
+    AbstractBookManager *takeBookSource();
 
     int  addVolume(int index, const QString &title);
     int  addChapter(int volume_index, const QString &title);
@@ -59,7 +58,7 @@ protected:
 private:
     GlobalCommandManager                      command_manager_;
     MessyInputWorker                         *messy_input_;
-    BookManager                              *book_manager_;
+    AbstractBookManager                      *book_manager_;
     QTimer                                    sec_timer_;
     int                                       current_cid_;
     QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;

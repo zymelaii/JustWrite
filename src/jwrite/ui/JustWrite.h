@@ -45,6 +45,7 @@ protected:
     void    requestUpdateBookInfo(int index);
     QString requestImagePath(bool validate, QImage *out_image);
     void    requestBookAction(int index, Gallery::MenuAction action);
+    void    requestStartEditBook(int index);
 
     void showPopupLayer(QWidget *widget);
     void closePopupLayer();
@@ -52,9 +53,9 @@ protected:
     void switchToPage(PageType page);
 
 private:
-    QMap<PageType, QWidget *> page_map_;
-    QMap<int, BookManager *>  books_;
-    QString                   likely_author_;
+    QMap<PageType, QWidget *>            page_map_;
+    QMap<QString, AbstractBookManager *> books_;
+    QString                              likely_author_;
 
     TitleBar               *ui_title_bar_;
     Gallery                *ui_gallery_;

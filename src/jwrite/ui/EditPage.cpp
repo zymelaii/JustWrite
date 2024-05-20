@@ -111,7 +111,7 @@ void EditPage::updateColorTheme(const ColorTheme &color_theme) {
     }
 }
 
-BookManager *EditPage::resetBookSource(BookManager *book_manager) {
+AbstractBookManager *EditPage::resetBookSource(AbstractBookManager *book_manager) {
     Q_ASSERT(book_manager);
 
     if (book_manager == book_manager_) { return nullptr; }
@@ -124,7 +124,7 @@ BookManager *EditPage::resetBookSource(BookManager *book_manager) {
     return old_book_manager;
 }
 
-BookManager *EditPage::takeBookSource() {
+AbstractBookManager *EditPage::takeBookSource() {
     if (!book_manager_) { return nullptr; }
 
     auto old_book_manager = book_manager_;
@@ -152,7 +152,7 @@ int EditPage::addChapter(int volume_index, const QString &title) {
     const auto vid = ui_book_dir->topItemAt(volume_index);
     Q_ASSERT(vid != -1);
     const int chap_index = ui_book_dir->totalSubItemsUnderTopItem(vid);
-    book_manager_->add_chapter(book_manager_->vid_list[volume_index], chap_index, title);
+    book_manager_->add_chapter(vid, chap_index, title);
     return ui_book_dir->addSubItem(vid, chap_index, title);
 }
 
@@ -165,8 +165,9 @@ void EditPage::openChapter(int cid) {
 
     jwrite_profiler_start(SwitchChapter);
 
-    auto text = book_manager_->has_chapter(current_cid_) ? book_manager_->get_chapter(current_cid_)
-                                                         : QString{};
+    auto text   = book_manager_->has_chapter(current_cid_)
+                    ? book_manager_->fetch_chapter_content(current_cid_).value()
+                    : QString{};
     chap_words_ = text.length();
 
     if (current_cid_ != -1) {
@@ -175,7 +176,7 @@ void EditPage::openChapter(int cid) {
     }
 
     ui_editor->reset(text, true);
-    book_manager_->write_chapter(current_cid_, text);
+    book_manager_->sync_chapter_content(current_cid_, text);
     current_cid_ = cid;
 
     if (chapter_locs_.contains(cid)) {
@@ -188,7 +189,7 @@ void EditPage::openChapter(int cid) {
 
 void EditPage::renameBookDirItem(int id, const QString &title) {
     Q_ASSERT(book_manager_);
-    book_manager_->rename_title(id, title);
+    book_manager_->update_title(id, title);
     ui_book_dir->setItemValue(id, title);
 }
 
@@ -212,28 +213,29 @@ void EditPage::exportToLocal(const QString &path, ExportType type) {
                 const auto vid = book_manager_->get_volumes()[i];
                 out << QStringLiteral("【第 %1 卷 %2】\n\n")
                            .arg(i + 1)
-                           .arg(book_manager_->get_title(vid));
+                           .arg(book_manager_->get_title(vid).value());
                 const auto &chaps = book_manager_->get_chapters_of_volume(vid);
                 for (const auto cid : chaps) {
-                    const auto content =
-                        current_cid_ == cid ? ui_editor->text() : book_manager_->get_chapter(cid);
+                    const auto content = current_cid_ == cid
+                                           ? ui_editor->text()
+                                           : book_manager_->fetch_chapter_content(cid).value();
                     out << QStringLiteral("第 %1 章 %2\n")
                                .arg(++chap_index)
-                               .arg(book_manager_->get_title(cid))
+                               .arg(book_manager_->get_title(cid).value())
                         << content << "\n\n";
                 }
             }
         } break;
         case ExportType::ePub: {
-            const auto &title  = book_manager_->info.title;
-            const auto &author = book_manager_->info.author;
+            const auto &title  = book_manager_->info_ref().title;
+            const auto &author = book_manager_->info_ref().author;
 
             EpubBuilder builder(path);
             const int   total_volumes = book_manager_->get_volumes().size();
             for (int i = 0; i < total_volumes; ++i) {
                 const int vid = book_manager_->get_volumes()[i];
                 builder.with_volume(
-                    QString("第 %1 卷 %2").arg(i + 1).arg(book_manager_->get_title(vid)),
+                    QString("第 %1 卷 %2").arg(i + 1).arg(book_manager_->get_title(vid).value()),
                     book_manager_->get_chapters_of_volume(vid).size());
             }
             int global_chap_index = 0;
@@ -248,9 +250,10 @@ void EditPage::exportToLocal(const QString &path, ExportType type) {
                     const int cid  = book_manager_->get_chapters_of_volume(vid)[chap_index];
                     out_chap_title = QString("第 %1 章 %2")
                                          .arg(++global_chap_index)
-                                         .arg(book_manager_->get_title(cid));
-                    out_content =
-                        current_cid_ == cid ? ui_editor->text() : book_manager_->get_chapter(cid);
+                                         .arg(book_manager_->get_title(cid).value());
+                    out_content = current_cid_ == cid
+                                    ? ui_editor->text()
+                                    : book_manager_->fetch_chapter_content(cid).value();
                 })
                 .build();
         } break;
@@ -371,7 +374,7 @@ void EditPage::requestExportToLocal() {
     Q_ASSERT(book_manager_);
 
     const auto  caption      = "导出到本地";
-    const auto &title        = book_manager_->info.title;
+    const auto &title        = book_manager_->info_ref().title;
     const auto  default_name = title.isEmpty() ? "未命名书籍" : title;
 
     QMap<QString, ExportType> types;
@@ -412,7 +415,7 @@ void EditPage::flushWordsCount() {
     total_words_ = 0;
     if (book_manager_) {
         for (const auto cid : book_manager_->get_all_chapters()) {
-            const int count = book_manager_->get_chapter(cid).length();
+            const int count = book_manager_->fetch_chapter_content(cid).value().length();
             if (cid == current_cid_) { chap_words_ = count; }
             total_words_ += count;
         }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <jwrite/ColorTheme.h>
-#include <jwrite/BookInfo.h>
+#include <jwrite/BookManager.h>
 #include <QWidget>
 #include <QUrl>
 
@@ -27,23 +27,14 @@ signals:
 
 public:
     void removeDisplayCase(int index);
-    void updateDisplayCaseItem(int index, const QString &title, const QString &cover_url);
+    void updateDisplayCaseItem(int index, const BookInfo &book_info);
     void updateColorTheme(const ColorTheme &color_theme);
 
     int totalItems() const {
         return items_.size();
     }
 
-    jwrite::BookInfo bookInfoAt(int index) const {
-        //! TODO: record book id
-        Q_ASSERT(index >= 0 && index < items_.size());
-        const auto &item = items_[index];
-        return {
-            .title     = item.title,
-            .author    = "",
-            .cover_url = item.source,
-        };
-    }
+    BookInfo bookInfoAt(int index) const;
 
 public:
     QSize minimumSizeHint() const override;
@@ -76,9 +67,8 @@ protected:
 
 private:
     struct DisplayCaseItem {
-        QString source;
-        QPixmap cover;
-        QString title;
+        BookInfo book_info;
+        QPixmap  cover;
     };
 
     QList<DisplayCaseItem> items_;

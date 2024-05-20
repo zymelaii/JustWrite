@@ -12,14 +12,20 @@
 
 namespace jwrite::ui {
 
-class InMemoryBookManager : public BookManager {
+class BookManager : public InMemoryBookManager {
 public:
-    QString get_chapter(int cid) override {
-        return chapters_.value(cid, "");
+    OptionalString fetch_chapter_content(int cid) override {
+        if (!has_chapter(cid)) {
+            return std::nullopt;
+        } else {
+            return {chapters_.value(cid)};
+        }
     }
 
-    void write_chapter(int cid, const QString &text) override {
+    bool sync_chapter_content(int cid, const QString &text) override {
+        if (!has_chapter(cid)) { return false; }
         chapters_[cid] = text;
+        return true;
     }
 
 private:
@@ -204,12 +210,7 @@ void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
     Q_ASSERT(index != ui_gallery_->totalItems());
     switch (action) {
         case Gallery::Open: {
-            auto book     = new InMemoryBookManager;
-            book->book_id = books_.size();
-            book->info    = ui_gallery_->bookInfoAt(index);
-            books_.insert(book->book_id, book);
-            ui_edit_page_->resetBookSource(book);
-            switchToPage(PageType::Edit);
+            requestStartEditBook(index);
         } break;
         case Gallery::Edit: {
             requestUpdateBookInfo(index);
@@ -220,6 +221,26 @@ void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
             if (result == QMessageBox::Yes) { ui_gallery_->removeDisplayCase(index); }
         } break;
     }
+}
+
+void JustWrite::requestStartEditBook(int index) {
+    const auto  book_info = ui_gallery_->bookInfoAt(index);
+    const auto &uuid      = book_info.uuid;
+
+    qDebug() << uuid;
+
+    if (!books_.contains(uuid)) {
+        auto bm        = new BookManager;
+        bm->info_ref() = book_info;
+        books_.insert(uuid, bm);
+    }
+
+    auto bm = books_.value(uuid);
+    Q_ASSERT(bm);
+
+    ui_edit_page_->resetBookSource(bm);
+
+    switchToPage(PageType::Edit);
 }
 
 void JustWrite::showPopupLayer(QWidget *widget) {

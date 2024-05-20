@@ -1,6 +1,6 @@
 #pragma once
 
-#include <jwrite/BookInfo.h>
+#include <jwrite/BookManager.h>
 #include <qt-material/qtmaterialtextfield.h>
 #include <qt-material/qtmaterialraisedbutton.h>
 #include <QWidget>
