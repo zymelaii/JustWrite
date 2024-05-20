@@ -36,6 +36,10 @@ public:
     void updateBookInfo(int index, const jwrite::BookInfo &info);
 
 protected:
+    QString getLikelyAuthor() const;
+    void    updateLikelyAuthor(const QString &author);
+
+protected:
     void    setupUi();
     void    setupConnections();
     void    requestUpdateBookInfo(int index);
@@ -50,6 +54,7 @@ protected:
 private:
     QMap<PageType, QWidget *> page_map_;
     QMap<int, BookManager *>  books_;
+    QString                   likely_author_;
 
     jwrite::ui::TitleBar       *ui_title_bar_;
     jwrite::ui::Gallery        *ui_gallery_;

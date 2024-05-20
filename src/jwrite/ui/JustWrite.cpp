@@ -43,13 +43,28 @@ JustWrite::~JustWrite() {
                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
 }
 
-void JustWrite::updateBookInfo(int index, const jwrite::BookInfo &info) {
+void JustWrite::updateBookInfo(int index, const BookInfo &info) {
     auto book_info = info;
 
-    if (book_info.author.isEmpty()) { book_info.author = "佚名"; }
+    if (book_info.author.isEmpty()) {
+        book_info.author = getLikelyAuthor();
+    } else {
+        updateLikelyAuthor(book_info.author);
+    }
     if (book_info.title.isEmpty()) { book_info.title = QString("未命名书籍-%1").arg(index + 1); }
 
-    ui_gallery_->updateDisplayCaseItem(index, book_info.title, book_info.cover_url);
+    ui_gallery_->updateDisplayCaseItem(index, book_info);
+}
+
+QString JustWrite::getLikelyAuthor() const {
+    return likely_author_.isEmpty() ? "佚名" : likely_author_;
+}
+
+void JustWrite::updateLikelyAuthor(const QString &author) {
+    //! TODO: save likely author to local storage
+    if (!author.isEmpty() && likely_author_.isEmpty() && author != getLikelyAuthor()) {
+        likely_author_ = author;
+    }
 }
 
 void JustWrite::setTheme(Theme theme) {
@@ -148,7 +163,7 @@ void JustWrite::requestUpdateBookInfo(int index) {
     const bool on_insert = index == ui_gallery_->totalItems();
 
     auto info = on_insert ? jwrite::BookInfo{} : ui_gallery_->bookInfoAt(index);
-    if (info.author.isEmpty()) { info.author = "佚名"; }
+    if (info.author.isEmpty()) { info.author = getLikelyAuthor(); }
     if (info.title.isEmpty()) { info.title = QString("未命名书籍-%1").arg(index + 1); }
 
     auto edit = new jwrite::ui::BookInfoEdit;
@@ -204,9 +219,9 @@ void JustWrite::requestBookAction(int index, jwrite::ui::Gallery::MenuAction act
             requestUpdateBookInfo(index);
         } break;
         case Gallery::Delete: {
-            const auto result =
-                QMessageBox::information(this, "删除书籍", "是否确认删除？", QMessageBox::Yes);
-            if (result == QMessageBox::Apply) { ui_gallery_->removeDisplayCase(index); }
+            const auto result = QMessageBox::information(
+                this, "删除书籍", "是否确认删除？", QMessageBox::Yes | QMessageBox::No);
+            if (result == QMessageBox::Yes) { ui_gallery_->removeDisplayCase(index); }
         } break;
     }
 }
