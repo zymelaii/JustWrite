@@ -5,12 +5,14 @@
 #include <QMouseEvent>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <magic_enum.hpp>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 Gallery::Gallery(QWidget *parent)
     : QWidget(parent)
     , hover_index_{-1}
+    , hover_btn_index_{-1}
     , item_size_(150, 200)
     , item_spacing_{20} {
     setupUi();
@@ -19,23 +21,13 @@ Gallery::Gallery(QWidget *parent)
 
 Gallery::~Gallery() {}
 
-void Gallery::addDisplayCaseItem() {
-    const auto filter = "图片 (*.bmp *.jpg *.jpeg *.png)";
-    auto       path   = QFileDialog::getOpenFileName(this, "选择封面", "", filter);
-    if (path.isEmpty()) { return; }
-
-    auto title = QInputDialog::getText(this, "书名", "请输入书名");
-    if (title.isEmpty()) { title = QString("未命名书籍-%1").arg(items_.size() + 1); }
-
-    updateDisplayCaseItem(-1, title, path);
-}
-
-void Gallery::updateDisplayCaseItem(int index, const QString &title, const QUrl &cover_url) {
-    Q_ASSERT(index == -1 || index >= 0 && index < items_.size());
+void Gallery::updateDisplayCaseItem(int index, const QString &title, const QString &cover_url) {
+    Q_ASSERT(index >= 0 && index <= items_.size());
+    const bool on_insert = index == items_.size();
 
     if (cover_url.isEmpty()) { return; }
 
-    QImage cover(cover_url.toString());
+    QImage cover(cover_url);
     if (cover.isNull()) { return; }
 
     cover = cover.scaled(item_size_, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
@@ -46,7 +38,7 @@ void Gallery::updateDisplayCaseItem(int index, const QString &title, const QUrl 
         .title  = title,
     };
 
-    if (index == -1) {
+    if (on_insert) {
         items_.append(std::move(item));
         updateGeometry();
     } else {
@@ -144,7 +136,7 @@ QRect Gallery::getItemTitleRect(const QRect &item_rect) const {
     return bb;
 }
 
-int Gallery::getItemIndex(const QPoint &pos) const {
+int Gallery::getItemIndex(const QPoint &pos, int *out_menu_index) const {
     const auto rect      = contentsRect();
     const auto item_rect = getItemRect(0, 0);
 
@@ -154,13 +146,46 @@ int Gallery::getItemIndex(const QPoint &pos) const {
     const auto rel_pos = pos - rect.topLeft();
     const int  col     = (rel_pos.x() + item_spacing_) / (item_rect.width() + item_spacing_);
 
-    if (col >= cols) { return -1; }
+    do {
+        if (col >= cols) { break; }
 
-    const int row = (rel_pos.y() + item_spacing_) / (item_rect.height() + item_spacing_);
+        const int row = (rel_pos.y() + item_spacing_) / (item_rect.height() + item_spacing_);
 
-    if (const auto bb = getItemRect(row, col); bb.contains(pos)) { return row * cols + col; }
+        const auto bb = getItemRect(row, col);
+
+        if (; !bb.contains(pos)) { break; }
+
+        if (const int total_btn = 3; out_menu_index) {
+            int  spacing = 0;
+            auto menu_bb = getDisplayCaseMenuButtonRect(QRect(bb.topLeft(), item_size_), spacing);
+            for (int i = 0; i < total_btn; ++i) {
+                if (menu_bb.contains(pos)) {
+                    *out_menu_index = i;
+                    break;
+                }
+                menu_bb.translate(0, menu_bb.height() + spacing);
+            }
+        }
+
+        return row * cols + col;
+    } while (0);
+
+    if (out_menu_index) { *out_menu_index = -1; }
 
     return -1;
+}
+
+QRect Gallery::getDisplayCaseMenuButtonRect(const QRect &cover_bb, int &out_v_spacing) const {
+    const int total_btn = 3;
+    const int height    = 32;
+    const int margin    = 12;
+    const int spacing   = (cover_bb.height() - margin * 2 - height * total_btn) / (total_btn + 1);
+    const int width     = 56;
+    const int dx        = (cover_bb.width() - width) / 2;
+
+    out_v_spacing = spacing;
+
+    return QRect(dx, spacing + margin, width, height).translated(cover_bb.topLeft());
 }
 
 void Gallery::drawDisplayCase(QPainter *p, int index, int row, int col) {
@@ -190,14 +215,15 @@ void Gallery::drawDisplayCase(QPainter *p, int index, int row, int col) {
     if (has_cover) {
         const auto &item = items_[index];
 
+        QPainterPath cover_path{};
+        cover_path.addRoundedRect(cover_bb, cover_radius, cover_radius);
+
+        p->save();
+        p->setClipPath(cover_path);
+
         p->drawPixmap(cover_bb, item.cover);
 
-        if (hover) {
-            background.setAlpha(100);
-            p->setPen(Qt::transparent);
-            p->setBrush(background);
-            p->drawRoundedRect(cover_bb, cover_radius, cover_radius);
-        }
+        p->restore();
 
         const auto title = fm.elidedText(item.title, Qt::ElideRight, title_bb.width());
         p->setPen(pal.color(QPalette::WindowText));
@@ -235,6 +261,53 @@ void Gallery::drawDisplayCase(QPainter *p, int index, int row, int col) {
         p->fillPath(path, foreground);
     }
 
+    if (hover && index != -1) { drawDisplayCaseMenu(p, index, cover_bb); }
+
+    p->restore();
+}
+
+void Gallery::drawDisplayCaseMenu(QPainter *p, int index, const QRect &cover_bb) {
+    Q_ASSERT(hover_index_ == index);
+
+    const auto &pal = palette();
+
+    p->save();
+
+    auto background = pal.color(QPalette::Window);
+    background.setAlpha(100);
+
+    const auto fm           = fontMetrics();
+    const int  cover_radius = 8;
+
+    p->setPen(Qt::transparent);
+    p->setBrush(background);
+    p->drawRoundedRect(cover_bb, cover_radius, cover_radius);
+
+    auto btn_normal = pal.color(QPalette::Text);
+    auto btn_hover  = btn_normal;
+    btn_hover.setAlpha(128);
+
+    p->setBrush(btn_normal);
+
+    const int total_btn = 3;
+    int       spacing   = 0;
+    auto      bb        = getDisplayCaseMenuButtonRect(cover_bb, spacing);
+    const int stride    = bb.height() + spacing;
+
+    const QStringList btn_text{"打开", "编辑", "删除"};
+
+    for (int i = 0; i < total_btn; ++i) {
+        p->setPen(Qt::transparent);
+        if (hover_btn_index_ == i) { p->setBrush(btn_hover); }
+        p->drawRect(bb);
+        if (hover_btn_index_ == i) { p->setBrush(btn_normal); }
+
+        p->setPen(pal.color(QPalette::Base));
+        p->drawText(bb, Qt::AlignCenter, btn_text[i]);
+
+        bb.translate(0, stride);
+    }
+
     p->restore();
 }
 
@@ -259,7 +332,8 @@ void Gallery::leaveEvent(QEvent *event) {
 void Gallery::mouseMoveEvent(QMouseEvent *event) {
     QWidget::mouseMoveEvent(event);
 
-    hover_index_ = getItemIndex(event->pos());
+    hover_index_ = getItemIndex(event->pos(), &hover_btn_index_);
+
     update();
 }
 
@@ -268,15 +342,25 @@ void Gallery::mousePressEvent(QMouseEvent *event) {
 
     if (hover_index_ == -1) { return; }
 
+    if (hover_index_ == items_.size()) {
+        emit clicked(hover_index_);
+    } else if (hover_btn_index_ != -1) {
+        emit menuClicked(hover_index_, magic_enum::enum_value<MenuAction>(hover_btn_index_));
+    }
+}
+
+void Gallery::mouseDoubleClickEvent(QMouseEvent *event) {
+    QWidget::mouseDoubleClickEvent(event);
+
+    if (hover_index_ == -1) { return; }
+
     if (hover_index_ != items_.size()) { return; }
 
     emit clicked(hover_index_);
-
-    // addDisplayCaseItem();
 }
 
 void Gallery::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
 }
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

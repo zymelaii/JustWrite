@@ -5,7 +5,7 @@
 #include <QTimer>
 #include <QWidget>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 struct EditorPrivate;
 
@@ -115,4 +115,4 @@ private:
     Qt::CursorShape ui_cursor_shape_[2];
 };
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

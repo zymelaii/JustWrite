@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 
     setup_jwrite_profiler(10);
 
-    auto client = std::make_unique<jwrite::Ui::JustWrite>();
+    auto client = std::make_unique<jwrite::ui::JustWrite>();
     client->setGeometry(compute_preferred_geometry(screen_geo));
     client->show();
 

@@ -4,7 +4,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 class StatusBar : public QWidget {
     Q_OBJECT
@@ -30,4 +30,4 @@ private:
     QHBoxLayout *ui_layout_;
 };
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

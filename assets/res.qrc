@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/">
+        <file>res/default-cover.png</file>
         <file>res/icons/light/side-bar-line.png</file>
         <file>res/icons/light/book-2-line.png</file>
         <file>res/icons/light/folder-2-line.png</file>

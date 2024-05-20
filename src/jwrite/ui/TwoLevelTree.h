@@ -2,7 +2,7 @@
 
 #include <QWidget>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 class TwoLevelTree : public QWidget {
     Q_OBJECT
@@ -88,4 +88,4 @@ private:
     int ui_hover_on_;
 };
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

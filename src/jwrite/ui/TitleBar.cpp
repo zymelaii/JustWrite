@@ -1,7 +1,7 @@
 #include <jwrite/ui/TitleBar.h>
 #include <QPainter>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent) {
@@ -53,4 +53,4 @@ void TitleBar::resizeEvent(QResizeEvent *event) {
     update();
 }
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

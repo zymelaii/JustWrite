@@ -13,7 +13,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 class BookDirItemRenderProxy
     : public TwoLevelTree::ItemRenderProxy
@@ -223,14 +223,14 @@ void EditPage::setupUi() {
     auto splitter       = new QSplitter;
     ui_named_widgets.insert("sidebar.splitter", splitter);
 
-    ui_editor     = new jwrite::Ui::Editor;
-    ui_status_bar = new jwrite::Ui::StatusBar;
+    ui_editor     = new jwrite::ui::Editor;
+    ui_status_bar = new jwrite::ui::StatusBar;
 
     ui_sidebar         = new QWidget;
     ui_new_volume      = new FlatButton;
     ui_new_chapter     = new FlatButton;
     ui_export_to_local = new FlatButton;
-    ui_book_dir        = new jwrite::Ui::TwoLevelTree;
+    ui_book_dir        = new jwrite::ui::TwoLevelTree;
 
     auto btn_line        = new QWidget;
     auto btn_line_layout = new QHBoxLayout(btn_line);
@@ -415,4 +415,4 @@ bool EditPage::eventFilter(QObject *watched, QEvent *event) {
     return false;
 }
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

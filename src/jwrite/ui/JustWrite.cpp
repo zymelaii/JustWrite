@@ -7,8 +7,9 @@
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QPainter>
+#include <QFileDialog>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 JustWrite::JustWrite() {
     setupUi();
@@ -22,6 +23,15 @@ JustWrite::JustWrite() {
 JustWrite::~JustWrite() {
     jwrite_profiler_dump(QString("jwrite-profiler.%1.log")
                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
+}
+
+void JustWrite::updateBookInfo(int index, const jwrite::BookInfo &info) {
+    auto book_info = info;
+
+    if (book_info.author.isEmpty()) { book_info.author = "佚名"; }
+    if (book_info.title.isEmpty()) { book_info.title = QString("未命名书籍-%1").arg(index + 1); }
+
+    ui_gallery_->updateDisplayCaseItem(index, book_info.title, book_info.cover_url);
 }
 
 void JustWrite::setTheme(Theme theme) {
@@ -71,14 +81,14 @@ void JustWrite::setupUi() {
     auto container      = new QWidget;
     ui_top_most_layout_ = new QStackedLayout(container);
 
-    ui_title_bar_ = new jwrite::Ui::TitleBar;
+    ui_title_bar_ = new jwrite::ui::TitleBar;
 
     top_layout->addWidget(ui_title_bar_);
     top_layout->addWidget(container);
 
     ui_page_stack_  = new QStackedWidget;
-    ui_gallery_     = new jwrite::Ui::Gallery;
-    ui_edit_page_   = new jwrite::Ui::EditPage;
+    ui_gallery_     = new jwrite::ui::Gallery;
+    ui_edit_page_   = new jwrite::ui::EditPage;
     ui_popup_layer_ = new jwrite::ui::FloatingDialog;
 
     auto gallery_page = new jwrite::ui::ScrollArea;
@@ -109,11 +119,64 @@ void JustWrite::setupUi() {
 }
 
 void JustWrite::setupConnections() {
-    connect(ui_gallery_, &jwrite::Ui::Gallery::clicked, this, [this](int index) {
-        qDebug() << "called on" << index << "total items" << ui_gallery_->totalItems();
-        if (index != ui_gallery_->totalItems()) { return; }
-        showPopupLayer(new jwrite::ui::BookInfoEdit);
+    using GalleryMenuAction = jwrite::ui::Gallery::MenuAction;
+
+    connect(ui_gallery_, &jwrite::ui::Gallery::clicked, this, [this](int index) {
+        if (index == ui_gallery_->totalItems()) { requestUpdateBookInfo(index); }
     });
+    connect(
+        ui_gallery_,
+        &jwrite::ui::Gallery::menuClicked,
+        this,
+        [this](int index, GalleryMenuAction action) {
+            //! TODO: ...
+        });
+}
+
+void JustWrite::requestUpdateBookInfo(int index) {
+    Q_ASSERT(index >= 0 && index <= ui_gallery_->totalItems());
+    const bool on_insert = index == ui_gallery_->totalItems();
+
+    auto info = on_insert ? jwrite::BookInfo{} : ui_gallery_->bookInfoAt(index);
+    if (info.author.isEmpty()) { info.author = "佚名"; }
+    if (info.title.isEmpty()) { info.title = QString("未命名书籍-%1").arg(index + 1); }
+
+    auto edit = new jwrite::ui::BookInfoEdit;
+    edit->setBookInfo(info);
+
+    showPopupLayer(edit);
+
+    connect(
+        edit,
+        &jwrite::ui::BookInfoEdit::submitRequested,
+        this,
+        [this, index](jwrite::BookInfo info) {
+            updateBookInfo(index, info);
+            closePopupLayer();
+        });
+    connect(edit, &jwrite::ui::BookInfoEdit::cancelRequested, this, &JustWrite::closePopupLayer);
+    connect(edit, &jwrite::ui::BookInfoEdit::changeCoverRequested, this, [this, edit] {
+        QImage     image;
+        const auto path = requestImagePath(true, &image);
+        if (path.isEmpty()) { return; }
+        edit->setCover(path);
+    });
+}
+
+QString JustWrite::requestImagePath(bool validate, QImage *out_image) {
+    const auto filter = "图片 (*.bmp *.jpg *.jpeg *.png)";
+    auto       path   = QFileDialog::getOpenFileName(this, "选择封面", "", filter);
+
+    if (path.isEmpty()) { return ""; }
+
+    if (!validate) { return path; }
+
+    QImage image(path);
+    if (image.isNull()) { return ""; }
+
+    if (out_image) { *out_image = std::move(image); }
+
+    return path;
 }
 
 void JustWrite::showPopupLayer(QWidget *widget) {
@@ -135,4 +198,4 @@ void JustWrite::switchToPage(PageType page) {
     }
 }
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

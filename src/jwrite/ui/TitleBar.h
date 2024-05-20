@@ -2,7 +2,7 @@
 
 #include <QWidget>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 class TitleBar : public QWidget {
     Q_OBJECT
@@ -29,4 +29,4 @@ private:
     QString title_;
 };
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

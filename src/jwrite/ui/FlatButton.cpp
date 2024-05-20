@@ -1,7 +1,7 @@
 #include <jwrite/ui/FlatButton.h>
 #include <QPainter>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 FlatButton::FlatButton(QWidget *parent)
     : QWidget(parent)
@@ -83,4 +83,4 @@ void FlatButton::mouseReleaseEvent(QMouseEvent *e) {
     emit pressed();
 }
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

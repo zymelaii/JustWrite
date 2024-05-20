@@ -3,7 +3,7 @@
 #include <QPainter>
 #include <QMouseEvent>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 TwoLevelTree::TwoLevelTree(QWidget *parent)
     : QWidget(parent)
@@ -247,4 +247,4 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
     }
 }
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

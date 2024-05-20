@@ -1,6 +1,6 @@
 #include <jwrite/ui/StatusBar.h>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 StatusBar::StatusBar(QWidget *parent)
     : QWidget(parent)
@@ -49,4 +49,4 @@ void StatusBar::setSpacing(int spacing) {
     ui_layout_->setSpacing(spacing);
 }
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

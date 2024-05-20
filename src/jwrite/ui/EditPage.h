@@ -13,7 +13,7 @@
 #include <QLabel>
 #include <QAction>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 class EditPage : public QWidget {
     Q_OBJECT
@@ -63,16 +63,16 @@ private:
     QString                                   book_name_;
     QString                                   author_;
 
-    jwrite::Ui::Editor       *ui_editor;
-    jwrite::Ui::StatusBar    *ui_status_bar;
-    jwrite::Ui::FlatButton   *ui_new_volume;
-    jwrite::Ui::FlatButton   *ui_new_chapter;
-    jwrite::Ui::FlatButton   *ui_export_to_local;
-    jwrite::Ui::TwoLevelTree *ui_book_dir;
+    jwrite::ui::Editor       *ui_editor;
+    jwrite::ui::StatusBar    *ui_status_bar;
+    jwrite::ui::FlatButton   *ui_new_volume;
+    jwrite::ui::FlatButton   *ui_new_chapter;
+    jwrite::ui::FlatButton   *ui_export_to_local;
+    jwrite::ui::TwoLevelTree *ui_book_dir;
     QLabel                   *ui_total_words;
     QLabel                   *ui_datetime;
     QWidget                  *ui_sidebar;
     QMap<QString, QWidget *>  ui_named_widgets;
 };
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

@@ -19,7 +19,7 @@
 #include <QMap>
 #include <magic_enum.hpp>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 Editor::Editor(QWidget *parent)
     : QWidget(parent) {
@@ -1067,4 +1067,4 @@ void Editor::dropEvent(QDropEvent *e) {
     //! TODO: filter plain text files and handle open action
 }
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui

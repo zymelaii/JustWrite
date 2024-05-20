@@ -2,7 +2,7 @@
 
 #include <QWidget>
 
-namespace jwrite::Ui {
+namespace jwrite::ui {
 
 class FlatButton : public QWidget {
     Q_OBJECT
@@ -53,4 +53,4 @@ private:
     bool          ui_mouse_entered_;
 };
 
-} // namespace jwrite::Ui
+} // namespace jwrite::ui
