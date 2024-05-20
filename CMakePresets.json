@@ -2,7 +2,7 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "ninja-base-debug",
+      "name": "ninja-base",
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
