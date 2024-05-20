@@ -13,7 +13,7 @@ ScrollArea::ScrollArea(QWidget *parent)
     setWidgetResizable(true);
 
     setHorizontalScrollBarPolicy(Qt::ScrollBarPolicy::ScrollBarAlwaysOff);
-    setVerticalScrollBar(new jwrite::ui::ScrollBar(this));
+    setVerticalScrollBar(new ScrollBar(this));
 }
 
 } // namespace jwrite::ui

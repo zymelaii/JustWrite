@@ -89,8 +89,8 @@ protected:
     void dropEvent(QDropEvent *e) override;
 
 private:
-    VisualTextEditContext           *context_;
-    jwrite::TextInputCommandManager *input_manager_;
+    VisualTextEditContext   *context_;
+    TextInputCommandManager *input_manager_;
 
     int    min_text_line_chars_;
     bool   soft_center_mode_;

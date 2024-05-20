@@ -35,7 +35,7 @@ void BookInfoEdit::setCover(const QString &cover_url) {
     book_info_.cover_url = cover_url;
 }
 
-void BookInfoEdit::setBookInfo(const jwrite::BookInfo &info) {
+void BookInfoEdit::setBookInfo(const BookInfo &info) {
     setTitle(info.title);
     setAuthor(info.author);
     setCover(info.cover_url);

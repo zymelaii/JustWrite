@@ -15,6 +15,8 @@
 
 namespace jwrite::ui {
 
+using epub::EpubBuilder;
+
 class BookDirItemRenderProxy
     : public TwoLevelTree::ItemRenderProxy
     , public QObject {
@@ -226,8 +228,8 @@ void EditPage::exportToLocal(const QString &path, ExportType type) {
             const auto &title  = book_manager_->info.title;
             const auto &author = book_manager_->info.author;
 
-            jwrite::epub::EpubBuilder builder(path);
-            const int                 total_volumes = book_manager_->get_volumes().size();
+            EpubBuilder builder(path);
+            const int   total_volumes = book_manager_->get_volumes().size();
             for (int i = 0; i < total_volumes; ++i) {
                 const int vid = book_manager_->get_volumes()[i];
                 builder.with_volume(
@@ -262,14 +264,14 @@ void EditPage::setupUi() {
     auto splitter       = new QSplitter;
     ui_named_widgets.insert("sidebar.splitter", splitter);
 
-    ui_editor     = new jwrite::ui::Editor;
-    ui_status_bar = new jwrite::ui::StatusBar;
+    ui_editor     = new Editor;
+    ui_status_bar = new StatusBar;
 
     ui_sidebar         = new QWidget;
     ui_new_volume      = new FlatButton;
     ui_new_chapter     = new FlatButton;
     ui_export_to_local = new FlatButton;
-    ui_book_dir        = new jwrite::ui::TwoLevelTree;
+    ui_book_dir        = new TwoLevelTree;
 
     auto btn_line        = new QWidget;
     auto btn_line_layout = new QHBoxLayout(btn_line);

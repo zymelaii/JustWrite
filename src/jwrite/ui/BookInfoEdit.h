@@ -19,10 +19,10 @@ public:
     void setTitle(const QString &title);
     void setAuthor(const QString &author);
     void setCover(const QString &cover_url);
-    void setBookInfo(const jwrite::BookInfo &info);
+    void setBookInfo(const BookInfo &info);
 
 signals:
-    void submitRequested(jwrite::BookInfo info);
+    void submitRequested(BookInfo info);
     void cancelRequested();
     void changeCoverRequested();
 
@@ -33,7 +33,7 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
-    jwrite::BookInfo book_info_;
+    BookInfo book_info_;
 
     QtMaterialTextField    *ui_title_edit_;
     QtMaterialTextField    *ui_author_edit_;

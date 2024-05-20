@@ -44,7 +44,7 @@ Editor::Editor(QWidget *parent)
     setSoftCenterMode(true);
 
     const auto text_area = textArea();
-    context_             = new jwrite::VisualTextEditContext(fontMetrics(), text_area.width());
+    context_             = new VisualTextEditContext(fontMetrics(), text_area.width());
     context_->resize_viewport(context_->viewport_width, text_area.height());
 
     update_requested_ = false;
@@ -54,7 +54,7 @@ Editor::Editor(QWidget *parent)
     blink_timer_.setInterval(500);
     blink_timer_.setSingleShot(false);
 
-    input_manager_ = new jwrite::GeneralTextInputCommandManager(context_->engine);
+    input_manager_ = new GeneralTextInputCommandManager(context_->engine);
     input_manager_->load_default();
 
     scrollToStart();

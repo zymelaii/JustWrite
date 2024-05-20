@@ -114,17 +114,17 @@ void JustWrite::setupUi() {
     auto container      = new QWidget;
     ui_top_most_layout_ = new QStackedLayout(container);
 
-    ui_title_bar_ = new jwrite::ui::TitleBar;
+    ui_title_bar_ = new TitleBar;
 
     top_layout->addWidget(ui_title_bar_);
     top_layout->addWidget(container);
 
     ui_page_stack_  = new QStackedWidget;
-    ui_gallery_     = new jwrite::ui::Gallery;
-    ui_edit_page_   = new jwrite::ui::EditPage;
-    ui_popup_layer_ = new jwrite::ui::FloatingDialog;
+    ui_gallery_     = new Gallery;
+    ui_edit_page_   = new EditPage;
+    ui_popup_layer_ = new FloatingDialog;
 
-    auto gallery_page = new jwrite::ui::ScrollArea;
+    auto gallery_page = new ScrollArea;
     gallery_page->setWidget(ui_gallery_);
 
     ui_page_stack_->addWidget(gallery_page);
@@ -152,35 +152,31 @@ void JustWrite::setupUi() {
 }
 
 void JustWrite::setupConnections() {
-    connect(ui_gallery_, &jwrite::ui::Gallery::clicked, this, [this](int index) {
+    connect(ui_gallery_, &Gallery::clicked, this, [this](int index) {
         if (index == ui_gallery_->totalItems()) { requestUpdateBookInfo(index); }
     });
-    connect(ui_gallery_, &jwrite::ui::Gallery::menuClicked, this, &JustWrite::requestBookAction);
+    connect(ui_gallery_, &Gallery::menuClicked, this, &JustWrite::requestBookAction);
 }
 
 void JustWrite::requestUpdateBookInfo(int index) {
     Q_ASSERT(index >= 0 && index <= ui_gallery_->totalItems());
     const bool on_insert = index == ui_gallery_->totalItems();
 
-    auto info = on_insert ? jwrite::BookInfo{} : ui_gallery_->bookInfoAt(index);
+    auto info = on_insert ? BookInfo{} : ui_gallery_->bookInfoAt(index);
     if (info.author.isEmpty()) { info.author = getLikelyAuthor(); }
     if (info.title.isEmpty()) { info.title = QString("未命名书籍-%1").arg(index + 1); }
 
-    auto edit = new jwrite::ui::BookInfoEdit;
+    auto edit = new BookInfoEdit;
     edit->setBookInfo(info);
 
     showPopupLayer(edit);
 
-    connect(
-        edit,
-        &jwrite::ui::BookInfoEdit::submitRequested,
-        this,
-        [this, index](jwrite::BookInfo info) {
-            updateBookInfo(index, info);
-            closePopupLayer();
-        });
-    connect(edit, &jwrite::ui::BookInfoEdit::cancelRequested, this, &JustWrite::closePopupLayer);
-    connect(edit, &jwrite::ui::BookInfoEdit::changeCoverRequested, this, [this, edit] {
+    connect(edit, &BookInfoEdit::submitRequested, this, [this, index](BookInfo info) {
+        updateBookInfo(index, info);
+        closePopupLayer();
+    });
+    connect(edit, &BookInfoEdit::cancelRequested, this, &JustWrite::closePopupLayer);
+    connect(edit, &BookInfoEdit::changeCoverRequested, this, [this, edit] {
         QImage     image;
         const auto path = requestImagePath(true, &image);
         if (path.isEmpty()) { return; }
@@ -204,7 +200,7 @@ QString JustWrite::requestImagePath(bool validate, QImage *out_image) {
     return path;
 }
 
-void JustWrite::requestBookAction(int index, jwrite::ui::Gallery::MenuAction action) {
+void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
     Q_ASSERT(index != ui_gallery_->totalItems());
     switch (action) {
         case Gallery::Open: {

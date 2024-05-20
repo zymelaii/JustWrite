@@ -31,7 +31,7 @@ QRect ScrollBarProxyStyle::subControlRect(
 
 ScrollBar::ScrollBar(QWidget *parent)
     : QScrollBar(Qt::Vertical, parent) {
-    setStyle(new jwrite::ui::ScrollBarProxyStyle(style()));
+    setStyle(new ScrollBarProxyStyle(style()));
 }
 
 void ScrollBar::paintEvent(QPaintEvent *event) {

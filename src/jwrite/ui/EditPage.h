@@ -57,25 +57,25 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
-    jwrite::GlobalCommandManager              command_manager_;
-    jwrite::MessyInputWorker                 *messy_input_;
-    jwrite::BookManager                      *book_manager_;
+    GlobalCommandManager                      command_manager_;
+    MessyInputWorker                         *messy_input_;
+    BookManager                              *book_manager_;
     QTimer                                    sec_timer_;
     int                                       current_cid_;
     QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;
     int                                       chap_words_;
     int                                       total_words_;
 
-    jwrite::ui::Editor       *ui_editor;
-    jwrite::ui::StatusBar    *ui_status_bar;
-    jwrite::ui::FlatButton   *ui_new_volume;
-    jwrite::ui::FlatButton   *ui_new_chapter;
-    jwrite::ui::FlatButton   *ui_export_to_local;
-    jwrite::ui::TwoLevelTree *ui_book_dir;
-    QLabel                   *ui_total_words;
-    QLabel                   *ui_datetime;
-    QWidget                  *ui_sidebar;
-    QMap<QString, QWidget *>  ui_named_widgets;
+    Editor                  *ui_editor;
+    StatusBar               *ui_status_bar;
+    FlatButton              *ui_new_volume;
+    FlatButton              *ui_new_chapter;
+    FlatButton              *ui_export_to_local;
+    TwoLevelTree            *ui_book_dir;
+    QLabel                  *ui_total_words;
+    QLabel                  *ui_datetime;
+    QWidget                 *ui_sidebar;
+    QMap<QString, QWidget *> ui_named_widgets;
 };
 
 } // namespace jwrite::ui

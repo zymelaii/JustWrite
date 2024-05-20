@@ -33,7 +33,7 @@ public:
 
 public:
     void setTheme(Theme theme);
-    void updateBookInfo(int index, const jwrite::BookInfo &info);
+    void updateBookInfo(int index, const BookInfo &info);
 
 protected:
     QString getLikelyAuthor() const;
@@ -44,7 +44,7 @@ protected:
     void    setupConnections();
     void    requestUpdateBookInfo(int index);
     QString requestImagePath(bool validate, QImage *out_image);
-    void    requestBookAction(int index, jwrite::ui::Gallery::MenuAction action);
+    void    requestBookAction(int index, Gallery::MenuAction action);
 
     void showPopupLayer(QWidget *widget);
     void closePopupLayer();
@@ -56,13 +56,13 @@ private:
     QMap<int, BookManager *>  books_;
     QString                   likely_author_;
 
-    jwrite::ui::TitleBar       *ui_title_bar_;
-    jwrite::ui::Gallery        *ui_gallery_;
-    jwrite::ui::EditPage       *ui_edit_page_;
-    jwrite::ui::FloatingDialog *ui_popup_layer_;
-    QStackedWidget             *ui_page_stack_;
-    QStackedLayout             *ui_top_most_layout_;
-    QWK::WidgetWindowAgent     *ui_agent_;
+    TitleBar               *ui_title_bar_;
+    Gallery                *ui_gallery_;
+    EditPage               *ui_edit_page_;
+    FloatingDialog         *ui_popup_layer_;
+    QStackedWidget         *ui_page_stack_;
+    QStackedLayout         *ui_top_most_layout_;
+    QWK::WidgetWindowAgent *ui_agent_;
 };
 
 } // namespace jwrite::ui
