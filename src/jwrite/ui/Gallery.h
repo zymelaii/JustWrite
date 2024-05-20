@@ -26,6 +26,7 @@ signals:
     void menuClicked(int index, MenuAction action);
 
 public:
+    void removeDisplayCase(int index);
     void updateDisplayCaseItem(int index, const QString &title, const QString &cover_url);
     void updateColorTheme(const ColorTheme &color_theme);
 
@@ -34,6 +35,7 @@ public:
     }
 
     jwrite::BookInfo bookInfoAt(int index) const {
+        //! TODO: record book id
         Q_ASSERT(index >= 0 && index < items_.size());
         const auto &item = items_[index];
         return {
@@ -55,6 +57,7 @@ public:
 
 protected:
     void  setupUi();
+    void  resetHoverState();
     int   getTitleHeight() const;
     int   getTitleOffset() const;
     QRect getItemRect(int row, int col) const;

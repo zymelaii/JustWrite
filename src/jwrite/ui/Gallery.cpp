@@ -21,6 +21,15 @@ Gallery::Gallery(QWidget *parent)
 
 Gallery::~Gallery() {}
 
+void Gallery::removeDisplayCase(int index) {
+    if (!(index >= 0 && index < items_.size())) { return; }
+
+    items_.remove(index);
+    updateGeometry();
+
+    resetHoverState();
+}
+
 void Gallery::updateDisplayCaseItem(int index, const QString &title, const QString &cover_url) {
     Q_ASSERT(index >= 0 && index <= items_.size());
     const bool on_insert = index == items_.size();
@@ -97,6 +106,12 @@ void Gallery::setupUi() {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::MinimumExpanding);
     setBackgroundRole(QPalette::Base);
     setAutoFillBackground(true);
+}
+
+void Gallery::resetHoverState() {
+    hover_index_     = -1;
+    hover_btn_index_ = -1;
+    update();
 }
 
 int Gallery::getTitleHeight() const {
@@ -325,8 +340,7 @@ void Gallery::paintEvent(QPaintEvent *event) {
 void Gallery::leaveEvent(QEvent *event) {
     QWidget::leaveEvent(event);
 
-    hover_index_ = -1;
-    update();
+    resetHoverState();
 }
 
 void Gallery::mouseMoveEvent(QMouseEvent *event) {
@@ -361,6 +375,8 @@ void Gallery::mouseDoubleClickEvent(QMouseEvent *event) {
 
 void Gallery::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
+
+    resetHoverState();
 }
 
 } // namespace jwrite::ui

@@ -1,13 +1,15 @@
 #pragma once
 
-#include "Editor.h"
-#include "StatusBar.h"
-#include "FlatButton.h"
-#include "TwoLevelTree.h"
-#include "../MessyInput.h"
-#include "../VisualTextEditContext.h"
-#include "../GlobalCommand.h"
-#include "../ColorTheme.h"
+#include <jwrite/ui/Editor.h>
+#include <jwrite/ui/StatusBar.h>
+#include <jwrite/ui/FlatButton.h>
+#include <jwrite/ui/TwoLevelTree.h>
+#include <jwrite/MessyInput.h>
+#include <jwrite/VisualTextEditContext.h>
+#include <jwrite/GlobalCommand.h>
+#include <jwrite/ColorTheme.h>
+#include <jwrite/BookInfo.h>
+#include <jwrite/BookManager.h>
 #include <QWidget>
 #include <QTimer>
 #include <QLabel>
@@ -31,7 +33,8 @@ public:
 public:
     void updateColorTheme(const ColorTheme &color_theme);
 
-    void setCurrentBookInfo(const QString &name, const QString &author);
+    BookManager *resetBookSource(BookManager *book_manager);
+    BookManager *takeBookSource();
 
     int  addVolume(int index, const QString &title);
     int  addChapter(int volume_index, const QString &title);
@@ -47,6 +50,8 @@ protected:
     void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
     void requestExportToLocal();
     void updateWordsCount(const QString &text);
+    void flushWordsCount();
+    void syncWordsStatus();
     void createAndOpenNewChapter();
 
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -54,14 +59,12 @@ protected:
 private:
     jwrite::GlobalCommandManager              command_manager_;
     jwrite::MessyInputWorker                 *messy_input_;
+    jwrite::BookManager                      *book_manager_;
     QTimer                                    sec_timer_;
     int                                       current_cid_;
-    QMap<int, QString>                        chapters_;
     QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;
     int                                       chap_words_;
     int                                       total_words_;
-    QString                                   book_name_;
-    QString                                   author_;
 
     jwrite::ui::Editor       *ui_editor;
     jwrite::ui::StatusBar    *ui_status_bar;

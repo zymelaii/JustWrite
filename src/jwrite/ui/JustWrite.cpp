@@ -8,8 +8,23 @@
 #include <QDateTime>
 #include <QPainter>
 #include <QFileDialog>
+#include <QMessageBox>
 
 namespace jwrite::ui {
+
+class InMemoryBookManager : public BookManager {
+public:
+    QString get_chapter(int cid) override {
+        return chapters_.value(cid, "");
+    }
+
+    void write_chapter(int cid, const QString &text) override {
+        chapters_[cid] = text;
+    }
+
+private:
+    QMap<int, QString> chapters_;
+};
 
 JustWrite::JustWrite() {
     setupUi();
@@ -21,6 +36,9 @@ JustWrite::JustWrite() {
 }
 
 JustWrite::~JustWrite() {
+    for (auto book : books_) { delete book; }
+    books_.clear();
+
     jwrite_profiler_dump(QString("jwrite-profiler.%1.log")
                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
 }
@@ -119,18 +137,10 @@ void JustWrite::setupUi() {
 }
 
 void JustWrite::setupConnections() {
-    using GalleryMenuAction = jwrite::ui::Gallery::MenuAction;
-
     connect(ui_gallery_, &jwrite::ui::Gallery::clicked, this, [this](int index) {
         if (index == ui_gallery_->totalItems()) { requestUpdateBookInfo(index); }
     });
-    connect(
-        ui_gallery_,
-        &jwrite::ui::Gallery::menuClicked,
-        this,
-        [this](int index, GalleryMenuAction action) {
-            //! TODO: ...
-        });
+    connect(ui_gallery_, &jwrite::ui::Gallery::menuClicked, this, &JustWrite::requestBookAction);
 }
 
 void JustWrite::requestUpdateBookInfo(int index) {
@@ -177,6 +187,28 @@ QString JustWrite::requestImagePath(bool validate, QImage *out_image) {
     if (out_image) { *out_image = std::move(image); }
 
     return path;
+}
+
+void JustWrite::requestBookAction(int index, jwrite::ui::Gallery::MenuAction action) {
+    Q_ASSERT(index != ui_gallery_->totalItems());
+    switch (action) {
+        case Gallery::Open: {
+            auto book     = new InMemoryBookManager;
+            book->book_id = books_.size();
+            book->info    = ui_gallery_->bookInfoAt(index);
+            books_.insert(book->book_id, book);
+            ui_edit_page_->resetBookSource(book);
+            switchToPage(PageType::Edit);
+        } break;
+        case Gallery::Edit: {
+            requestUpdateBookInfo(index);
+        } break;
+        case Gallery::Delete: {
+            const auto result =
+                QMessageBox::information(this, "删除书籍", "是否确认删除？", QMessageBox::Yes);
+            if (result == QMessageBox::Apply) { ui_gallery_->removeDisplayCase(index); }
+        } break;
+    }
 }
 
 void JustWrite::showPopupLayer(QWidget *widget) {

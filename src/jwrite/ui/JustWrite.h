@@ -4,6 +4,7 @@
 #include <jwrite/ui/EditPage.h>
 #include <jwrite/ui/Gallery.h>
 #include <jwrite/ui/FloatingDialog.h>
+#include <jwrite/BookManager.h>
 #include <QWidget>
 #include <QStackedWidget>
 #include <QStackedLayout>
@@ -39,6 +40,7 @@ protected:
     void    setupConnections();
     void    requestUpdateBookInfo(int index);
     QString requestImagePath(bool validate, QImage *out_image);
+    void    requestBookAction(int index, jwrite::ui::Gallery::MenuAction action);
 
     void showPopupLayer(QWidget *widget);
     void closePopupLayer();
@@ -47,6 +49,7 @@ protected:
 
 private:
     QMap<PageType, QWidget *> page_map_;
+    QMap<int, BookManager *>  books_;
 
     jwrite::ui::TitleBar       *ui_title_bar_;
     jwrite::ui::Gallery        *ui_gallery_;
