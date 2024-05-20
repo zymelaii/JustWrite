@@ -270,7 +270,9 @@ void Gallery::mousePressEvent(QMouseEvent *event) {
 
     if (hover_index_ != items_.size()) { return; }
 
-    addDisplayCaseItem();
+    emit clicked(hover_index_);
+
+    // addDisplayCaseItem();
 }
 
 void Gallery::resizeEvent(QResizeEvent *event) {

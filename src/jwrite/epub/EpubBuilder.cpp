@@ -1,5 +1,5 @@
 #include "EpubBuilder.h"
-#include "../minizip/zip.h"
+#include <minizip/zip.h>
 #include <QDir>
 #include <QStack>
 

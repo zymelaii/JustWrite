@@ -29,8 +29,9 @@ set(CMAKE_AUTORCC ON)
 
 option(JWRITE_BUILD_TESTS "Build the unittests" ON)
 
-find_package(QT NAMES Qt6 COMPONENTS Core Gui Widgets REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Core Gui Widgets REQUIRED)
+set(QT_DEPENDENCY Core Gui Widgets StateMachine)
+find_package(QT NAMES Qt6 COMPONENTS ${QT_DEPENDENCY} REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_DEPENDENCY} REQUIRED)
 
 find_package(magic_enum QUIET)
 if(NOT magic_enum_FOUND)
@@ -74,7 +75,6 @@ endif()
 
 install(
 	TARGETS ${INSTALL_TARGETS}
-	LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}
 	RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
 
@@ -82,3 +82,26 @@ install(
     DIRECTORY ${CMAKE_SOURCE_DIR}/assets/fonts
     DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
+
+if(WIN32)
+    add_custom_target(
+        install-runtime-deps
+        COMMAND cmake -E copy $<TARGET_FILE:zlib> ${CMAKE_INSTALL_PREFIX}
+        COMMENT "Install runtime dependencies..."
+        DEPENDS zlib install
+    )
+    add_custom_target(
+        deploy
+        COMMAND windeployqt ${CMAKE_INSTALL_PREFIX}/$<TARGET_FILE_NAME:${CMAKE_PROJECT_NAME}>
+            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:--debug>
+            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Release>:--release>
+        COMMENT "Deploy the application..."
+        DEPENDS install-runtime-deps
+    )
+else()
+    add_custom_target(
+        deploy
+        COMMENT "Deploy the application..."
+        DEPENDS install
+    )
+endif()

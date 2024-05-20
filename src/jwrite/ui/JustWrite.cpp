@@ -1,20 +1,19 @@
 #include <jwrite/ui/JustWrite.h>
+#include <jwrite/ui/ScrollArea.h>
+#include <jwrite/ui/BookInfoEdit.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/ProfileUtils.h>
-#include <jwrite/ui/ScrollArea.h>
 #include <QVBoxLayout>
-#include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QPainter>
-#include <QMessageBox>
-#include <QScrollArea>
 
 namespace jwrite::Ui {
 
-JustWrite::JustWrite(QWidget *parent)
-    : QWidget(parent) {
+JustWrite::JustWrite() {
     setupUi();
+    setupConnections();
+    closePopupLayer();
 
     switchToPage(PageType::Gallery);
     setTheme(Theme::Dark);
@@ -63,57 +62,77 @@ void JustWrite::setTheme(Theme theme) {
     pal.setColor(QPalette::ButtonText, color_theme.WindowText);
     setPalette(pal);
 
-    ui_gallery->updateColorTheme(color_theme);
-    ui_edit_page->updateColorTheme(color_theme);
+    ui_gallery_->updateColorTheme(color_theme);
+    ui_edit_page_->updateColorTheme(color_theme);
 }
 
 void JustWrite::setupUi() {
-    auto top_layout    = new QVBoxLayout(this);
-    auto container     = new QWidget;
-    ui_top_most_layout = new QStackedLayout(container);
+    auto top_layout     = new QVBoxLayout(this);
+    auto container      = new QWidget;
+    ui_top_most_layout_ = new QStackedLayout(container);
 
-    ui_title_bar = new jwrite::Ui::TitleBar;
+    ui_title_bar_ = new jwrite::Ui::TitleBar;
 
-    top_layout->addWidget(ui_title_bar);
+    top_layout->addWidget(ui_title_bar_);
     top_layout->addWidget(container);
 
-    ui_page_stack  = new QStackedWidget;
-    ui_gallery     = new jwrite::Ui::Gallery;
-    ui_edit_page   = new jwrite::Ui::EditPage;
-    ui_popup_layer = new QWidget;
+    ui_page_stack_  = new QStackedWidget;
+    ui_gallery_     = new jwrite::Ui::Gallery;
+    ui_edit_page_   = new jwrite::Ui::EditPage;
+    ui_popup_layer_ = new jwrite::ui::FloatingDialog;
 
     auto gallery_page = new jwrite::ui::ScrollArea;
-    gallery_page->setWidget(ui_gallery);
+    gallery_page->setWidget(ui_gallery_);
 
-    ui_page_stack->addWidget(gallery_page);
-    ui_page_stack->addWidget(ui_edit_page);
+    ui_page_stack_->addWidget(gallery_page);
+    ui_page_stack_->addWidget(ui_edit_page_);
 
-    ui_top_most_layout->addWidget(ui_page_stack);
-    ui_top_most_layout->addWidget(ui_popup_layer);
+    ui_top_most_layout_->addWidget(ui_page_stack_);
+    ui_top_most_layout_->addWidget(ui_popup_layer_);
 
-    ui_agent = new QWK::WidgetWindowAgent(this);
-    ui_agent->setup(this);
-    ui_agent->setTitleBar(ui_title_bar);
+    ui_agent_ = new QWK::WidgetWindowAgent(this);
+    ui_agent_->setup(this);
+    ui_agent_->setTitleBar(ui_title_bar_);
 
     top_layout->setContentsMargins({});
     top_layout->setSpacing(0);
 
     container->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 
-    ui_top_most_layout->setStackingMode(QStackedLayout::StackAll);
+    ui_top_most_layout_->setStackingMode(QStackedLayout::StackAll);
+    ui_top_most_layout_->setCurrentWidget(ui_popup_layer_);
 
     page_map_[PageType::Gallery] = gallery_page;
-    page_map_[PageType::Edit]    = ui_edit_page;
+    page_map_[PageType::Edit]    = ui_edit_page_;
 
-    ui_popup_layer->hide();
+    ui_title_bar_->setTitle("只写 丶 阐释你的梦");
+}
 
-    ui_title_bar->setTitle("只写 丶 阐释你的梦");
+void JustWrite::setupConnections() {
+    connect(ui_gallery_, &jwrite::Ui::Gallery::clicked, this, [this](int index) {
+        qDebug() << "called on" << index << "total items" << ui_gallery_->totalItems();
+        if (index != ui_gallery_->totalItems()) { return; }
+        showPopupLayer(new jwrite::ui::BookInfoEdit);
+    });
+}
+
+void JustWrite::showPopupLayer(QWidget *widget) {
+    ui_popup_layer_->setWidget(widget);
+    ui_popup_layer_->show();
+}
+
+void JustWrite::closePopupLayer() {
+    ui_popup_layer_->hide();
+    if (auto w = ui_popup_layer_->take()) { delete w; }
 }
 
 void JustWrite::switchToPage(PageType page) {
     Q_ASSERT(page_map_.contains(page));
     Q_ASSERT(page_map_.value(page, nullptr));
-    ui_page_stack->setCurrentWidget(page_map_[page]);
+    if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
+        closePopupLayer();
+        ui_page_stack_->setCurrentWidget(w);
+    }
 }
 
 } // namespace jwrite::Ui

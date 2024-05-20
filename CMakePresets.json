@@ -2,46 +2,49 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "ninja-base",
+      "name": "ninja-base-debug",
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
-      "installDir": "${sourceDir}/install/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}"
+    },
+    {
+      "name": "ninja-base-debug",
+      "hidden": true,
+      "inherits": "ninja-base",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "JWRITE_BUILD_TESTS": true
+      }
+    },
+    {
+      "name": "ninja-base-release",
+      "hidden": true,
+      "inherits": "ninja-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "JWRITE_BUILD_TESTS": false
       }
     },
     {
       "name": "windows-x64-debug",
       "displayName": "Windows x64 Debug",
-      "inherits": "ninja-base",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
+      "inherits": "ninja-base-debug"
     },
     {
       "name": "windows-x64-release",
       "displayName": "Windows x64 Release",
-      "inherits": "ninja-base",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+      "inherits": "ninja-base-release"
     },
     {
       "name": "linux-x64-debug",
       "displayName": "Linux x64 Debug",
-      "inherits": "ninja-base",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
+      "inherits": "ninja-base-debug"
     },
     {
       "name": "linux-x64-release",
       "displayName": "Linux x64 Release",
-      "inherits": "ninja-base",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+      "inherits": "ninja-base-release"
     }
   ]
 }

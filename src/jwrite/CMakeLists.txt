@@ -2,12 +2,10 @@ file(GLOB CORE_SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
 list(REMOVE_ITEM CORE_SOURCE_FILES App.cpp)
 
 aux_source_directory(ui UI_SOURCE_FILES)
-aux_source_directory(minizip MINIZIP_SOURCE_FILES)
 aux_source_directory(epub EPUB_SOURCE_FILES)
 
 set(SOURCE_FILES App.cpp)
 list(APPEND SOURCE_FILES ${UI_SOURCE_FILES})
-list(APPEND SOURCE_FILES ${MINIZIP_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${EPUB_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/res.qrc)
 
@@ -22,10 +20,11 @@ add_executable(${CMAKE_PROJECT_NAME} ${SOURCE_FILES})
 
 target_link_libraries(
 	${CMAKE_PROJECT_NAME}
+	PRIVATE qt-material
+	PRIVATE minizip
 	PRIVATE jwrite-core
 	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
 	PRIVATE QWindowKit::Widgets
-	PRIVATE zlib
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")

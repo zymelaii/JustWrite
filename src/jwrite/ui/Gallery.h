@@ -13,10 +13,17 @@ public:
     explicit Gallery(QWidget *parent = nullptr);
     ~Gallery();
 
+signals:
+    void clicked(int index);
+
 public:
     void addDisplayCaseItem();
     void updateDisplayCaseItem(int index, const QString &title, const QUrl &cover_url);
     void updateColorTheme(const ColorTheme &color_theme);
+
+    int totalItems() const {
+        return items_.size();
+    }
 
 public:
     QSize minimumSizeHint() const override;
