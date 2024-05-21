@@ -93,6 +93,7 @@ public:
 protected:
     void setupUi();
     void renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info);
+    void drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &item_info);
     int  totalVisibleItems() const;
 
     void paintEvent(QPaintEvent *event) override;

@@ -7,13 +7,16 @@ ScrollArea::ScrollArea(QWidget *parent)
     : QScrollArea(parent) {
     setFrameShape(QFrame::NoFrame);
 
-    setAutoFillBackground(true);
-    setBackgroundRole(QPalette::Base);
+    setHorizontalScrollBarPolicy(Qt::ScrollBarPolicy::ScrollBarAlwaysOff);
+    setVerticalScrollBar(new ScrollBar(this));
 
     setWidgetResizable(true);
 
-    setHorizontalScrollBarPolicy(Qt::ScrollBarPolicy::ScrollBarAlwaysOff);
-    setVerticalScrollBar(new ScrollBar(this));
+    setAutoFillBackground(false);
+}
+
+void ScrollArea::setEdgeOffset(int offset) {
+    static_cast<ScrollBar *>(verticalScrollBar())->setEdgeOffset(offset);
 }
 
 } // namespace jwrite::ui

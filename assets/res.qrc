@@ -1,6 +1,8 @@
 <RCC>
     <qresource prefix="/">
         <file>res/default-cover.png</file>
+        <file>res/icons/indicator/ellapse.svg</file>
+        <file>res/icons/indicator/expand.svg</file>
         <file>res/icons/system/minimize.svg</file>
         <file>res/icons/system/maximize.svg</file>
         <file>res/icons/system/close.svg</file>

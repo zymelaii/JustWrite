@@ -7,6 +7,9 @@ class ScrollArea : public QScrollArea {
 
 public:
     explicit ScrollArea(QWidget *parent = nullptr);
+
+public:
+    void setEdgeOffset(int offset);
 };
 
 } // namespace jwrite::ui

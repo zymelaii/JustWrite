@@ -3,6 +3,7 @@
 #include <jwrite/ui/BookInfoEdit.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/ProfileUtils.h>
+#include <QScrollBar>
 #include <QVBoxLayout>
 #include <QKeyEvent>
 #include <QDateTime>
@@ -110,6 +111,13 @@ void JustWrite::setTheme(Theme theme) {
     pal.setColor(QPalette::Button, color_theme.Window);
     pal.setColor(QPalette::ButtonText, color_theme.WindowText);
     setPalette(pal);
+
+    if (auto w = static_cast<QScrollArea *>(page_map_[PageType::Gallery])->verticalScrollBar()) {
+        auto pal = w->palette();
+        pal.setColor(w->backgroundRole(), color_theme.TextBase);
+        pal.setColor(w->foregroundRole(), color_theme.Window);
+        w->setPalette(pal);
+    }
 
     ui_gallery_->updateColorTheme(color_theme);
     ui_edit_page_->updateColorTheme(color_theme);
@@ -235,7 +243,7 @@ QString JustWrite::requestImagePath(bool validate, QImage *out_image) {
 }
 
 void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
-    Q_ASSERT(index != ui_gallery_->totalItems());
+    Q_ASSERT(index >= 0 && index < ui_gallery_->totalItems());
     switch (action) {
         case Gallery::Open: {
             requestStartEditBook(index);

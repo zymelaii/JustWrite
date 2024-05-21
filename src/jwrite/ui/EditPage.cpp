@@ -1,8 +1,11 @@
 #include <jwrite/ui/EditPage.h>
+#include <jwrite/ui/ScrollArea.h>
 #include <jwrite/TextInputCommand.h>
 #include <jwrite/ProfileUtils.h>
 #include <jwrite/epub/EpubBuilder.h>
 #include <QVBoxLayout>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QSplitter>
@@ -174,6 +177,14 @@ void EditPage::updateColorTheme(const ColorTheme &color_theme) {
     if (auto w = ui_named_widgets.value("sidebar.sep-line")) {
         auto pal = w->palette();
         pal.setColor(QPalette::WindowText, color_theme.Border);
+        w->setPalette(pal);
+    }
+
+    if (auto w = static_cast<QScrollArea *>(ui_named_widgets.value("sidebar.book-dir-container"))
+                     ->verticalScrollBar()) {
+        auto pal = w->palette();
+        pal.setColor(w->backgroundRole(), color_theme.Panel);
+        pal.setColor(w->foregroundRole(), color_theme.Window);
         w->setPalette(pal);
     }
 
@@ -384,11 +395,15 @@ void EditPage::setupUi() {
     sep_line->setFrameShape(QFrame::HLine);
     ui_named_widgets.insert("sidebar.sep-line", sep_line);
 
+    auto book_dir_container = new ScrollArea;
+    book_dir_container->setWidget(ui_book_dir);
+    ui_named_widgets.insert("sidebar.book-dir-container", book_dir_container);
+
     auto sidebar_layout = new QVBoxLayout(ui_sidebar);
     sidebar_layout->setContentsMargins(0, 10, 0, 10);
     sidebar_layout->addWidget(btn_line);
     sidebar_layout->addWidget(sep_line);
-    sidebar_layout->addWidget(ui_book_dir);
+    sidebar_layout->addWidget(book_dir_container);
 
     ui_sidebar->setAutoFillBackground(true);
     ui_sidebar->setMinimumWidth(200);

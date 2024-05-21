@@ -27,9 +27,11 @@ TwoLevelDataModel *TwoLevelTree::setModel(TwoLevelDataModel *model) {
     if (old_model) {
         old_model->setParent(nullptr);
         disconnect(old_model, &TwoLevelDataModel::valueChanged, this, update_slot);
+        disconnect(old_model, &TwoLevelDataModel::valueChanged, this, &QWidget::updateGeometry);
     }
 
     connect(model, &TwoLevelDataModel::valueChanged, this, update_slot);
+    connect(model, &TwoLevelDataModel::valueChanged, this, &QWidget::updateGeometry);
     model->setParent(this);
 
     ellapsed_top_items_.clear();
@@ -68,16 +70,13 @@ void TwoLevelTree::setItemRenderProxy(ItemRenderProxy *proxy) {
 QSize TwoLevelTree::minimumSizeHint() const {
     const auto fm         = fontMetrics();
     const auto row_height = fm.height() + fm.descent();
-    QRect      rect(0, 0, fm.averageCharWidth() * 4, fm.descent() + row_height);
+    const auto height     = fm.descent() + row_height * totalVisibleItems();
+    QRect      rect(0, 0, fm.averageCharWidth() * 4, height);
     return rect.marginsAdded(contentsMargins()).size();
 }
 
 QSize TwoLevelTree::sizeHint() const {
-    const auto fm         = fontMetrics();
-    const auto row_height = fm.height() + fm.descent();
-    const auto height     = fm.descent() + row_height * totalVisibleItems();
-    QRect      rect(0, 0, fm.averageCharWidth() * 4, height);
-    return rect.marginsAdded(contentsMargins()).size();
+    return minimumSizeHint();
 }
 
 void TwoLevelTree::setupUi() {
@@ -89,10 +88,28 @@ void TwoLevelTree::renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo 
     p->drawText(clip_bb, flags, item_info.value);
 }
 
+void TwoLevelTree::drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &item_info) {
+    if (!item_info.is_top_item) { return; }
+
+    const bool ellapsed = ellapsed_top_items_.contains(item_info.id);
+
+    const auto svg_file =
+        QString(":/res/icons/indicator/%1.svg").arg(ellapsed ? "ellapse" : "expand");
+
+    const auto size  = QSize(12, 12);
+    const auto delta = (bb.size() - size) / 2;
+
+    QIcon indicator(svg_file);
+
+    const auto pos = bb.topLeft() + QPoint(delta.width(), delta.height());
+
+    p->drawPixmap(pos, indicator.pixmap(size));
+}
+
 int TwoLevelTree::totalVisibleItems() const {
     if (!model_) { return 0; }
-    int size = model_->total_top_items() + model_->total_sub_items();
-    for (auto topid : ellapsed_top_items_) { size -= model_->total_items_under_top_item(topid); }
+    int size = totalTopItems() + totalSubItems();
+    for (const int top_id : ellapsed_top_items_) { size -= totalSubItemsUnderTopItem(top_id); }
     return size;
 }
 
@@ -108,9 +125,10 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     const auto fm         = fontMetrics();
     const int  row_height = fm.height() + fm.descent();
 
-    auto clip_bb = contentsRect();
+    auto clip_bb      = contentsRect().translated(0, fm.descent());
+    auto indicator_bb = QRect(clip_bb.topLeft(), QSize(row_height, row_height));
+
     clip_bb.adjust(row_height, 0, -row_height, 0);
-    clip_bb.translate(0, fm.descent());
     clip_bb.setHeight(row_height);
 
     const auto hover_color     = pal.color(QPalette::HighlightedText);
@@ -128,36 +146,51 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
 
     //! TODO: handle ellapsed top items
 
-    const int total_top_items = model_->total_top_items();
+    const int total_top_items = totalTopItems();
     for (int i = 0; i < total_top_items; ++i) {
-        const int top_id      = model_->top_item_at(i);
+        const int top_id      = topItemAt(i);
         item_info.is_top_item = true;
         item_info.id          = top_id;
-        item_info.value       = model_->value(top_id);
+        item_info.value       = itemValue(top_id);
         item_info.level_index = level_index[0];
+
+        drawIndicator(&p, indicator_bb, item_info);
         render_func_(&p, clip_bb, item_info);
+
         clip_bb.translate(0, row_height);
         clip_bb.adjust(sub_item_indent, 0, 0, 0);
+        indicator_bb.translate(sub_item_indent, row_height);
+
         ++level_index[0];
         ++item_info.global_index;
+
         item_info.local_index = 0;
         item_info.is_top_item = false;
-        for (auto sub_id : model_->get_sub_items(top_id)) {
+
+        for (auto sub_id : getSubItems(top_id)) {
             item_info.id          = sub_id;
-            item_info.value       = model_->value(sub_id);
+            item_info.value       = itemValue(sub_id);
             item_info.level_index = level_index[1];
+
+            drawIndicator(&p, indicator_bb, item_info);
             render_func_(&p, clip_bb, item_info);
+
             if (!should_draw_hover_highlight && ui_hover_on_ == item_info.global_index) {
                 should_draw_hover_highlight = true;
                 hover_item_bb               = clip_bb.adjusted(-sub_item_indent, 0, 0, 0);
             } else if (selected_sub_item_ == item_info.id) {
                 selected_item_bb = clip_bb.adjusted(-sub_item_indent, 0, 0, 0);
             }
+
             clip_bb.translate(0, row_height);
+            indicator_bb.translate(0, row_height);
+
             ++level_index[1];
             ++item_info.global_index;
             ++item_info.local_index;
         }
+
+        indicator_bb.translate(-sub_item_indent, 0);
         clip_bb.adjust(-sub_item_indent, 0, 0, 0);
     }
 
@@ -211,9 +244,9 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
 
     int level_index[2] = {0, 0};
 
-    const int total_top_items = model_->total_top_items();
+    const int total_top_items = totalTopItems();
     for (int i = 0; i < total_top_items; ++i) {
-        const int top_id = model_->top_item_at(i);
+        const int top_id = topItemAt(i);
 
         if (item_info.global_index == ui_hover_on_) {
             item_info.is_top_item = true;
@@ -227,7 +260,7 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
         ++item_info.global_index;
         item_info.local_index = 0;
 
-        for (auto sub_id : model_->get_sub_items(top_id)) {
+        for (auto sub_id : getSubItems(top_id)) {
             if (item_info.global_index == ui_hover_on_) {
                 item_info.is_top_item = false;
                 item_info.id          = sub_id;
