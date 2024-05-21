@@ -276,7 +276,12 @@ void EditPage::openChapter(int cid) {
 
     current_cid_ = next_cid;
 
-    //! TODO: expand corresponding book dir top item (volume)
+    //! TODO: provide interface in AbstractBookManager to get volume id of a chapter
+    for (const int vid : book_manager_->get_volumes()) {
+        if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }
+        ui_book_dir->setSubItemSelected(vid, cid);
+        ui_book_dir->setTopItemEllapsed(vid, false);
+    }
 
     jwrite_profiler_record(SwitchChapter);
 }
@@ -450,7 +455,14 @@ void EditPage::setupUi() {
 void EditPage::setupConnections() {
     connect(ui_editor, &Editor::activated, this, [this] {
         if (current_cid_ != -1) { return; }
-        createAndOpenNewChapter();
+        if (book_manager_->get_all_chapters().empty()) {
+            createAndOpenNewChapter();
+        } else {
+            //! TODO: open the last opened chapter
+            //! ATTENTION: here we assume that the returned chapters are in order
+            const int cid = book_manager_->get_all_chapters().last();
+            openChapter(cid);
+        }
     });
     connect(ui_editor, &Editor::textChanged, this, &EditPage::updateWordsCount);
     connect(ui_book_dir, &TwoLevelTree::subItemSelected, this, [this](int vid, int cid) {
