@@ -174,13 +174,14 @@ int Gallery::getItemIndex(const QPoint &pos, int *out_menu_index) const {
 
         const int row = (rel_pos.y() + item_spacing_) / (item_rect.height() + item_spacing_);
 
-        const auto bb = getItemRect(row, col);
+        const auto bb       = getItemRect(row, col);
+        const auto cover_bb = QRect(bb.topLeft(), item_size_);
 
-        if (!bb.contains(pos)) { break; }
+        if (!cover_bb.contains(pos)) { break; }
 
         if (const int total_btn = 3; out_menu_index) {
-            int  spacing = 0;
-            auto menu_bb = getDisplayCaseMenuButtonRect(QRect(bb.topLeft(), item_size_), spacing);
+            int  spacing    = 0;
+            auto menu_bb    = getDisplayCaseMenuButtonRect(cover_bb, spacing);
             *out_menu_index = -1;
             for (int i = 0; i < total_btn; ++i) {
                 if (menu_bb.contains(pos)) {
