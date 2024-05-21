@@ -245,7 +245,6 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
             indicator_bb.translate(indicator_bb.width(), 0);
 
             for (const int sub_id : getSubItems(top_id)) {
-                level_index[Sub]       += 1;
                 item_info.is_top_item   = false;
                 item_info.id            = sub_id;
                 item_info.global_index += 1;
@@ -267,6 +266,8 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
                 ++row_index;
                 item_bb.translate(0, row_height);
                 indicator_bb.translate(0, row_height);
+
+                level_index[Sub] += 1;
             }
 
             item_bb.adjust(-sub_item_indent, 0, 0, 0);
