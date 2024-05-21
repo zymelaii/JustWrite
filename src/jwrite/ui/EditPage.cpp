@@ -554,6 +554,17 @@ void EditPage::createAndOpenNewChapter() {
     ui_book_dir->setSubItemSelected(ui_book_dir->topItemAt(volume_index), cid);
 }
 
+void EditPage::requestRenameTocItem() {
+    if (!book_manager_) { return; }
+    const int cid = ui_book_dir->selectedSubItem();
+    if (cid == -1) { return; }
+
+    for (const int vid : book_manager_->get_volumes()) {
+        if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }
+        emit renameTocItemRequested(book_manager_->info_ref(), vid, cid);
+    }
+}
+
 bool EditPage::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto e = static_cast<QKeyEvent *>(event);
@@ -568,7 +579,6 @@ bool EditPage::eventFilter(QObject *watched, QEvent *event) {
         if (auto opt = command_manager_.match(e)) {
             const auto action = *opt;
             qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
-
             switch (action) {
                 case GlobalCommand::ToggleSidebar: {
                     ui_sidebar->setVisible(!ui_sidebar->isVisible());
@@ -578,6 +588,9 @@ bool EditPage::eventFilter(QObject *watched, QEvent *event) {
                 } break;
                 case GlobalCommand::CreateNewChapter: {
                     createAndOpenNewChapter();
+                } break;
+                case GlobalCommand::Rename: {
+                    requestRenameTocItem();
                 } break;
                 case GlobalCommand::DEV_EnableMessyInput: {
                     ui_editor->setFocus();

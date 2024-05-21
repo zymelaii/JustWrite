@@ -29,6 +29,9 @@ public:
     explicit EditPage(QWidget *parent = nullptr);
     virtual ~EditPage();
 
+signals:
+    void renameTocItemRequested(const BookInfo &book_info, int vid, int cid);
+
 public:
     void updateColorTheme(const ColorTheme &color_theme);
 
@@ -58,6 +61,7 @@ protected:
     void flushWordsCount();
     void syncWordsStatus();
     void createAndOpenNewChapter();
+    void requestRenameTocItem();
 
     bool eventFilter(QObject *watched, QEvent *event) override;
 

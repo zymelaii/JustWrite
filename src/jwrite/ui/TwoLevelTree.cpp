@@ -46,18 +46,6 @@ TwoLevelDataModel *TwoLevelTree::setModel(TwoLevelDataModel *model) {
     return old_model;
 }
 
-bool TwoLevelTree::setSubItemSelected(int top_item_id, int sub_item_id) {
-    //! ATTENTION: even the same item id can be different (dirty), report it honestly
-
-    if (!model_->has_sub_item_strict(top_item_id, sub_item_id)) { return false; }
-
-    selected_sub_item_ = sub_item_id;
-    emit subItemSelected(top_item_id, sub_item_id);
-    update();
-
-    return true;
-}
-
 void TwoLevelTree::setItemRenderProxy(ItemRenderProxy *proxy) {
     render_proxy_ = proxy;
     if (render_proxy_) {
@@ -69,6 +57,22 @@ void TwoLevelTree::setItemRenderProxy(ItemRenderProxy *proxy) {
             renderItem(p, clip_bb, item_info);
         };
     }
+}
+
+int TwoLevelTree::selectedSubItem() const {
+    return selected_sub_item_;
+}
+
+bool TwoLevelTree::setSubItemSelected(int top_item_id, int sub_item_id) {
+    //! ATTENTION: even the same item id can be different (dirty), report it honestly
+
+    if (!model_->has_sub_item_strict(top_item_id, sub_item_id)) { return false; }
+
+    selected_sub_item_ = sub_item_id;
+    emit subItemSelected(top_item_id, sub_item_id);
+    update();
+
+    return true;
 }
 
 bool TwoLevelTree::topItemEllapsed(int top_item_id) const {
@@ -166,12 +170,17 @@ void TwoLevelTree::renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo 
 }
 
 void TwoLevelTree::drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &item_info) {
-    if (!item_info.is_top_item) { return; }
+    QString svg_name{};
+    if (item_info.is_top_item) {
+        const bool ellapsed = ellapsed_top_items_.contains(item_info.id);
+        svg_name            = ellapsed ? "ellapse" : "expand";
+    } else if (selected_sub_item_ != item_info.id) {
+        return;
+    } else {
+        svg_name = "edit";
+    }
 
-    const bool ellapsed = ellapsed_top_items_.contains(item_info.id);
-
-    const auto svg_file =
-        QString(":/res/icons/indicator/%1.svg").arg(ellapsed ? "ellapse" : "expand");
+    const auto svg_file = QString(":/res/icons/indicator/%1.svg").arg(svg_name);
 
     const auto size  = QSize(12, 12);
     const auto delta = (bb.size() - size) / 2;
@@ -220,6 +229,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     const auto selected_color      = pal.color(QPalette::Highlight);
     bool       should_draw_hover   = false;
     bool       found_selected_item = false;
+    int        hover_item_id       = -1;
     QRect      hover_bb{};
     QRect      sel_bb{};
 
@@ -242,7 +252,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
         const int total_sub_items = totalSubItemsUnderTopItem(top_id);
         if (!topItemEllapsed(top_id)) {
             item_bb.adjust(sub_item_indent, 0, 0, 0);
-            indicator_bb.translate(indicator_bb.width(), 0);
+            indicator_bb.translate(sub_item_indent, 0);
 
             for (const int sub_id : getSubItems(top_id)) {
                 item_info.is_top_item   = false;
@@ -257,6 +267,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
 
                 if (row_index == ui_hover_row_index_) {
                     hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
+                    hover_item_id     = sub_id;
                     should_draw_hover = true;
                 } else if (selected_sub_item_ == sub_id) {
                     sel_bb              = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
@@ -271,7 +282,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
             }
 
             item_bb.adjust(-sub_item_indent, 0, 0, 0);
-            indicator_bb.translate(-indicator_bb.width(), 0);
+            indicator_bb.translate(-sub_item_indent, 0);
         } else {
             level_index[Sub]       += total_sub_items;
             item_info.global_index += total_sub_items;
@@ -283,8 +294,12 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
 
     if (should_draw_hover) { p.fillRect(hover_bb, hover_color); }
 
-    if (selected_sub_item_ != -1) {
-        Q_ASSERT(found_selected_item);
+    if (found_selected_item) {
+        //! FIXME: assertion not complete
+        //! HINT: case 1: selected_sub_item_ != -1
+        //! HINT: case 2: should_draw_hover && hover_item_id == selected_sub_item_
+        //! HINT: case 3: selected_sub_item_ is available but the corresponding top item is ellapsed
+        //! and the selected_sub_item_ becomes a dirty value without being noticed
         p.fillRect(sel_bb, selected_color);
     }
 }

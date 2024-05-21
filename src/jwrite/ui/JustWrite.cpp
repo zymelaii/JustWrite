@@ -1,6 +1,7 @@
 #include <jwrite/ui/JustWrite.h>
 #include <jwrite/ui/ScrollArea.h>
 #include <jwrite/ui/BookInfoEdit.h>
+#include <jwrite/ui/QuickTextInput.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/ProfileUtils.h>
 #include <QScrollBar>
@@ -36,8 +37,8 @@ private:
 JustWrite::JustWrite() {
     setupUi();
     setupConnections();
-    closePopupLayer();
 
+    closePopupLayer();
     switchToPage(PageType::Gallery);
     setTheme(Theme::Dark);
 }
@@ -198,6 +199,8 @@ void JustWrite::setupConnections() {
     connect(ui_title_bar_, &TitleBar::minimizeRequested, this, &QWidget::showMinimized);
     connect(ui_title_bar_, &TitleBar::maximizeRequested, this, &JustWrite::toggleMaximize);
     connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::closePage);
+    connect(
+        ui_edit_page_, &EditPage::renameTocItemRequested, this, &JustWrite::requestRenameTocItem);
 }
 
 void JustWrite::requestUpdateBookInfo(int index) {
@@ -277,9 +280,29 @@ void JustWrite::requestStartEditBook(int index) {
     switchToPage(PageType::Edit);
 }
 
+void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid) {
+    auto input = new QuickTextInput;
+
+    auto bm = books_.value(book_info.uuid);
+    Q_ASSERT(bm);
+
+    input->setPlaceholderText("请输入新章节名");
+    input->setText(bm->get_title(cid).value());
+    input->setLabel("章节名");
+
+    showPopupLayer(input);
+
+    connect(input, &QuickTextInput::submitRequested, this, [this, cid](QString text) {
+        closePopupLayer();
+        ui_edit_page_->renameBookDirItem(cid, text);
+    });
+    connect(input, &QuickTextInput::cancelRequested, this, &JustWrite::closePopupLayer);
+}
+
 void JustWrite::showPopupLayer(QWidget *widget) {
     ui_popup_layer_->setWidget(widget);
     ui_popup_layer_->show();
+    widget->setFocus();
 }
 
 void JustWrite::closePopupLayer() {

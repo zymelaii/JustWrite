@@ -10,6 +10,7 @@ enum class GlobalCommand {
     ToggleSidebar,
     ToggleSoftCenterMode,
     CreateNewChapter,
+    Rename,
     DEV_EnableMessyInput,
 };
 

@@ -88,10 +88,10 @@ public:
 
     TwoLevelDataModel *setModel(TwoLevelDataModel *model);
 
-    bool setSubItemSelected(int top_item_id, int sub_item_id);
-
     void setItemRenderProxy(ItemRenderProxy *proxy);
 
+    int  selectedSubItem() const;
+    bool setSubItemSelected(int top_item_id, int sub_item_id);
     bool topItemEllapsed(int top_item_id) const;
     void toggleEllapsedTopItem(int top_item_id);
     void setTopItemEllapsed(int top_item_id, bool ellapse);

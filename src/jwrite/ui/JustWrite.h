@@ -52,6 +52,7 @@ protected:
     QString requestImagePath(bool validate, QImage *out_image);
     void    requestBookAction(int index, Gallery::MenuAction action);
     void    requestStartEditBook(int index);
+    void    requestRenameTocItem(const BookInfo &book_info, int vid, int cid);
 
     void showPopupLayer(QWidget *widget);
     void closePopupLayer();
