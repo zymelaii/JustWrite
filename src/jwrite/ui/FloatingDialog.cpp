@@ -11,7 +11,10 @@ FloatingDialog::FloatingDialog(QWidget *parent)
 FloatingDialog::~FloatingDialog() {}
 
 QWidget *FloatingDialog::take() {
-    return ui_layout_->isEmpty() ? nullptr : ui_layout_->takeAt(0)->widget();
+    auto w = ui_layout_->isEmpty() ? nullptr : ui_layout_->takeAt(0)->widget();
+    //! force to recalculate the size hint
+    ui_layout_->invalidate();
+    return w;
 }
 
 QWidget *FloatingDialog::setWidget(QWidget *widget) {
