@@ -10,11 +10,17 @@ class TwoLevelTree : public QWidget {
 
 public:
     struct ItemInfo {
-        bool    is_top_item;
-        int     id;
-        int     global_index;
-        int     local_index;
-        int     level_index;
+        //! whether the item is a top-level item or a sub-item
+        bool is_top_item;
+        //! unique id of the item
+        int id;
+        //! global index of the item in the tree
+        int global_index;
+        //! index of the item in its level, sorted with nearby same-level items
+        int local_index;
+        //! index of the item in its level, sorted in the global order of all items
+        int level_index;
+        //! value of the item
         QString value;
     };
 
@@ -86,12 +92,23 @@ public:
 
     void setItemRenderProxy(ItemRenderProxy *proxy);
 
+    bool topItemEllapsed(int top_item_id) const;
+    void toggleEllapsedTopItem(int top_item_id);
+    void setTopItemEllapsed(int top_item_id, bool ellapse);
+    int  focuedTopItem() const;
+    void setFocusedTopItem(int top_item_id);
+    void clearTopItemFocus();
+
 public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
 
 protected:
     void setupUi();
+
+    QRect getFirstRowItemRect(QRect *out_indicator_bb, int *out_sub_indent) const;
+    int   rowIndexAtPos(const QPoint &pos) const;
+
     void renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info);
     void drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &item_info);
     int  totalVisibleItems() const;
@@ -105,11 +122,12 @@ private:
     TwoLevelDataModel *model_;
     QSet<int>          ellapsed_top_items_;
     int                selected_sub_item_;
+    int                focused_top_item_;
     ItemRenderProxy   *render_proxy_;
 
     std::function<void(QPainter *, const QRect &, const ItemInfo &)> render_func_;
 
-    int ui_hover_on_;
+    int ui_hover_row_index_;
 };
 
 } // namespace jwrite::ui

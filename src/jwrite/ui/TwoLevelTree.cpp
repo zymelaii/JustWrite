@@ -9,8 +9,9 @@ TwoLevelTree::TwoLevelTree(QWidget *parent)
     : QWidget(parent)
     , model_{nullptr}
     , selected_sub_item_{-1}
+    , focused_top_item_{-1}
     , render_proxy_{nullptr}
-    , ui_hover_on_{-1} {
+    , ui_hover_row_index_{-1} {
     setupUi();
     setMouseTracking(true);
     setItemRenderProxy(nullptr);
@@ -34,8 +35,11 @@ TwoLevelDataModel *TwoLevelTree::setModel(TwoLevelDataModel *model) {
     connect(model, &TwoLevelDataModel::valueChanged, this, &QWidget::updateGeometry);
     model->setParent(this);
 
+    selected_sub_item_ = -1;
+    focused_top_item_  = -1;
+
     ellapsed_top_items_.clear();
-    ui_hover_on_ = -1;
+    ui_hover_row_index_ = -1;
 
     update();
 
@@ -67,6 +71,43 @@ void TwoLevelTree::setItemRenderProxy(ItemRenderProxy *proxy) {
     }
 }
 
+bool TwoLevelTree::topItemEllapsed(int top_item_id) const {
+    Q_ASSERT(model_->has_top_item(top_item_id));
+    return ellapsed_top_items_.contains(top_item_id);
+}
+
+void TwoLevelTree::toggleEllapsedTopItem(int top_item_id) {
+    Q_ASSERT(model_->has_top_item(top_item_id));
+    setTopItemEllapsed(top_item_id, !topItemEllapsed(top_item_id));
+}
+
+void TwoLevelTree::setTopItemEllapsed(int top_item_id, bool ellapse) {
+    Q_ASSERT(model_->has_top_item(top_item_id));
+    if (ellapse) {
+        ellapsed_top_items_.insert(top_item_id);
+    } else {
+        ellapsed_top_items_.remove(top_item_id);
+    }
+    update();
+}
+
+int TwoLevelTree::focuedTopItem() const {
+    return focused_top_item_;
+}
+
+void TwoLevelTree::setFocusedTopItem(int top_item_id) {
+    Q_ASSERT(model_->has_top_item(top_item_id));
+    if (focused_top_item_ == top_item_id) { return; }
+    focused_top_item_ = top_item_id;
+    update();
+}
+
+void TwoLevelTree::clearTopItemFocus() {
+    if (focused_top_item_ == -1) { return; }
+    focused_top_item_ = -1;
+    return;
+}
+
 QSize TwoLevelTree::minimumSizeHint() const {
     const auto fm         = fontMetrics();
     const auto row_height = fm.height() + fm.descent();
@@ -81,6 +122,42 @@ QSize TwoLevelTree::sizeHint() const {
 
 void TwoLevelTree::setupUi() {
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+}
+
+QRect TwoLevelTree::getFirstRowItemRect(QRect *out_indicator_bb, int *out_sub_indent) const {
+    const auto fm = fontMetrics();
+
+    const int row_height = fm.height() + fm.descent();
+    const int h_padding  = row_height;
+    const int v_padding  = fm.descent();
+
+    auto bb = contentsRect();
+    bb.translate(0, v_padding);
+    bb.adjust(h_padding, 0, -h_padding, 0);
+    bb.setHeight(row_height);
+
+    if (out_indicator_bb) {
+        auto indicator = bb;
+        indicator.translate(-h_padding, 0);
+        indicator.setWidth(row_height);
+        *out_indicator_bb = indicator;
+    }
+
+    if (out_sub_indent) { *out_sub_indent = 16; }
+
+    return bb;
+}
+
+int TwoLevelTree::rowIndexAtPos(const QPoint &pos) const {
+    auto bb = getFirstRowItemRect(nullptr, nullptr);
+
+    const int row_height = bb.height();
+    const int total_rows = totalVisibleItems();
+    bb.setHeight(total_rows * row_height);
+
+    if (!bb.contains(pos)) { return -1; }
+
+    return qBound(0, (pos.y() - bb.top()) / row_height, total_rows - 1);
 }
 
 void TwoLevelTree::renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
@@ -122,109 +199,108 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     p.setPen(pal.color(QPalette::WindowText));
     p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
 
-    const auto fm         = fontMetrics();
-    const int  row_height = fm.height() + fm.descent();
+    int   sub_item_indent = 0;
+    QRect indicator_bb{};
+    auto  item_bb = getFirstRowItemRect(&indicator_bb, &sub_item_indent);
 
-    auto clip_bb      = contentsRect().translated(0, fm.descent());
-    auto indicator_bb = QRect(clip_bb.topLeft(), QSize(row_height, row_height));
-
-    clip_bb.adjust(row_height, 0, -row_height, 0);
-    clip_bb.setHeight(row_height);
-
-    const auto hover_color     = pal.color(QPalette::HighlightedText);
-    const auto selected_color  = pal.color(QPalette::Highlight);
-    const int  sub_item_indent = 16;
+    const int row_height = item_bb.height();
 
     ItemInfo item_info{};
     item_info.global_index = 0;
 
+    enum {
+        Top = 0,
+        Sub = 1,
+    };
+
     int level_index[2] = {0, 0};
+    int row_index      = 0;
 
-    QRect hover_item_bb{};
-    QRect selected_item_bb{};
-    bool  should_draw_hover_highlight = false;
-
-    //! TODO: handle ellapsed top items
+    const auto hover_color         = pal.color(QPalette::HighlightedText);
+    const auto selected_color      = pal.color(QPalette::Highlight);
+    bool       should_draw_hover   = false;
+    bool       found_selected_item = false;
+    QRect      hover_bb{};
+    QRect      sel_bb{};
 
     const int total_top_items = totalTopItems();
     for (int i = 0; i < total_top_items; ++i) {
         const int top_id      = topItemAt(i);
         item_info.is_top_item = true;
         item_info.id          = top_id;
+        item_info.local_index = 0;
+        item_info.level_index = level_index[Top];
         item_info.value       = itemValue(top_id);
-        item_info.level_index = level_index[0];
 
         drawIndicator(&p, indicator_bb, item_info);
-        render_func_(&p, clip_bb, item_info);
+        render_func_(&p, item_bb, item_info);
 
-        clip_bb.translate(0, row_height);
-        clip_bb.adjust(sub_item_indent, 0, 0, 0);
-        indicator_bb.translate(sub_item_indent, row_height);
+        ++row_index;
+        item_bb.translate(0, row_height);
+        indicator_bb.translate(0, row_height);
 
-        ++level_index[0];
-        ++item_info.global_index;
+        const int total_sub_items = totalSubItemsUnderTopItem(top_id);
+        if (!topItemEllapsed(top_id)) {
+            item_bb.adjust(sub_item_indent, 0, 0, 0);
+            indicator_bb.translate(indicator_bb.width(), 0);
 
-        item_info.local_index = 0;
-        item_info.is_top_item = false;
+            for (const int sub_id : getSubItems(top_id)) {
+                level_index[Sub]       += 1;
+                item_info.is_top_item   = false;
+                item_info.id            = sub_id;
+                item_info.global_index += 1;
+                item_info.local_index  += 1;
+                item_info.level_index   = level_index[Sub];
+                item_info.value         = itemValue(sub_id);
 
-        for (auto sub_id : getSubItems(top_id)) {
-            item_info.id          = sub_id;
-            item_info.value       = itemValue(sub_id);
-            item_info.level_index = level_index[1];
+                drawIndicator(&p, indicator_bb, item_info);
+                render_func_(&p, item_bb, item_info);
 
-            drawIndicator(&p, indicator_bb, item_info);
-            render_func_(&p, clip_bb, item_info);
+                if (row_index == ui_hover_row_index_) {
+                    hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
+                    should_draw_hover = true;
+                } else if (selected_sub_item_ == sub_id) {
+                    sel_bb              = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
+                    found_selected_item = true;
+                }
 
-            if (!should_draw_hover_highlight && ui_hover_on_ == item_info.global_index) {
-                should_draw_hover_highlight = true;
-                hover_item_bb               = clip_bb.adjusted(-sub_item_indent, 0, 0, 0);
-            } else if (selected_sub_item_ == item_info.id) {
-                selected_item_bb = clip_bb.adjusted(-sub_item_indent, 0, 0, 0);
+                ++row_index;
+                item_bb.translate(0, row_height);
+                indicator_bb.translate(0, row_height);
             }
 
-            clip_bb.translate(0, row_height);
-            indicator_bb.translate(0, row_height);
-
-            ++level_index[1];
-            ++item_info.global_index;
-            ++item_info.local_index;
+            item_bb.adjust(-sub_item_indent, 0, 0, 0);
+            indicator_bb.translate(-indicator_bb.width(), 0);
+        } else {
+            level_index[Sub]       += total_sub_items;
+            item_info.global_index += total_sub_items;
         }
 
-        indicator_bb.translate(-sub_item_indent, 0);
-        clip_bb.adjust(-sub_item_indent, 0, 0, 0);
+        item_info.global_index += 1;
+        level_index[Top]       += 1;
     }
 
-    if (should_draw_hover_highlight) { p.fillRect(hover_item_bb, hover_color); }
+    if (should_draw_hover) { p.fillRect(hover_bb, hover_color); }
 
-    if (selected_sub_item_ != -1) { p.fillRect(selected_item_bb, selected_color); }
+    if (selected_sub_item_ != -1) {
+        Q_ASSERT(found_selected_item);
+        p.fillRect(sel_bb, selected_color);
+    }
 }
 
 void TwoLevelTree::mouseMoveEvent(QMouseEvent *e) {
     QWidget::mouseMoveEvent(e);
 
-    const auto fm         = fontMetrics();
-    const auto row_height = fm.height() + fm.descent();
-    auto       rect       = contentsRect();
-    rect.adjust(row_height, fm.descent(), 0, 0);
-
-    const int last_hover_row = ui_hover_on_;
-
-    if (rect.contains(e->pos())) {
-        ui_hover_on_ = (e->pos().y() - rect.top()) / row_height;
-    } else {
-        ui_hover_on_ = -1;
-    }
-
-    if (ui_hover_on_ != last_hover_row) { update(); }
+    const int last_row_index = ui_hover_row_index_;
+    ui_hover_row_index_      = rowIndexAtPos(e->pos());
+    if (ui_hover_row_index_ != last_row_index) { update(); }
 }
 
 void TwoLevelTree::leaveEvent(QEvent *e) {
     QWidget::leaveEvent(e);
 
-    if (ui_hover_on_ != -1) {
-        ui_hover_on_ = -1;
-        update();
-    }
+    ui_hover_row_index_ = -1;
+    update();
 }
 
 void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
@@ -232,55 +308,80 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
 
     if (!model_) { return; }
 
-    if (e->button() == Qt::MiddleButton) { return; }
-    if (ui_hover_on_ == -1) { return; }
-    if (ui_hover_on_ >= totalVisibleItems()) { return; }
+    if (ui_hover_row_index_ == -1) {
+        clearTopItemFocus();
+        return;
+    }
+    Q_ASSERT(ui_hover_row_index_ >= 0 && ui_hover_row_index_ < totalVisibleItems());
+
+    //! NOTE: only accept left or right button
+    //! HINT: left-button: toggle ellasped top-item or select sub-item
+    //! HINT: right-button: request context menu on the hover item
+    if (!(e->buttons() & (Qt::LeftButton | Qt::RightButton))) { return; }
 
     ItemInfo item_info{};
     item_info.global_index = 0;
+    item_info.id           = -1;
 
-    int top_item_id = -1;
-    int sub_item_id = -1;
+    enum {
+        Top = 0,
+        Sub = 1,
+    };
 
     int level_index[2] = {0, 0};
+    int item_id[2]     = {-1, -1};
+    int row_index      = 0;
 
     const int total_top_items = totalTopItems();
     for (int i = 0; i < total_top_items; ++i) {
         const int top_id = topItemAt(i);
+        item_id[Top]     = top_id;
 
-        if (item_info.global_index == ui_hover_on_) {
+        if (row_index == ui_hover_row_index_) {
             item_info.is_top_item = true;
             item_info.id          = top_id;
-            item_info.level_index = level_index[0];
-            top_item_id           = top_id;
+            item_info.local_index = 0;
+            item_info.level_index = level_index[Top];
             break;
         }
 
-        ++level_index[0];
-        ++item_info.global_index;
-        item_info.local_index = 0;
-
-        for (auto sub_id : getSubItems(top_id)) {
-            if (item_info.global_index == ui_hover_on_) {
-                item_info.is_top_item = false;
-                item_info.id          = sub_id;
-                item_info.level_index = level_index[1];
-                top_item_id           = top_id;
-                sub_item_id           = sub_id;
-                break;
+        const int total_sub_items = totalSubItemsUnderTopItem(top_id);
+        if (!topItemEllapsed(top_id)) {
+            int local_index = 0;
+            for (const int sub_id : getSubItems(top_id)) {
+                ++row_index;
+                if (row_index == ui_hover_row_index_) {
+                    item_id[Sub]            = sub_id;
+                    item_info.global_index += local_index;
+                    level_index[Sub]       += local_index;
+                    item_info.is_top_item   = false;
+                    item_info.id            = sub_id;
+                    item_info.local_index   = local_index;
+                    item_info.level_index   = level_index[Sub];
+                    break;
+                }
+                ++local_index;
             }
-
-            ++level_index[1];
-            ++item_info.global_index;
-            ++item_info.local_index;
+            if (item_info.id != -1) { break; }
         }
+
+        item_info.global_index += total_sub_items + 1;
+        level_index[Top]       += 1;
+        level_index[Sub]       += total_sub_items;
+        ++row_index;
     }
 
+    Q_ASSERT(item_info.id != -1);
+
     if (e->button() == Qt::LeftButton) {
-        if (sub_item_id != -1) {
-            selected_sub_item_ = sub_item_id;
-            emit subItemSelected(top_item_id, sub_item_id);
+        if (item_info.is_top_item) {
+            toggleEllapsedTopItem(item_info.id);
+        } else {
+            Q_ASSERT(item_id[Sub] == item_info.id);
+            selected_sub_item_ = item_id[Sub];
+            emit subItemSelected(item_id[Top], item_id[Sub]);
         }
+        setFocusedTopItem(item_id[Top]);
     } else if (e->button() == Qt::RightButton) {
         emit contextMenuRequested(e->pos(), item_info);
     }

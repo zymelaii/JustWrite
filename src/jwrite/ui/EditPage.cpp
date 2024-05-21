@@ -276,6 +276,8 @@ void EditPage::openChapter(int cid) {
 
     current_cid_ = next_cid;
 
+    //! TODO: expand corresponding book dir top item (volume)
+
     jwrite_profiler_record(SwitchChapter);
 }
 
@@ -530,6 +532,9 @@ void EditPage::syncWordsStatus() {
 }
 
 void EditPage::createAndOpenNewChapter() {
+    //! TODO: consider to create the new chapter under the volume which is corresponded to the
+    //! focused top item in book dir
+
     if (ui_book_dir->totalTopItems() == 0) { addVolume(0, "默认卷"); }
     const int volume_index = ui_book_dir->totalTopItems() - 1;
     const int cid          = addChapter(volume_index, "");
