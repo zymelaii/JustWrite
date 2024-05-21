@@ -28,8 +28,9 @@ public:
 
     QRect textArea() const;
 
-    void reset(QString &text, bool swap);
-    void scrollToCursor();
+    void    reset(QString &text, bool swap);
+    QString take();
+    void    scrollToCursor();
 
     QString text() const;
 

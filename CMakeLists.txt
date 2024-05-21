@@ -46,7 +46,6 @@ if(NOT QWindowKit_FOUND)
     set(QWINDOWKIT_INSTALL OFF)
     set(QWINDOWKIT_BUILD_STATIC ON)
     set(QWINDOWKIT_BUILD_EXAMPLES OFF)
-    set(QWINDOWKIT_BUILD_EXAMPLES OFF)
     add_subdirectory(deps/qwindowskit)
 endif()
 

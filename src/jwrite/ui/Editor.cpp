@@ -143,6 +143,21 @@ void Editor::reset(QString &text, bool swap) {
     requestUpdate(true);
 }
 
+QString Editor::take() {
+    context_->quit_preedit();
+
+    QString text{std::move(context_->edit_text)};
+
+    context_->engine.clear_all();
+    context_->edit_text.clear();
+    context_->unset_sel();
+    context_->cached_render_data_ready = false;
+    context_->cursor_moved             = true;
+    context_->vertical_move_state      = false;
+
+    return std::move(text);
+}
+
 void Editor::scrollToCursor() {
     const auto &d = context_->cached_render_state;
     const auto &e = context_->engine;

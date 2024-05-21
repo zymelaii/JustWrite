@@ -1,5 +1,6 @@
 #pragma once
 
+#include <jwrite/TwoLevelDataModel.h>
 #include <QWidget>
 
 namespace jwrite::ui {
@@ -32,30 +33,54 @@ signals:
 
 public:
     int totalTopItems() const {
-        return top_item_id_list_.size();
+        return model_->total_top_items();
     }
 
     int topItemAt(int index) const {
-        return top_item_id_list_.value(index, -1);
+        return model_->top_item_at(index);
     }
 
-    int totalSubItemsUnderTopItem(int top_item_id) const;
-    int totalSubItems() const;
+    int totalSubItemsUnderTopItem(int top_item_id) const {
+        return model_->total_items_under_top_item(top_item_id);
+    }
+
+    int totalSubItems() const {
+        return model_->total_sub_items();
+    }
 
     QList<int> getSubItems(int top_item_id) const {
-        return sub_item_id_list_set_.value(top_item_id, {});
+        return model_->get_sub_items(top_item_id);
     }
 
     int getSubItem(int top_item_id, int index) const {
-        if (!sub_item_id_list_set_.contains(top_item_id)) { return -1; }
-        return sub_item_id_list_set_[top_item_id].value(index, -1);
+        return model_->sub_item_at(top_item_id, index);
     }
 
-    int addTopItem(int index, const QString &value);
-    int addSubItem(int top_item_id, int index, const QString &value);
+    int addTopItem(int index, const QString &value) {
+        return model_->add_top_item(index, value);
+    }
 
-    QString itemValue(int id) const;
-    void    setItemValue(int id, const QString &value);
+    int addSubItem(int top_item_id, int index, const QString &value) {
+        return model_->add_sub_item(top_item_id, index, value);
+    }
+
+    QString itemValue(int id) const {
+        return model_->value(id);
+    }
+
+    void setItemValue(int id, const QString &value) {
+        model_->set_value(id, value);
+    }
+
+    TwoLevelDataModel *model() {
+        return model_;
+    }
+
+    TwoLevelDataModel *model() const {
+        return const_cast<TwoLevelTree *>(this)->model_;
+    }
+
+    TwoLevelDataModel *setModel(TwoLevelDataModel *model);
 
     bool setSubItemSelected(int top_item_id, int sub_item_id);
 
@@ -68,6 +93,7 @@ public:
 protected:
     void setupUi();
     void renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info);
+    int  totalVisibleItems() const;
 
     void paintEvent(QPaintEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -75,13 +101,10 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
 
 private:
-    QList<int>            top_item_id_list_;
-    QMap<int, QList<int>> sub_item_id_list_set_;
-    QList<QString>        item_values_;
-    QList<QString>        title_list_;
-    QSet<int>             expanded_top_items_;
-    int                   selected_sub_item_;
-    ItemRenderProxy      *render_proxy_;
+    TwoLevelDataModel *model_;
+    QSet<int>          ellapsed_top_items_;
+    int                selected_sub_item_;
+    ItemRenderProxy   *render_proxy_;
 
     std::function<void(QPainter *, const QRect &, const ItemInfo &)> render_func_;
 

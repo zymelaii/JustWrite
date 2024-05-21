@@ -7,9 +7,10 @@ namespace jwrite::ui {
 
 TwoLevelTree::TwoLevelTree(QWidget *parent)
     : QWidget(parent)
-    , ui_hover_on_{-1}
+    , model_{nullptr}
     , selected_sub_item_{-1}
-    , render_proxy_{nullptr} {
+    , render_proxy_{nullptr}
+    , ui_hover_on_{-1} {
     setupUi();
     setMouseTracking(true);
     setItemRenderProxy(nullptr);
@@ -17,53 +18,37 @@ TwoLevelTree::TwoLevelTree(QWidget *parent)
 
 TwoLevelTree::~TwoLevelTree() {}
 
-int TwoLevelTree::totalSubItemsUnderTopItem(int top_item_id) const {
-    if (!sub_item_id_list_set_.contains(top_item_id)) { return 0; }
-    return sub_item_id_list_set_[top_item_id].size();
-}
+TwoLevelDataModel *TwoLevelTree::setModel(TwoLevelDataModel *model) {
+    auto old_model = model_;
+    model_         = model;
 
-int TwoLevelTree::totalSubItems() const {
-    return title_list_.size() - top_item_id_list_.size();
-}
+    auto update_slot = static_cast<void (QWidget::*)()>(&QWidget::update);
 
-int TwoLevelTree::addTopItem(int index, const QString &value) {
-    if (index < 0 || index > static_cast<int>(top_item_id_list_.size())) { return -1; }
-    const int id = static_cast<int>(title_list_.size());
-    title_list_.push_back(value);
-    top_item_id_list_.insert(index, id);
-    sub_item_id_list_set_.insert(id, {});
+    if (old_model) {
+        old_model->setParent(nullptr);
+        disconnect(old_model, &TwoLevelDataModel::valueChanged, this, update_slot);
+    }
+
+    connect(model, &TwoLevelDataModel::valueChanged, this, update_slot);
+    model->setParent(this);
+
+    ellapsed_top_items_.clear();
+    ui_hover_on_ = -1;
+
     update();
-    return id;
-}
 
-int TwoLevelTree::addSubItem(int top_item_id, int index, const QString &value) {
-    if (!sub_item_id_list_set_.contains(top_item_id)) { return -1; }
-    auto &sub_item_id_list = sub_item_id_list_set_[top_item_id];
-    if (index < 0 || index > static_cast<int>(sub_item_id_list.size())) { return -1; }
-    const int id = static_cast<int>(title_list_.size());
-    title_list_.push_back(value);
-    sub_item_id_list.insert(index, id);
-    update();
-    return id;
-}
-
-QString TwoLevelTree::itemValue(int id) const {
-    Q_ASSERT(id >= 0 && id < title_list_.size());
-    return title_list_[id];
-}
-
-void TwoLevelTree::setItemValue(int id, const QString &value) {
-    Q_ASSERT(id >= 0 && id < title_list_.size());
-    title_list_[id] = value;
+    return old_model;
 }
 
 bool TwoLevelTree::setSubItemSelected(int top_item_id, int sub_item_id) {
-    if (selected_sub_item_ == sub_item_id) { return true; }
-    if (!sub_item_id_list_set_.contains(top_item_id)) { return false; }
-    if (!sub_item_id_list_set_[top_item_id].contains(sub_item_id)) { return false; }
+    //! ATTENTION: even the same item id can be different (dirty), report it honestly
+
+    if (!model_->has_sub_item_strict(top_item_id, sub_item_id)) { return false; }
+
     selected_sub_item_ = sub_item_id;
     emit subItemSelected(top_item_id, sub_item_id);
     update();
+
     return true;
 }
 
@@ -90,7 +75,7 @@ QSize TwoLevelTree::minimumSizeHint() const {
 QSize TwoLevelTree::sizeHint() const {
     const auto fm         = fontMetrics();
     const auto row_height = fm.height() + fm.descent();
-    const auto height     = fm.descent() + row_height * title_list_.size();
+    const auto height     = fm.descent() + row_height * totalVisibleItems();
     QRect      rect(0, 0, fm.averageCharWidth() * 4, height);
     return rect.marginsAdded(contentsMargins()).size();
 }
@@ -104,7 +89,16 @@ void TwoLevelTree::renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo 
     p->drawText(clip_bb, flags, item_info.value);
 }
 
+int TwoLevelTree::totalVisibleItems() const {
+    if (!model_) { return 0; }
+    int size = model_->total_top_items() + model_->total_sub_items();
+    for (auto topid : ellapsed_top_items_) { size -= model_->total_items_under_top_item(topid); }
+    return size;
+}
+
 void TwoLevelTree::paintEvent(QPaintEvent *event) {
+    if (!model_) { return; }
+
     QPainter   p(this);
     const auto pal = palette();
 
@@ -132,10 +126,14 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     QRect selected_item_bb{};
     bool  should_draw_hover_highlight = false;
 
-    for (auto topid : top_item_id_list_) {
+    //! TODO: handle ellapsed top items
+
+    const int total_top_items = model_->total_top_items();
+    for (int i = 0; i < total_top_items; ++i) {
+        const int top_id      = model_->top_item_at(i);
         item_info.is_top_item = true;
-        item_info.id          = topid;
-        item_info.value       = title_list_[item_info.id];
+        item_info.id          = top_id;
+        item_info.value       = model_->value(top_id);
         item_info.level_index = level_index[0];
         render_func_(&p, clip_bb, item_info);
         clip_bb.translate(0, row_height);
@@ -144,9 +142,9 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
         ++item_info.global_index;
         item_info.local_index = 0;
         item_info.is_top_item = false;
-        for (auto subid : sub_item_id_list_set_[topid]) {
-            item_info.id          = subid;
-            item_info.value       = title_list_[item_info.id];
+        for (auto sub_id : model_->get_sub_items(top_id)) {
+            item_info.id          = sub_id;
+            item_info.value       = model_->value(sub_id);
             item_info.level_index = level_index[1];
             render_func_(&p, clip_bb, item_info);
             if (!should_draw_hover_highlight && ui_hover_on_ == item_info.global_index) {
@@ -199,9 +197,11 @@ void TwoLevelTree::leaveEvent(QEvent *e) {
 void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
     QWidget::mousePressEvent(e);
 
+    if (!model_) { return; }
+
     if (e->button() == Qt::MiddleButton) { return; }
     if (ui_hover_on_ == -1) { return; }
-    if (ui_hover_on_ >= static_cast<int>(title_list_.size())) { return; }
+    if (ui_hover_on_ >= totalVisibleItems()) { return; }
 
     ItemInfo item_info{};
     item_info.global_index = 0;
@@ -211,26 +211,32 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
 
     int level_index[2] = {0, 0};
 
-    for (auto topid : top_item_id_list_) {
+    const int total_top_items = model_->total_top_items();
+    for (int i = 0; i < total_top_items; ++i) {
+        const int top_id = model_->top_item_at(i);
+
         if (item_info.global_index == ui_hover_on_) {
             item_info.is_top_item = true;
-            item_info.id          = topid;
+            item_info.id          = top_id;
             item_info.level_index = level_index[0];
-            top_item_id           = topid;
+            top_item_id           = top_id;
             break;
         }
+
         ++level_index[0];
         ++item_info.global_index;
         item_info.local_index = 0;
-        for (auto subid : sub_item_id_list_set_[topid]) {
+
+        for (auto sub_id : model_->get_sub_items(top_id)) {
             if (item_info.global_index == ui_hover_on_) {
                 item_info.is_top_item = false;
-                item_info.id          = subid;
+                item_info.id          = sub_id;
                 item_info.level_index = level_index[1];
-                top_item_id           = topid;
-                sub_item_id           = subid;
+                top_item_id           = top_id;
+                sub_item_id           = sub_id;
                 break;
             }
+
             ++level_index[1];
             ++item_info.global_index;
             ++item_info.local_index;

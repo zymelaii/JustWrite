@@ -293,7 +293,7 @@ void JustWrite::switchToPage(PageType page) {
 void JustWrite::closePage() {
     switch (current_page_) {
         case PageType::Edit: {
-            //! TODO: sync book content to local storage or elsewhere
+            ui_edit_page_->syncAndClearEditor();
             switchToPage(PageType::Gallery);
         } break;
         case PageType::Gallery: {

@@ -43,6 +43,7 @@ public:
     int  addVolume(int index, const QString &title);
     int  addChapter(int volume_index, const QString &title);
     void openChapter(int cid);
+    void syncAndClearEditor();
 
     void renameBookDirItem(int id, const QString &title);
     void exportToLocal(const QString &path, ExportType type);
