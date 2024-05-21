@@ -82,6 +82,11 @@ install(
     DESTINATION ${CMAKE_INSTALL_PREFIX}
 )
 
+install(
+    FILES ${CMAKE_SOURCE_DIR}/VERSION
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
+)
+
 if(WIN32)
     add_custom_target(
         install-runtime-deps
