@@ -25,6 +25,18 @@ SystemButton *TitleBar::systemButton(SystemButton::SystemCommand command_type) c
     return sys_buttons_[magic_enum::enum_index(command_type).value()];
 }
 
+void TitleBar::requestMinimize() {
+    emit minimizeRequested();
+}
+
+void TitleBar::requestMaximize() {
+    emit maximizeRequested();
+}
+
+void TitleBar::requestClose() {
+    emit closeRequested();
+}
+
 QSize TitleBar::minimumSizeHint() const {
     const auto margins      = contentsMargins();
     const auto fm           = fontMetrics();
@@ -61,19 +73,19 @@ void TitleBar::setupUi() {
 void TitleBar::setupConnections() {
     connect(
         sys_buttons_[magic_enum::enum_index<SystemButton::Minimize>()],
-        &SystemButton::clicked,
+        SIGNAL(clicked(bool)),
         this,
-        &TitleBar::minimizeRequested);
+        SLOT(requestMinimize()));
     connect(
         sys_buttons_[magic_enum::enum_index<SystemButton::Maximize>()],
-        &SystemButton::clicked,
+        SIGNAL(clicked(bool)),
         this,
-        &TitleBar::maximizeRequested);
+        SLOT(requestMaximize()));
     connect(
         sys_buttons_[magic_enum::enum_index<SystemButton::Close>()],
-        &SystemButton::clicked,
+        SIGNAL(clicked(bool)),
         this,
-        &TitleBar::closeRequested);
+        SLOT(requestClose()));
 }
 
 void TitleBar::paintEvent(QPaintEvent *event) {

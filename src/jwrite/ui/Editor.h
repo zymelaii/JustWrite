@@ -58,6 +58,10 @@ public:
     void breakIntoNewLine();
     void verticalMove(bool up);
 
+protected slots:
+    void renderBlinkCursor();
+    void render();
+
 public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;

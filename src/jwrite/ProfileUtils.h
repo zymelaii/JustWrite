@@ -36,6 +36,8 @@ enum class ProfileTarget {
 };
 
 class Profiler : public QObject {
+    Q_OBJECT
+
 public:
     using timestamp_t     = decltype(std::chrono::system_clock::now());
     using duration_t      = std::chrono::microseconds;
@@ -50,6 +52,9 @@ public:
     void record(ProfileTarget target);
 
     void dump_profile_data(const QString &path) const;
+
+protected slots:
+    void summary_collected_data();
 
 protected:
     int   total_valid() const;

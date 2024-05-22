@@ -174,12 +174,12 @@ void JustWrite::setupUi() {
     ui_agent_ = new QWK::WidgetWindowAgent(this);
     ui_agent_->setup(this);
     ui_agent_->setTitleBar(ui_title_bar_);
-    // ui_agent_->setSystemButton(
-    //     QWK::WidgetWindowAgent::Minimize, ui_title_bar_->systemButton(SystemButton::Minimize));
-    // ui_agent_->setSystemButton(
-    //     QWK::WidgetWindowAgent::Maximize, ui_title_bar_->systemButton(SystemButton::Maximize));
-    // ui_agent_->setSystemButton(
-    //     QWK::WidgetWindowAgent::Close, ui_title_bar_->systemButton(SystemButton::Close));
+    ui_agent_->setSystemButton(
+        QWK::WidgetWindowAgent::Minimize, ui_title_bar_->systemButton(SystemButton::Minimize));
+    ui_agent_->setSystemButton(
+        QWK::WidgetWindowAgent::Maximize, ui_title_bar_->systemButton(SystemButton::Maximize));
+    ui_agent_->setSystemButton(
+        QWK::WidgetWindowAgent::Close, ui_title_bar_->systemButton(SystemButton::Close));
 
     top_layout->setContentsMargins({});
     top_layout->setSpacing(0);

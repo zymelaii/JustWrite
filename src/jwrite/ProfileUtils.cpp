@@ -15,21 +15,7 @@ void Profiler::setup(int interval_sec) {
     timer_->setInterval(interval_sec_ * 1000);
     timer_->setSingleShot(false);
     timer_->start();
-    QObject::connect(timer_, &QTimer::timeout, this, [this]() {
-        if (total_valid() == 0) { return; }
-        qDebug().noquote() << QStringLiteral("PROFILE DATA");
-        for (auto target : magic_enum::enum_values<ProfileTarget>()) {
-            const int   index = indexof(target);
-            const auto &data  = profile_data_[index];
-            if (data.empty()) { continue; }
-            const double average = averageof(target);
-            timeline_[index].append(average);
-            qDebug().noquote() << QStringLiteral("  %1 %2us")
-                                      .arg(magic_enum::enum_name(target).data())
-                                      .arg(average);
-            clear(target);
-        }
-    });
+    connect(timer_, SIGNAL(timeout()), this, SLOT(summary_collected_data()));
 }
 
 void Profiler::start(ProfileTarget target) {
@@ -68,6 +54,21 @@ void Profiler::dump_profile_data(const QString &path) const {
     file.write(QJsonDocument(root).toJson());
 
     file.close();
+}
+
+void Profiler::summary_collected_data() {
+    if (total_valid() == 0) { return; }
+    qDebug().noquote() << QStringLiteral("PROFILE DATA");
+    for (auto target : magic_enum::enum_values<ProfileTarget>()) {
+        const int   index = indexof(target);
+        const auto &data  = profile_data_[index];
+        if (data.empty()) { continue; }
+        const double average = averageof(target);
+        timeline_[index].append(average);
+        qDebug().noquote()
+            << QStringLiteral("  %1 %2us").arg(magic_enum::enum_name(target).data()).arg(average);
+        clear(target);
+    }
 }
 
 int Profiler::total_valid() const {

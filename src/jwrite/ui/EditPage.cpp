@@ -369,6 +369,10 @@ void EditPage::exportToLocal(const QString &path, ExportType type) {
     }
 }
 
+void EditPage::updateCurrentDateTime() {
+    ui_datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
+}
+
 void EditPage::setupUi() {
     auto layout         = new QVBoxLayout(this);
     auto content        = new QWidget;
@@ -472,9 +476,7 @@ void EditPage::setupConnections() {
     });
     connect(ui_new_chapter, &FlatButton::pressed, this, &EditPage::createAndOpenNewChapter);
     connect(ui_export_to_local, &FlatButton::pressed, this, &EditPage::requestExportToLocal);
-    connect(&sec_timer_, &QTimer::timeout, this, [this] {
-        ui_datetime->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
-    });
+    connect(&sec_timer_, SIGNAL(timeout()), this, SLOT(updateCurrentDateTime()));
     connect(ui_editor, &Editor::focusLost, this, [this] {
         messy_input_->kill();
     });

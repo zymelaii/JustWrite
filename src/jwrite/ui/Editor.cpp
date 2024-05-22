@@ -63,23 +63,8 @@ Editor::Editor(QWidget *parent)
         context_->resize_viewport(area.width(), area.height());
         requestUpdate(false);
     });
-    connect(&blink_timer_, &QTimer::timeout, this, [this] {
-        blink_cursor_should_paint_ = !blink_cursor_should_paint_;
-        requestUpdate(false);
-    });
-    connect(&stable_timer_, &QTimer::timeout, this, [this] {
-        if (auto_scroll_mode_) {
-            scroll((scroll_ref_y_pos_ - scroll_base_y_pos_) / 10, false);
-            update_requested_ = true;
-        }
-
-        if (drag_sel_flag_ && oob_drag_sel_flag_) { updateTextLocToVisualPos(oob_drag_sel_vpos_); }
-
-        if (update_requested_) {
-            update();
-            update_requested_ = false;
-        }
-    });
+    connect(&blink_timer_, SIGNAL(timeout()), this, SLOT(renderBlinkCursor()));
+    connect(&stable_timer_, SIGNAL(timeout()), this, SLOT(render()));
 
     stable_timer_.start();
 }
@@ -408,6 +393,25 @@ void Editor::breakIntoNewLine() {
 void Editor::verticalMove(bool up) {
     context_->vertical_move(up);
     requestUpdate(true);
+}
+
+void Editor::renderBlinkCursor() {
+    blink_cursor_should_paint_ = !blink_cursor_should_paint_;
+    requestUpdate(false);
+}
+
+void Editor::render() {
+    if (auto_scroll_mode_) {
+        scroll((scroll_ref_y_pos_ - scroll_base_y_pos_) / 10, false);
+        update_requested_ = true;
+    }
+
+    if (drag_sel_flag_ && oob_drag_sel_flag_) { updateTextLocToVisualPos(oob_drag_sel_vpos_); }
+
+    if (update_requested_) {
+        update();
+        update_requested_ = false;
+    }
 }
 
 QSize Editor::sizeHint() const {

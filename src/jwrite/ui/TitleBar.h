@@ -25,6 +25,11 @@ public:
 
     SystemButton *systemButton(SystemButton::SystemCommand command_type) const;
 
+protected slots:
+    void requestMinimize();
+    void requestMaximize();
+    void requestClose();
+
 public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;

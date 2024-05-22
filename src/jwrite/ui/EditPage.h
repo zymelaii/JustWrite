@@ -51,6 +51,9 @@ public:
     void renameBookDirItem(int id, const QString &title);
     void exportToLocal(const QString &path, ExportType type);
 
+protected slots:
+    void updateCurrentDateTime();
+
 protected:
     void setupUi();
     void setupConnections();
