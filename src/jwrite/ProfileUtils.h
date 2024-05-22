@@ -17,8 +17,6 @@
 #define jwrite_profiler_record(target)  ON_DEBUG(JwriteProfiler.record(ProfileTarget::target))
 #define jwrite_profiler_dump(path)      ON_DEBUG(JwriteProfiler.dump_profile_data(path))
 
-#ifndef NDEBUG
-
 namespace jwrite {
 
 enum class ProfileTarget {
@@ -72,6 +70,6 @@ private:
 
 } // namespace jwrite
 
+#ifndef NDEBUG
 extern jwrite::Profiler JwriteProfiler;
-
 #endif

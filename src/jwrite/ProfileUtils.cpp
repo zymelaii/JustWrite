@@ -1,5 +1,3 @@
-#ifndef NDEBUG
-
 #include <jwrite/ProfileUtils.h>
 #include <QDebug>
 #include <QFile>
@@ -96,6 +94,6 @@ void Profiler::clear(ProfileTarget target) {
 
 } // namespace jwrite
 
+#ifndef NDEBUG
 jwrite::Profiler JwriteProfiler;
-
 #endif

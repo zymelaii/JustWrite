@@ -21,11 +21,25 @@ namespace jwrite::ui {
 
 class BookManager : public InMemoryBookManager {
 public:
+    bool chapter_cached(int cid) const {
+        return chapters_.contains(cid);
+    }
+
     OptionalString fetch_chapter_content(int cid) override {
         if (!has_chapter(cid)) {
             return std::nullopt;
-        } else {
+        } else if (chapters_.contains(cid)) {
             return {chapters_.value(cid)};
+        } else if (const auto path = get_path_to_chapter(cid); QFile::exists(path)) {
+            QFile file(path);
+            file.open(QIODevice::ReadOnly | QIODevice::Text);
+            Q_ASSERT(file.isOpen());
+            const auto content = file.readAll();
+            file.close();
+            chapters_[cid] = content;
+            return content;
+        } else {
+            return QString{};
         }
     }
 
@@ -33,6 +47,13 @@ public:
         if (!has_chapter(cid)) { return false; }
         chapters_[cid] = text;
         return true;
+    }
+
+    QString get_path_to_chapter(int cid) const {
+        QDir dir{QCoreApplication::applicationDirPath()};
+        dir.cd("data");
+        dir.cd(AbstractBookManager::info_ref().uuid);
+        return dir.filePath(QString::number(cid));
     }
 
 private:
@@ -414,6 +435,61 @@ void JustWrite::loadDataFromLocalStorage() {
         };
 
         updateBookInfo(ui_gallery_->totalItems(), book_info);
+
+        if (!dir.exists(uuid)) { continue; }
+
+        const bool succeed = dir.cd(uuid);
+        Q_ASSERT(succeed);
+
+        auto bm = books_.value(uuid);
+        Q_ASSERT(bm);
+
+        if (dir.exists("TOC")) {
+            const auto toc_path = dir.filePath("TOC");
+            QFile      toc_file(toc_path);
+            toc_file.open(QIODevice::ReadOnly | QIODevice::Text);
+            const auto toc_text = toc_file.readAll();
+            toc_file.close();
+
+            const auto toc_json = QJsonDocument::fromJson(toc_text);
+            Q_ASSERT(toc_json.isArray());
+            const auto &volumes = toc_json.array();
+
+            /*! Json Structure
+             *  [
+             *      {
+             *          'vid': <volume-id>,
+             *          'title': '<volume-title>',
+             *          'chapters': [
+             *              {
+             *                  'cid': <chapter-id>,
+             *                  'title': '<chapter-title>',
+             *              }
+             *          ]
+             *      }
+             *  ]
+             */
+
+            int vol_index = 0;
+            for (const auto &vol_ref : volumes) {
+                Q_ASSERT(vol_ref.isObject());
+                const auto &volume    = vol_ref.toObject();
+                const auto  vid       = volume["vid"].toInt();
+                const auto  vol_title = volume["title"].toString("");
+                bm->add_volume(vol_index++, vol_title);
+                const auto &chapters   = volume["chapters"].toArray({});
+                int         chap_index = 0;
+                for (const auto &chap_ref : chapters) {
+                    Q_ASSERT(chap_ref.isObject());
+                    const auto &chapter    = chap_ref.toObject();
+                    const auto  cid        = chapter["cid"].toInt();
+                    const auto  chap_title = chapter["title"].toString("");
+                    bm->add_chapter(vid, chap_index++, chap_title);
+                }
+            }
+        }
+
+        dir.cdUp();
     }
 }
 
@@ -452,6 +528,46 @@ void JustWrite::syncToLocalStorage() {
     data_file.open(QIODevice::WriteOnly | QIODevice::Text);
     data_file.write(QJsonDocument(local_storage).toJson());
     data_file.close();
+
+    for (const auto &[uuid, bm] : books_.asKeyValueRange()) {
+        if (!dir.exists(uuid)) { dir.mkdir(uuid); }
+        dir.cd(uuid);
+
+        QJsonArray volumes;
+        for (const int vid : bm->get_volumes()) {
+            QJsonObject volume;
+            QJsonArray  chapters;
+            for (const int cid : bm->get_chapters_of_volume(vid)) {
+                QJsonObject chapter;
+                chapter["cid"]   = cid;
+                chapter["title"] = bm->get_title(cid).value().get();
+                chapters.append(chapter);
+            }
+            volume["vid"]      = vid;
+            volume["title"]    = bm->get_title(vid).value().get();
+            volume["chapters"] = chapters;
+            volumes.append(volume);
+        }
+
+        QFile toc_file(dir.filePath("TOC"));
+        toc_file.open(QIODevice::WriteOnly | QIODevice::Text);
+        toc_file.write(QJsonDocument(volumes).toJson());
+        toc_file.close();
+
+        //! FIXME: unsafe cast
+        const auto book_manager = static_cast<BookManager *>(bm);
+        for (const int cid : book_manager->get_all_chapters()) {
+            if (!book_manager->chapter_cached(cid)) { continue; }
+            const auto content = std::move(book_manager->fetch_chapter_content(cid).value());
+            QFile      file(book_manager->get_path_to_chapter(cid));
+            file.open(QIODevice::WriteOnly | QIODevice::Text);
+            Q_ASSERT(file.isOpen());
+            file.write(content.toUtf8());
+            file.close();
+        }
+
+        dir.cdUp();
+    }
 }
 
 void JustWrite::showOverlay(QWidget *widget) {
