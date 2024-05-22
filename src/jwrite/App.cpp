@@ -21,6 +21,9 @@ QRect compute_preferred_geometry(const QRect &parent_geo) {
 }
 
 int main(int argc, char *argv[]) {
+    //! TODO: ensure single jwrite instance in the system
+    //! HINT: or ensure the book is always editable in only one instance
+
     QGuiApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
     QApplication app(argc, argv);
 
