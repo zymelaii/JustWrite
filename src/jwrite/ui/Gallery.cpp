@@ -36,6 +36,8 @@ void Gallery::updateDisplayCaseItem(int index, const BookInfo &book_info) {
 
     const auto &cover_url = book_info.cover_url;
 
+    Q_ASSERT(!book_info.uuid.isEmpty());
+
     if (cover_url.isEmpty()) { return; }
 
     QImage cover(cover_url);
@@ -49,7 +51,6 @@ void Gallery::updateDisplayCaseItem(int index, const BookInfo &book_info) {
     };
 
     if (on_insert) {
-        item.book_info.uuid = AbstractBookManager::alloc_uuid();
         items_.append(std::move(item));
         updateGeometry();
     } else {

@@ -221,7 +221,8 @@ void JustWrite::requestUpdateBookInfo(int index) {
     Q_ASSERT(index >= 0 && index <= ui_gallery_->totalItems());
     const bool on_insert = index == ui_gallery_->totalItems();
 
-    auto info = on_insert ? BookInfo{} : ui_gallery_->bookInfoAt(index);
+    auto info = on_insert ? BookInfo{.uuid = AbstractBookManager::alloc_uuid()}
+                          : ui_gallery_->bookInfoAt(index);
     if (info.author.isEmpty()) { info.author = getLikelyAuthor(); }
     if (info.title.isEmpty()) { info.title = QString("未命名书籍-%1").arg(index + 1); }
 
@@ -412,7 +413,7 @@ void JustWrite::loadDataFromLocalStorage() {
             .cover_url = book["cover_url"].toString(""),
         };
 
-        ui_gallery_->updateDisplayCaseItem(ui_gallery_->totalItems(), book_info);
+        updateBookInfo(ui_gallery_->totalItems(), book_info);
     }
 }
 

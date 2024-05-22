@@ -36,6 +36,7 @@ void BookInfoEdit::setBookInfo(const BookInfo &info) {
     setTitle(info.title);
     setAuthor(info.author);
     setCover(info.cover_url);
+    book_info_.uuid = info.uuid;
 }
 
 void BookInfoEdit::setupUi() {
