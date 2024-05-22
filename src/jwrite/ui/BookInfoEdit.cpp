@@ -113,8 +113,6 @@ void BookInfoEdit::setupUi() {
     ui_cancel_->setHaloVisible(false);
 
     setCover(":/res/default-cover.png");
-
-    setFixedSize(480, 480);
 }
 
 void BookInfoEdit::setupConnections() {

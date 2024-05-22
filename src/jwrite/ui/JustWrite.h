@@ -3,7 +3,7 @@
 #include <jwrite/ui/TitleBar.h>
 #include <jwrite/ui/EditPage.h>
 #include <jwrite/ui/Gallery.h>
-#include <jwrite/ui/FloatingDialog.h>
+#include <jwrite/ui/ShadowOverlay.h>
 #include <jwrite/BookManager.h>
 #include <QWidget>
 #include <QStackedWidget>
@@ -54,8 +54,8 @@ protected:
     void    requestStartEditBook(int index);
     void    requestRenameTocItem(const BookInfo &book_info, int vid, int cid);
 
-    void showPopupLayer(QWidget *widget);
-    void closePopupLayer();
+    void showOverlay(QWidget *widget);
+    void closeOverlay();
 
     void switchToPage(PageType page);
     void closePage();
@@ -69,7 +69,7 @@ private:
     TitleBar               *ui_title_bar_;
     Gallery                *ui_gallery_;
     EditPage               *ui_edit_page_;
-    FloatingDialog         *ui_popup_layer_;
+    ShadowOverlay          *ui_popup_layer_;
     QStackedWidget         *ui_page_stack_;
     QStackedLayout         *ui_top_most_layout_;
     QWK::WidgetWindowAgent *ui_agent_;

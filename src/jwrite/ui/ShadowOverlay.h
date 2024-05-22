@@ -1,16 +1,16 @@
 #pragma once
 
 #include <QWidget>
-#include <QGridLayout>
+#include <QHBoxLayout>
 
 namespace jwrite::ui {
 
-class FloatingDialog : public QWidget {
+class ShadowOverlay : public QWidget {
     Q_OBJECT
 
 public:
-    explicit FloatingDialog(QWidget* parent = nullptr);
-    ~FloatingDialog() override;
+    explicit ShadowOverlay(QWidget* parent = nullptr);
+    ~ShadowOverlay() override;
 
 public:
     QWidget* take();
@@ -22,7 +22,7 @@ protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
-    QGridLayout* ui_layout_;
+    QHBoxLayout* ui_layout_;
 };
 
 }; // namespace jwrite::ui

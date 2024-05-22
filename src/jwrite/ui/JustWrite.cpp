@@ -38,7 +38,7 @@ JustWrite::JustWrite() {
     setupUi();
     setupConnections();
 
-    closePopupLayer();
+    closeOverlay();
     switchToPage(PageType::Gallery);
     setTheme(Theme::Dark);
 }
@@ -146,7 +146,7 @@ void JustWrite::setupUi() {
     ui_page_stack_  = new QStackedWidget;
     ui_gallery_     = new Gallery;
     ui_edit_page_   = new EditPage;
-    ui_popup_layer_ = new FloatingDialog;
+    ui_popup_layer_ = new ShadowOverlay;
 
     auto gallery_page = new ScrollArea;
     gallery_page->setWidget(ui_gallery_);
@@ -214,13 +214,13 @@ void JustWrite::requestUpdateBookInfo(int index) {
     auto edit = new BookInfoEdit;
     edit->setBookInfo(info);
 
-    showPopupLayer(edit);
+    showOverlay(edit);
 
     connect(edit, &BookInfoEdit::submitRequested, this, [this, index](BookInfo info) {
         updateBookInfo(index, info);
-        closePopupLayer();
+        closeOverlay();
     });
-    connect(edit, &BookInfoEdit::cancelRequested, this, &JustWrite::closePopupLayer);
+    connect(edit, &BookInfoEdit::cancelRequested, this, &JustWrite::closeOverlay);
     connect(edit, &BookInfoEdit::changeCoverRequested, this, [this, edit] {
         QImage     image;
         const auto path = requestImagePath(true, &image);
@@ -290,22 +290,22 @@ void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid
     input->setText(bm->get_title(cid).value());
     input->setLabel("章节名");
 
-    showPopupLayer(input);
+    showOverlay(input);
 
     connect(input, &QuickTextInput::submitRequested, this, [this, cid](QString text) {
-        closePopupLayer();
+        closeOverlay();
         ui_edit_page_->renameBookDirItem(cid, text);
     });
-    connect(input, &QuickTextInput::cancelRequested, this, &JustWrite::closePopupLayer);
+    connect(input, &QuickTextInput::cancelRequested, this, &JustWrite::closeOverlay);
 }
 
-void JustWrite::showPopupLayer(QWidget *widget) {
+void JustWrite::showOverlay(QWidget *widget) {
     ui_popup_layer_->setWidget(widget);
     ui_popup_layer_->show();
     widget->setFocus();
 }
 
-void JustWrite::closePopupLayer() {
+void JustWrite::closeOverlay() {
     ui_popup_layer_->hide();
     if (auto w = ui_popup_layer_->take()) { delete w; }
 }
@@ -314,7 +314,7 @@ void JustWrite::switchToPage(PageType page) {
     Q_ASSERT(page_map_.contains(page));
     Q_ASSERT(page_map_.value(page, nullptr));
     if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
-        closePopupLayer();
+        closeOverlay();
         ui_page_stack_->setCurrentWidget(w);
     }
     current_page_ = page;

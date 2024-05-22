@@ -50,7 +50,7 @@ void QuickTextInput::setupUi() {
     ui_input_->setFont(font);
     ui_input_->setLabelFontSize(12);
 
-    setFixedSize(480, 150);
+    setFixedWidth(480);
 }
 
 void QuickTextInput::paintEvent(QPaintEvent *event) {
