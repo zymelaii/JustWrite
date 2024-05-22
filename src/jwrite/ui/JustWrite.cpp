@@ -5,12 +5,17 @@
 #include <jwrite/ui/MessageBox.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/ProfileUtils.h>
+#include <qt-material/qtmaterialcircularprogress.h>
 #include <QScrollBar>
 #include <QVBoxLayout>
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QPainter>
 #include <QFileDialog>
+#include <QCoreApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 namespace jwrite::ui {
 
@@ -38,9 +43,10 @@ JustWrite::JustWrite() {
     setupUi();
     setupConnections();
 
-    closeOverlay();
     switchToPage(PageType::Gallery);
     setTheme(Theme::Dark);
+
+    requestInitFromLocalStorage();
 }
 
 JustWrite::~JustWrite() {
@@ -62,6 +68,14 @@ void JustWrite::updateBookInfo(int index, const BookInfo &info) {
     if (book_info.title.isEmpty()) { book_info.title = QString("未命名书籍-%1").arg(index + 1); }
 
     ui_gallery_->updateDisplayCaseItem(index, book_info);
+
+    //! FIXME: only to ensure the sync-to-local-storage is available to access all the book items,
+    //! remeber to remove this later as long as realtime sync has been done
+    if (const auto &uuid = book_info.uuid; !books_.contains(uuid)) {
+        auto bm        = new BookManager;
+        bm->info_ref() = book_info;
+        books_.insert(uuid, bm);
+    }
 }
 
 QString JustWrite::getLikelyAuthor() const {
@@ -160,12 +174,12 @@ void JustWrite::setupUi() {
     ui_agent_ = new QWK::WidgetWindowAgent(this);
     ui_agent_->setup(this);
     ui_agent_->setTitleBar(ui_title_bar_);
-    ui_agent_->setSystemButton(
-        QWK::WidgetWindowAgent::Minimize, ui_title_bar_->systemButton(SystemButton::Minimize));
-    ui_agent_->setSystemButton(
-        QWK::WidgetWindowAgent::Maximize, ui_title_bar_->systemButton(SystemButton::Maximize));
-    ui_agent_->setSystemButton(
-        QWK::WidgetWindowAgent::Close, ui_title_bar_->systemButton(SystemButton::Close));
+    // ui_agent_->setSystemButton(
+    //     QWK::WidgetWindowAgent::Minimize, ui_title_bar_->systemButton(SystemButton::Minimize));
+    // ui_agent_->setSystemButton(
+    //     QWK::WidgetWindowAgent::Maximize, ui_title_bar_->systemButton(SystemButton::Maximize));
+    // ui_agent_->setSystemButton(
+    //     QWK::WidgetWindowAgent::Close, ui_title_bar_->systemButton(SystemButton::Close));
 
     top_layout->setContentsMargins({});
     top_layout->setSpacing(0);
@@ -305,6 +319,140 @@ void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid
     connect(input, &QuickTextInput::cancelRequested, this, &JustWrite::closeOverlay);
 }
 
+void JustWrite::requestInitFromLocalStorage() {
+    showProgressOverlay();
+
+    const QDir home_dir{QCoreApplication::applicationDirPath()};
+    if (home_dir.exists("data")) {
+        loadDataFromLocalStorage();
+    } else {
+        initLocalStorage();
+    }
+
+    closeOverlay();
+}
+
+void JustWrite::requestQuitApp() {
+    showProgressOverlay();
+    //! TODO: wait other background jobs to be finished
+    syncToLocalStorage();
+    close();
+}
+
+void JustWrite::initLocalStorage() {
+    QDir dir{QCoreApplication::applicationDirPath()};
+
+    if (!dir.exists("data")) {
+        const bool succeed = dir.mkdir("data");
+        Q_ASSERT(succeed);
+    }
+
+    dir.cd("data");
+
+    QJsonObject local_storage;
+    local_storage["major_author"]     = QString{};
+    local_storage["last_update_time"] = QDateTime::currentDateTimeUtc().toString();
+    local_storage["data"]             = QJsonArray{};
+
+    /*! Json Structure
+     *  {
+     *      "data": [
+     *          {
+     *              "book_id": "<book-uuid>",
+     *              "name": "<name>",
+     *              "author": "<author>",
+     *              "cover_url": "<cover-url>",
+     *              "last_update_time": "<last-update-time>"
+     *          }
+     *      ],
+     *      "major_author" "<major-author>",
+     *      "last_update_time": "<last-update-time>"
+     *  }
+     **/
+
+    QFile data_file(dir.filePath("mainfest.json"));
+    data_file.open(QIODevice::WriteOnly | QIODevice::Text);
+
+    data_file.write(QJsonDocument(local_storage).toJson());
+
+    data_file.close();
+}
+
+void JustWrite::loadDataFromLocalStorage() {
+    QDir dir{QCoreApplication::applicationDirPath()};
+
+    Q_ASSERT(dir.exists("data"));
+    dir.cd("data");
+
+    Q_ASSERT(dir.exists("mainfest.json"));
+
+    QFile data_file(dir.filePath("mainfest.json"));
+    data_file.open(QIODevice::ReadOnly | QIODevice::Text);
+    const auto text = data_file.readAll();
+    auto       json = QJsonDocument::fromJson(text);
+    data_file.close();
+
+    Q_ASSERT(json.isObject());
+    const auto &local_storage = json.object();
+
+    likely_author_        = local_storage["major_author"].toString("");
+    const auto &book_data = local_storage["data"].toArray({});
+
+    for (const auto &ref : book_data) {
+        Q_ASSERT(ref.isObject());
+        const auto &book = ref.toObject();
+        const auto &uuid = book["book_id"].toString("");
+        const auto &name = book["name"].toString("");
+        Q_ASSERT(!uuid.isEmpty() && !name.isEmpty());
+
+        BookInfo book_info{
+            .uuid      = uuid,
+            .title     = name,
+            .author    = book["author"].toString(""),
+            .cover_url = book["cover_url"].toString(""),
+        };
+
+        ui_gallery_->updateDisplayCaseItem(ui_gallery_->totalItems(), book_info);
+    }
+}
+
+void JustWrite::syncToLocalStorage() {
+    QJsonObject local_storage;
+    QJsonArray  book_data;
+
+    //! FIXME: combine with local data
+
+    for (const auto &[uuid, bm] : books_.asKeyValueRange()) {
+        const auto &book_info = bm->info_ref();
+        Q_ASSERT(uuid == book_info.uuid);
+        QJsonObject book;
+        book["book_id"]   = book_info.uuid;
+        book["name"]      = book_info.title;
+        book["author"]    = book_info.author;
+        book["cover_url"] = book_info.cover_url;
+        //! FIXME: record real update time
+        book["last_update_time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd.HH:mm:ss");
+        //! TODO: export toc and contents
+        book_data.append(book);
+    }
+
+    local_storage["major_author"]     = likely_author_;
+    local_storage["last_update_time"] = QDateTime::currentDateTimeUtc().toString();
+    local_storage["data"]             = book_data;
+
+    QDir dir{QCoreApplication::applicationDirPath()};
+
+    Q_ASSERT(dir.exists("data"));
+    dir.cd("data");
+
+    //! TODO: check validity of local storage file
+
+    QFile data_file(dir.filePath("mainfest.json"));
+    data_file.open(QIODevice::WriteOnly | QIODevice::Text);
+    data_file.write(QJsonDocument(local_storage).toJson());
+    data_file.close();
+}
+
 void JustWrite::showOverlay(QWidget *widget) {
     ui_popup_layer_->setWidget(widget);
     ui_popup_layer_->show();
@@ -314,6 +462,10 @@ void JustWrite::showOverlay(QWidget *widget) {
 void JustWrite::closeOverlay() {
     ui_popup_layer_->hide();
     if (auto w = ui_popup_layer_->take()) { delete w; }
+}
+
+void JustWrite::showProgressOverlay() {
+    showOverlay(new QtMaterialCircularProgress);
 }
 
 void JustWrite::switchToPage(PageType page) {
@@ -336,7 +488,7 @@ void JustWrite::closePage() {
         case PageType::Gallery: {
             //! TODO: throw a dialog to confirm quiting the jwrite
             //! TODO: sync book content to local storage
-            close();
+            requestQuitApp();
         } break;
     }
 }

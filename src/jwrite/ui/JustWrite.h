@@ -54,8 +54,16 @@ protected:
     void    requestStartEditBook(int index);
     void    requestRenameTocItem(const BookInfo &book_info, int vid, int cid);
 
+    void requestInitFromLocalStorage();
+    void requestQuitApp();
+
+    void initLocalStorage();
+    void loadDataFromLocalStorage();
+    void syncToLocalStorage();
+
     void showOverlay(QWidget *widget);
     void closeOverlay();
+    void showProgressOverlay();
 
     void switchToPage(PageType page);
     void closePage();
