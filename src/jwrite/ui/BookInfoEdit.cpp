@@ -126,6 +126,8 @@ void BookInfoEdit::setupUi() {
     ui_author_edit_->setLabelFontSize(12);
 
     setCover(":/res/default-cover.png");
+
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }
 
 void BookInfoEdit::setupConnections() {

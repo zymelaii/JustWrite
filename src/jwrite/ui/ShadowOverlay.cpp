@@ -27,20 +27,20 @@ QWidget *ShadowOverlay::setWidget(QWidget *widget) {
 
 void ShadowOverlay::setupUi() {
     auto container = new QWidget;
-    auto v_layout  = new QVBoxLayout(this);
-    auto h_layout  = new QHBoxLayout(container);
-
-    v_layout->addStretch();
-    v_layout->addWidget(container);
-    v_layout->addStretch();
+    auto h_layout  = new QHBoxLayout(this);
+    auto v_layout  = new QVBoxLayout(container);
 
     h_layout->addStretch();
+    h_layout->addWidget(container);
     h_layout->addStretch();
 
-    v_layout->setContentsMargins({});
+    v_layout->addStretch();
+    v_layout->addStretch();
+
     h_layout->setContentsMargins({});
+    v_layout->setContentsMargins({});
 
-    ui_layout_ = h_layout;
+    ui_layout_ = v_layout;
 
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 }

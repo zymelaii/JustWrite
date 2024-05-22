@@ -22,7 +22,7 @@ protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
-    QHBoxLayout* ui_layout_;
+    QVBoxLayout* ui_layout_;
 };
 
 }; // namespace jwrite::ui
