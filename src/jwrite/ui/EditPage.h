@@ -78,16 +78,16 @@ private:
     int                                       chap_words_;
     int                                       total_words_;
 
-    Editor                  *ui_editor;
-    StatusBar               *ui_status_bar;
-    FlatButton              *ui_new_volume;
-    FlatButton              *ui_new_chapter;
-    FlatButton              *ui_export_to_local;
-    TwoLevelTree            *ui_book_dir;
-    QLabel                  *ui_total_words;
-    QLabel                  *ui_datetime;
-    QWidget                 *ui_sidebar;
-    QMap<QString, QWidget *> ui_named_widgets;
+    Editor                  *ui_editor_;
+    StatusBar               *ui_status_bar_;
+    FlatButton              *ui_new_volume_;
+    FlatButton              *ui_new_chapter_;
+    FlatButton              *ui_export_to_local_;
+    TwoLevelTree            *ui_book_dir_;
+    QLabel                  *ui_total_words_;
+    QLabel                  *ui_datetime_;
+    QWidget                 *ui_sidebar_;
+    QMap<QString, QWidget *> ui_named_widgets_;
 };
 
 } // namespace jwrite::ui

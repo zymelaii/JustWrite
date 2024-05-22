@@ -131,7 +131,7 @@ void Editor::reset(QString &text, bool swap) {
 QString Editor::take() {
     context_->quit_preedit();
 
-    QString text{std::move(context_->edit_text)};
+    const auto text = this->text();
 
     context_->engine.clear_all();
     context_->edit_text.clear();
