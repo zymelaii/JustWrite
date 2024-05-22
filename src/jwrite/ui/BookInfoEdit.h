@@ -1,6 +1,8 @@
 #pragma once
 
 #include <jwrite/BookManager.h>
+#include <jwrite/ui/PlainImageView.h>
+#include <jwrite/ui/FlatButton.h>
 #include <qt-material/qtmaterialtextfield.h>
 #include <qt-material/qtmaterialraisedbutton.h>
 #include <QWidget>
@@ -35,12 +37,12 @@ protected:
 private:
     BookInfo book_info_;
 
-    QtMaterialTextField    *ui_title_edit_;
-    QtMaterialTextField    *ui_author_edit_;
-    QLabel                 *ui_cover_;
-    QtMaterialRaisedButton *ui_cover_select_;
-    QtMaterialRaisedButton *ui_submit_;
-    QtMaterialRaisedButton *ui_cancel_;
+    QtMaterialTextField *ui_title_edit_;
+    QtMaterialTextField *ui_author_edit_;
+    PlainImageView      *ui_cover_;
+    FlatButton          *ui_cover_select_;
+    FlatButton          *ui_submit_;
+    FlatButton          *ui_cancel_;
 };
 
 } // namespace jwrite::ui

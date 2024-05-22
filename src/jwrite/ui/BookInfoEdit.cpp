@@ -28,10 +28,7 @@ void BookInfoEdit::setCover(const QString &cover_url) {
     QImage image(cover_url);
     if (image.isNull()) { return; }
 
-    const auto cover = QPixmap::fromImage(
-        image.scaled(ui_cover_->size(), Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
-
-    ui_cover_->setPixmap(std::move(cover));
+    ui_cover_->setImage(cover_url);
     book_info_.cover_url = cover_url;
 }
 
@@ -44,10 +41,10 @@ void BookInfoEdit::setBookInfo(const BookInfo &info) {
 void BookInfoEdit::setupUi() {
     ui_title_edit_   = new QtMaterialTextField;
     ui_author_edit_  = new QtMaterialTextField;
-    ui_cover_        = new QLabel;
-    ui_cover_select_ = new QtMaterialRaisedButton;
-    ui_submit_       = new QtMaterialRaisedButton;
-    ui_cancel_       = new QtMaterialRaisedButton;
+    ui_cover_        = new PlainImageView;
+    ui_cover_select_ = new FlatButton;
+    ui_submit_       = new FlatButton;
+    ui_cancel_       = new FlatButton;
 
     auto row_container = new QWidget;
     auto btn_container = new QWidget;
@@ -64,18 +61,19 @@ void BookInfoEdit::setupUi() {
     layout_row->addWidget(btn_container);
 
     layout_btn->addWidget(ui_cover_select_);
+    layout_btn->addStretch();
     layout_btn->addWidget(ui_submit_);
+    layout_btn->addStretch();
     layout_btn->addWidget(ui_cancel_);
+
+    ui_cover_->setViewSize(QSize(150, 200));
+    ui_cover_->setBorderVisible(true);
 
     ui_title_edit_->setLabel("书名");
     ui_title_edit_->setPlaceholderText("请输入书名");
 
     ui_author_edit_->setLabel("作者");
     ui_author_edit_->setPlaceholderText("请输入作者");
-
-    ui_cover_->setFixedSize(150, 200);
-    ui_cover_->setMargin(0);
-    ui_cover_->setFrameShape(QFrame::Box);
 
     ui_cover_select_->setText("选择封面");
     ui_submit_->setText("确认");
@@ -89,44 +87,54 @@ void BookInfoEdit::setupUi() {
     pal.setColor(QPalette::Base, Qt::white);
     pal.setColor(QPalette::Text, Qt::black);
     setPalette(pal);
+    pal.setColor(QPalette::Window, QColor("#a0a0a0"));
+    ui_cover_->setPalette(pal);
+    pal.setColor(QPalette::Window, QColor("#6d6d6d"));
+    pal.setColor(QPalette::Base, QColor("#191919"));
+    pal.setColor(QPalette::Button, QColor("#393939"));
+    pal.setColor(QPalette::WindowText, QColor("#ffffff"));
+    ui_cover_select_->setPalette(pal);
+    ui_submit_->setPalette(pal);
+    ui_cancel_->setPalette(pal);
+
+    const int  button_radius         = 4;
+    const auto btn_margins           = QMargins(16, 8, 16, 8);
+    const bool button_border_visible = true;
+    ui_cover_select_->setRadius(button_radius);
+    ui_submit_->setRadius(button_radius);
+    ui_cancel_->setRadius(button_radius);
+    ui_cover_select_->setContentsMargins(btn_margins);
+    ui_submit_->setContentsMargins(btn_margins);
+    ui_cancel_->setContentsMargins(btn_margins);
+    ui_cover_select_->setBorderVisible(button_border_visible);
+    ui_submit_->setBorderVisible(button_border_visible);
+    ui_cancel_->setBorderVisible(button_border_visible);
+    ui_cover_select_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    ui_submit_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    ui_cancel_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
     auto font = this->font();
-
     ui_title_edit_->setFont(font);
     ui_author_edit_->setFont(font);
+    font.setPointSize(12);
     ui_cover_select_->setFont(font);
     ui_submit_->setFont(font);
     ui_cancel_->setFont(font);
 
     ui_title_edit_->setLabelFontSize(12);
     ui_author_edit_->setLabelFontSize(12);
-    ui_cover_select_->setFontSize(12);
-    ui_submit_->setFontSize(12);
-    ui_cancel_->setFontSize(12);
-
-    ui_cover_select_->setRippleStyle(Material::PositionedRipple);
-    ui_submit_->setRippleStyle(Material::PositionedRipple);
-    ui_cancel_->setRippleStyle(Material::PositionedRipple);
-
-    ui_cover_select_->setHaloVisible(false);
-    ui_submit_->setHaloVisible(false);
-    ui_cancel_->setHaloVisible(false);
 
     setCover(":/res/default-cover.png");
 }
 
 void BookInfoEdit::setupConnections() {
-    connect(ui_submit_, &QtMaterialRaisedButton::pressed, this, [this] {
+    connect(ui_submit_, &FlatButton::pressed, this, [this] {
         book_info_.title  = ui_title_edit_->text();
         book_info_.author = ui_author_edit_->text();
         emit submitRequested(book_info_);
     });
-    connect(ui_cancel_, &QtMaterialRaisedButton::pressed, this, &BookInfoEdit::cancelRequested);
-    connect(
-        ui_cover_select_,
-        &QtMaterialRaisedButton::pressed,
-        this,
-        &BookInfoEdit::changeCoverRequested);
+    connect(ui_cancel_, &FlatButton::pressed, this, &BookInfoEdit::cancelRequested);
+    connect(ui_cover_select_, &FlatButton::pressed, this, &BookInfoEdit::changeCoverRequested);
 }
 
 void BookInfoEdit::paintEvent(QPaintEvent *event) {
