@@ -5,6 +5,7 @@ namespace jwrite::ui {
 
 FlatButton::FlatButton(QWidget *parent)
     : QWidget(parent)
+    , border_visible_{false}
     , ui_radius_{0}
     , ui_alignment_{Qt::AlignLeft}
     , ui_mouse_entered_{false} {
@@ -12,6 +13,11 @@ FlatButton::FlatButton(QWidget *parent)
 }
 
 FlatButton::~FlatButton() {}
+
+void FlatButton::setBorderVisible(bool visble) {
+    border_visible_ = visble;
+    update();
+}
 
 void FlatButton::setText(const QString &text) {
     text_ = text;
@@ -58,12 +64,18 @@ void FlatButton::paintEvent(QPaintEvent *e) {
 
     p.save();
     p.setBrush(brush);
-    p.setPen(Qt::transparent);
-    p.drawRoundedRect(rect(), ui_radius_, ui_radius_);
+    auto rect = this->rect();
+    if (border_visible_) {
+        rect.adjust(1, 1, -1, -1);
+        p.setPen(QPen(pal.color(QPalette::Window), 0.5));
+    } else {
+        p.setPen(Qt::transparent);
+    }
+    p.drawRoundedRect(rect, ui_radius_, ui_radius_);
     p.restore();
 
     const auto bb    = contentsRect();
-    const auto flags = ui_alignment_;
+    const auto flags = ui_alignment_ | Qt::AlignVCenter;
     p.drawText(bb, flags, text_);
 }
 

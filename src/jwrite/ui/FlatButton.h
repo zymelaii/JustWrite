@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QFrame>
 
 namespace jwrite::ui {
 
@@ -15,6 +16,8 @@ signals:
     void pressed();
 
 public:
+    void setBorderVisible(bool visble);
+
     QString text() const {
         return text_;
     }
@@ -48,6 +51,7 @@ protected:
 private:
     QString text_;
 
+    bool          border_visible_;
     int           ui_radius_;
     Qt::Alignment ui_alignment_;
     bool          ui_mouse_entered_;

@@ -2,6 +2,7 @@
 #include <jwrite/ui/ScrollArea.h>
 #include <jwrite/ui/BookInfoEdit.h>
 #include <jwrite/ui/QuickTextInput.h>
+#include <jwrite/ui/MessageBox.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/ProfileUtils.h>
 #include <QScrollBar>
@@ -10,7 +11,6 @@
 #include <QDateTime>
 #include <QPainter>
 #include <QFileDialog>
-#include <QMessageBox>
 
 namespace jwrite::ui {
 
@@ -255,9 +255,15 @@ void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
             requestUpdateBookInfo(index);
         } break;
         case Gallery::Delete: {
-            const auto result = QMessageBox::information(
-                this, "删除书籍", "是否确认删除？", QMessageBox::Yes | QMessageBox::No);
-            if (result == QMessageBox::Yes) { ui_gallery_->removeDisplayCase(index); }
+            auto dialog = new MessageBox;
+            dialog->setCaption("删除书籍");
+            dialog->setText("删除后，作品将无法恢复，请谨慎操作。");
+
+            showOverlay(dialog);
+            const int result = dialog->exec();
+            closeOverlay();
+
+            if (result == MessageBox::Yes) { ui_gallery_->removeDisplayCase(index); }
         } break;
     }
 }

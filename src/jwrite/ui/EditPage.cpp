@@ -311,7 +311,6 @@ void EditPage::exportToLocal(const QString &path, ExportType type) {
             QFile file(path);
             if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
                 //! TODO: replace with jwrite style message box
-                QMessageBox::warning(this, "导出失败", "无法打开文件：" + path);
                 return;
             }
 
