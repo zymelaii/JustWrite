@@ -33,7 +33,7 @@ int MessageBox::exec() {
 
 void MessageBox::setupUi() {
     ui_caption_ = new QLabel;
-    ui_close_   = new QLabel;
+    ui_close_   = new Label;
     ui_icon_    = new QLabel;
     ui_message_ = new QLabel;
     ui_btn_no_  = new FlatButton;
@@ -121,6 +121,9 @@ void MessageBox::setupUi() {
 }
 
 void MessageBox::setupConnections() {
+    connect(ui_close_, &Label::pressed, this, [this] {
+        notifyChoice(Choice::Cancel);
+    });
     connect(ui_btn_no_, &FlatButton::pressed, this, [this] {
         notifyChoice(Choice::No);
     });

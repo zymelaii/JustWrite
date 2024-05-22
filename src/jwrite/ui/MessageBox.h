@@ -1,6 +1,7 @@
 #pragma once
 
 #include <jwrite/ui/FlatButton.h>
+#include <jwrite/ui/Label.h>
 #include <QWidget>
 #include <QLabel>
 #include <QEventLoop>
@@ -45,7 +46,7 @@ protected:
 
 private:
     QLabel     *ui_caption_;
-    QLabel     *ui_close_;
+    Label      *ui_close_;
     QLabel     *ui_icon_;
     QLabel     *ui_message_;
     FlatButton *ui_btn_no_;
