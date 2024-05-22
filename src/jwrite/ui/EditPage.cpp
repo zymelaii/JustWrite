@@ -102,11 +102,13 @@ public:
         : QObject(parent) {}
 
     void render(QPainter *p, const QRect &clip_bb, const TwoLevelTree::ItemInfo &item_info) {
+        const auto fm    = p->fontMetrics();
+        const auto flags = Qt::AlignLeft | Qt::AlignVCenter;
         const auto format =
             item_info.is_top_item ? QStringLiteral("第 %1 卷 %2") : QStringLiteral("第 %1 章 %2");
         const auto title = format.arg(item_info.level_index + 1).arg(item_info.value);
-        const auto flags = Qt::AlignLeft | Qt::AlignVCenter;
-        p->drawText(clip_bb, flags, title);
+        const auto text  = fm.elidedText(title, Qt::ElideRight, clip_bb.width());
+        p->drawText(clip_bb, flags, text);
     }
 };
 
