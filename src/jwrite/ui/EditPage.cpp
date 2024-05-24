@@ -486,9 +486,13 @@ void EditPage::setupConnections() {
     connect(ui_editor_, &Editor::textChanged, this, [this](const QString &text) {
         updateWordsCount(text, true);
     });
-    connect(ui_book_dir_, &TwoLevelTree::subItemSelected, this, [this](int vid, int cid) {
-        openChapter(cid);
-    });
+    connect(
+        ui_book_dir_,
+        &TwoLevelTree::itemSelected,
+        this,
+        [this](bool is_top_item, int top_item_id, int sub_item_id) {
+            if (!is_top_item) { openChapter(sub_item_id); }
+        });
     connect(ui_new_volume_, &FlatButton::pressed, this, [this] {
         addVolume(ui_book_dir_->totalTopItems(), "");
     });
@@ -589,8 +593,20 @@ void EditPage::createAndOpenNewChapter() {
 
 void EditPage::requestRenameTocItem() {
     if (!book_manager_) { return; }
+
+    const int item_id = ui_book_dir_->selectedItem();
+    if (item_id == -1) { return; }
+
     const int cid = ui_book_dir_->selectedSubItem();
-    if (cid == -1) { return; }
+
+    if (cid != item_id) {
+        Q_ASSERT(item_id == ui_book_dir_->focusedTopItem());
+        emit renameTocItemRequested(book_manager_->info_ref(), item_id, -1);
+        return;
+    }
+
+    //! ATTENTION: do not use focusTopItem() here to get the vid, it is not always the corresponding
+    //! top item to of the selected sub item
 
     for (const int vid : book_manager_->get_volumes()) {
         if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }

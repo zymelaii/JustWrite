@@ -8,6 +8,7 @@ namespace jwrite::ui {
 TwoLevelTree::TwoLevelTree(QWidget *parent)
     : QWidget(parent)
     , model_{nullptr}
+    , selected_item_{-1}
     , selected_sub_item_{-1}
     , focused_top_item_{-1}
     , render_proxy_{nullptr}
@@ -35,8 +36,8 @@ TwoLevelDataModel *TwoLevelTree::setModel(TwoLevelDataModel *model) {
     connect(model, &TwoLevelDataModel::valueChanged, this, &QWidget::updateGeometry);
     model->setParent(this);
 
-    selected_sub_item_ = -1;
-    focused_top_item_  = -1;
+    selected_item_    = -1;
+    focused_top_item_ = -1;
 
     ellapsed_top_items_.clear();
     ui_hover_row_index_ = -1;
@@ -59,6 +60,10 @@ void TwoLevelTree::setItemRenderProxy(ItemRenderProxy *proxy) {
     }
 }
 
+int TwoLevelTree::selectedItem() const {
+    return selected_item_;
+}
+
 int TwoLevelTree::selectedSubItem() const {
     return selected_sub_item_;
 }
@@ -69,7 +74,8 @@ bool TwoLevelTree::setSubItemSelected(int top_item_id, int sub_item_id) {
     if (!model_->has_sub_item_strict(top_item_id, sub_item_id)) { return false; }
 
     selected_sub_item_ = sub_item_id;
-    emit subItemSelected(top_item_id, sub_item_id);
+    selected_item_     = selected_sub_item_;
+    emit itemSelected(false, top_item_id, sub_item_id);
     update();
 
     return true;
@@ -95,7 +101,7 @@ void TwoLevelTree::setTopItemEllapsed(int top_item_id, bool ellapse) {
     update();
 }
 
-int TwoLevelTree::focuedTopItem() const {
+int TwoLevelTree::focusedTopItem() const {
     return focused_top_item_;
 }
 
@@ -174,10 +180,10 @@ void TwoLevelTree::drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &i
     if (item_info.is_top_item) {
         const bool ellapsed = ellapsed_top_items_.contains(item_info.id);
         svg_name            = ellapsed ? "ellapse" : "expand";
-    } else if (selected_sub_item_ != item_info.id) {
-        return;
-    } else {
+    } else if (selectedSubItem() == item_info.id) {
         svg_name = "edit";
+    } else {
+        return;
     }
 
     const auto svg_file = QString(":/res/icons/indicator/%1.svg").arg(svg_name);
@@ -245,6 +251,15 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
         drawIndicator(&p, indicator_bb, item_info);
         render_func_(&p, item_bb, item_info);
 
+        if (row_index == ui_hover_row_index_) {
+            hover_bb          = item_bb;
+            hover_item_id     = top_id;
+            should_draw_hover = true;
+        } else if (selected_item_ == top_id) {
+            sel_bb              = item_bb;
+            found_selected_item = true;
+        }
+
         ++row_index;
         item_bb.translate(0, row_height);
         indicator_bb.translate(0, row_height);
@@ -269,7 +284,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
                     hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
                     hover_item_id     = sub_id;
                     should_draw_hover = true;
-                } else if (selected_sub_item_ == sub_id) {
+                } else if (selected_item_ == sub_id) {
                     sel_bb              = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
                     found_selected_item = true;
                 }
@@ -296,10 +311,10 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
 
     if (found_selected_item) {
         //! FIXME: assertion not complete
-        //! HINT: case 1: selected_sub_item_ != -1
-        //! HINT: case 2: should_draw_hover && hover_item_id == selected_sub_item_
-        //! HINT: case 3: selected_sub_item_ is available but the corresponding top item is ellapsed
-        //! and the selected_sub_item_ becomes a dirty value without being noticed
+        //! HINT: case 1: selected_item_ != -1
+        //! HINT: case 2: should_draw_hover && hover_item_id == selected_item_
+        //! HINT: case 3: selected_item_ is an available sub item but the corresponding top item is
+        //! ellapsed and the target sub item becomes a dirty value without being noticed
         p.fillRect(sel_bb, selected_color);
     }
 }
@@ -392,12 +407,15 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
     if (e->button() == Qt::LeftButton) {
         if (item_info.is_top_item) {
             toggleEllapsedTopItem(item_info.id);
+            selected_item_ = item_id[Top];
         } else {
             Q_ASSERT(item_id[Sub] == item_info.id);
-            selected_sub_item_ = item_id[Sub];
-            emit subItemSelected(item_id[Top], item_id[Sub]);
+            selected_item_     = item_id[Sub];
+            selected_sub_item_ = selected_item_;
         }
+        emit itemSelected(item_info.is_top_item, item_id[Top], item_id[Sub]);
         setFocusedTopItem(item_id[Top]);
+        update();
     } else if (e->button() == Qt::RightButton) {
         emit contextMenuRequested(e->pos(), item_info);
     }

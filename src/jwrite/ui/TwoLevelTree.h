@@ -34,7 +34,7 @@ public:
     virtual ~TwoLevelTree();
 
 signals:
-    void subItemSelected(int top_item_id, int sub_item_id);
+    void itemSelected(bool is_top_item, int top_item_id, int sub_item_id);
     void contextMenuRequested(QPoint pos, ItemInfo item_info);
 
 public:
@@ -90,12 +90,13 @@ public:
 
     void setItemRenderProxy(ItemRenderProxy *proxy);
 
+    int  selectedItem() const;
     int  selectedSubItem() const;
     bool setSubItemSelected(int top_item_id, int sub_item_id);
     bool topItemEllapsed(int top_item_id) const;
     void toggleEllapsedTopItem(int top_item_id);
     void setTopItemEllapsed(int top_item_id, bool ellapse);
-    int  focuedTopItem() const;
+    int  focusedTopItem() const;
     void setFocusedTopItem(int top_item_id);
     void clearTopItemFocus();
 
@@ -121,6 +122,7 @@ protected:
 private:
     TwoLevelDataModel *model_;
     QSet<int>          ellapsed_top_items_;
+    int                selected_item_;
     int                selected_sub_item_;
     int                focused_top_item_;
     ItemRenderProxy   *render_proxy_;

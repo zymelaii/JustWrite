@@ -352,9 +352,17 @@ void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid
     auto bm = books_.value(book_info.uuid);
     Q_ASSERT(bm);
 
-    input->setPlaceholderText("请输入新章节名");
-    input->setText(bm->get_title(cid).value());
-    input->setLabel("章节名");
+    const int toc_id = cid == -1 ? vid : cid;
+    Q_ASSERT(bm->has_toc_item(toc_id));
+
+    if (cid == -1) {
+        input->setPlaceholderText("请输入新分卷名");
+        input->setLabel("分卷名");
+    } else {
+        input->setPlaceholderText("请输入新章节名");
+        input->setLabel("章节名");
+    }
+    input->setText(bm->get_title(toc_id).value());
 
     showOverlay(input);
 
@@ -362,9 +370,9 @@ void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid
         input,
         &QuickTextInput::submitRequested,
         this,
-        [this, cid](QString text) {
+        [this, toc_id](QString text) {
             closeOverlay();
-            ui_edit_page_->renameBookDirItem(cid, text);
+            ui_edit_page_->renameBookDirItem(toc_id, text);
             ui_edit_page_->focusOnEditor();
         },
         Qt::QueuedConnection);
