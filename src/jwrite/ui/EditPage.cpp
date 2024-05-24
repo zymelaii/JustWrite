@@ -551,8 +551,20 @@ void EditPage::flushWordsCount() {
     syncWordsStatus();
 }
 
+QString getFriendlyWordCount(int count) {
+    if (count > 1000 * 100) {
+        return " " + QString::number(count * 1e-4, 'f', 2) + " 万";
+    } else if (count > 1000 * 10) {
+        return " " + QString::number(count * 1e-3, 'f', 1) + " 千";
+    } else {
+        return " " + QString::number(count) + " ";
+    }
+}
+
 void EditPage::syncWordsStatus() {
-    ui_total_words_->setText(QString("全书共 %1 字 本章 %2 字").arg(total_words_).arg(chap_words_));
+    ui_total_words_->setText(QString("全书共%1字 本章%2字")
+                                 .arg(getFriendlyWordCount(total_words_))
+                                 .arg(getFriendlyWordCount(chap_words_)));
 }
 
 void EditPage::createAndOpenNewChapter() {
