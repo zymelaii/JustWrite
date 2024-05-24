@@ -542,7 +542,8 @@ void EditPage::flushWordsCount() {
     total_words_ = 0;
     if (book_manager_) {
         for (const auto cid : book_manager_->get_all_chapters()) {
-            const int count = book_manager_->fetch_chapter_content(cid).value().length();
+            const int count =
+                word_counter_->count_all(book_manager_->fetch_chapter_content(cid).value());
             if (cid == current_cid_) { chap_words_ = count; }
             total_words_ += count;
         }
