@@ -73,6 +73,13 @@ JustWrite::JustWrite() {
     switchToPage(PageType::Gallery);
     setTheme(Theme::Dark);
 
+    //! NOTE: Qt gives out an unexpected minimum height to my widgets and QLayout::invalidate()
+    //! could not solve the problem, maybe there is some dirty cached data at the bottom level. I
+    //! eventually found that an explicit call to the expcted-to-be-readonly method sizeHint() could
+    //! make effects on the confusing issue. so, **DO NOT TOUCH THE CODE** unless you figure out a
+    //! better way to solve the problem
+    const auto DO_NOT_REMOVE_THIS_STATEMENT = sizeHint();
+
     requestInitFromLocalStorage();
 }
 
