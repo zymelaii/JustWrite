@@ -25,6 +25,10 @@ public:
         return chapters_.contains(cid);
     }
 
+    bool is_chapter_dirty(int cid) const {
+        return modified_.contains(cid);
+    }
+
     OptionalString fetch_chapter_content(int cid) override {
         if (!has_chapter(cid)) {
             return std::nullopt;
@@ -46,6 +50,7 @@ public:
     bool sync_chapter_content(int cid, const QString &text) override {
         if (!has_chapter(cid)) { return false; }
         chapters_[cid] = text;
+        modified_.insert(cid);
         return true;
     }
 
@@ -58,6 +63,7 @@ public:
 
 private:
     QMap<int, QString> chapters_;
+    QSet<int>          modified_;
 };
 
 JustWrite::JustWrite() {
@@ -90,8 +96,8 @@ void JustWrite::updateBookInfo(int index, const BookInfo &info) {
 
     ui_gallery_->updateDisplayCaseItem(index, book_info);
 
-    //! FIXME: only to ensure the sync-to-local-storage is available to access all the book items,
-    //! remeber to remove this later as long as realtime sync has been done
+    //! FIXME: only to ensure the sync-to-local-storage is available to access all the book
+    //! items, remeber to remove this later as long as realtime sync has been done
     if (const auto &uuid = book_info.uuid; !books_.contains(uuid)) {
         auto bm        = new BookManager;
         bm->info_ref() = book_info;
@@ -302,8 +308,8 @@ void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
             if (result == MessageBox::Yes) {
                 const auto uuid = ui_gallery_->bookInfoAt(index).uuid;
                 ui_gallery_->removeDisplayCase(index);
-                //! NOTE: remove the book-manager means remove the book from the local storage when
-                //! the jwrite exits, see syncToLocalStorage()
+                //! NOTE: remove the book-manager means remove the book from the local storage
+                //! when the jwrite exits, see syncToLocalStorage()
                 //! FIXME: that's not a good idea
                 auto bm = books_.value(uuid);
                 books_.remove(uuid);
@@ -538,10 +544,10 @@ void JustWrite::syncToLocalStorage() {
     data_file.write(QJsonDocument(local_storage).toJson());
     data_file.close();
 
-    //! NOTE: here we simply sync to local according to the book set in the memory, and remove the
-    //! book from the set also means remove the book from the local storage, however, in the current
-    //! edition, we simply delete the record without removing the content from your machine, so you
-    //! can mannually recover it by adding the record to the mainfest.json file
+    //! NOTE: here we simply sync to local according to the book set in the memory, and remove
+    //! the book from the set also means remove the book from the local storage, however, in the
+    //! current edition, we simply delete the record without removing the content from your
+    //! machine, so you can mannually recover it by adding the record to the mainfest.json file
     //! FIXME: you know what I'm gonna say - yeah, that's not a good idea
 
     for (const auto &[uuid, bm] : books_.asKeyValueRange()) {
@@ -572,7 +578,8 @@ void JustWrite::syncToLocalStorage() {
         //! FIXME: unsafe cast
         const auto book_manager = static_cast<BookManager *>(bm);
         for (const int cid : book_manager->get_all_chapters()) {
-            if (!book_manager->chapter_cached(cid)) { continue; }
+            if (!book_manager->is_chapter_dirty(cid)) { continue; }
+            Q_ASSERT(book_manager->chapter_cached(cid));
             const auto content = std::move(book_manager->fetch_chapter_content(cid).value());
             QFile      file(book_manager->get_path_to_chapter(cid));
             file.open(QIODevice::WriteOnly | QIODevice::Text);
