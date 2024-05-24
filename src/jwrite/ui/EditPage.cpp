@@ -293,6 +293,8 @@ void EditPage::openChapter(int cid) {
     }
 
     jwrite_profiler_record(SwitchChapter);
+
+    focusOnEditor();
 }
 
 void EditPage::syncAndClearEditor() {
@@ -475,7 +477,7 @@ void EditPage::setupConnections() {
     connect(ui_editor_, &Editor::activated, this, [this] {
         if (current_cid_ != -1) { return; }
         if (book_manager_->get_all_chapters().empty()) {
-            createAndOpenNewChapter();
+            createAndOpenNewChapter(-1);
         } else {
             //! TODO: open the last opened chapter
             //! ATTENTION: here we assume that the returned chapters are in order
@@ -496,7 +498,11 @@ void EditPage::setupConnections() {
     connect(ui_new_volume_, &FlatButton::pressed, this, [this] {
         addVolume(ui_book_dir_->totalTopItems(), "");
     });
-    connect(ui_new_chapter_, &FlatButton::pressed, this, &EditPage::createAndOpenNewChapter);
+    connect(
+        ui_new_chapter_,
+        &FlatButton::pressed,
+        this,
+        &EditPage::createAndOpenNewChapterUnderActiveVolume);
     connect(ui_export_to_local_, &FlatButton::pressed, this, &EditPage::requestExportToLocal);
     connect(&sec_timer_, SIGNAL(timeout()), this, SLOT(updateCurrentDateTime()));
     connect(ui_editor_, &Editor::focusLost, this, [this](VisualTextEditContext::TextLoc last_loc) {
@@ -580,15 +586,41 @@ void EditPage::syncWordsStatus() {
                                  .arg(getFriendlyWordCount(chap_words_)));
 }
 
-void EditPage::createAndOpenNewChapter() {
+void EditPage::createAndOpenNewChapter(int vid) {
     //! TODO: consider to create the new chapter under the volume which is corresponded to the
     //! focused top item in book dir
 
-    if (ui_book_dir_->totalTopItems() == 0) { addVolume(0, "默认卷"); }
-    const int volume_index = ui_book_dir_->totalTopItems() - 1;
-    const int cid          = addChapter(volume_index, "");
+    int volume_index = ui_book_dir_->totalTopItems() - 1;
+    if (vid != -1) {
+        Q_ASSERT(book_manager_->has_volume(vid));
+        volume_index = book_manager_->get_volumes().indexOf(vid);
+    }
+
+    if (volume_index == -1) {
+        addVolume(0, "默认卷");
+        volume_index = 0;
+    } else if (volume_index >= ui_book_dir_->totalTopItems()) {
+        addVolume(volume_index, "");
+    }
+
+    const int cid = addChapter(volume_index, "");
     openChapter(cid);
     ui_book_dir_->setSubItemSelected(ui_book_dir_->topItemAt(volume_index), cid);
+}
+
+void EditPage::createAndOpenNewChapterUnderActiveVolume() {
+    const int vid     = ui_book_dir_->focusedTopItem();
+    const int item_id = ui_book_dir_->selectedItem();
+    if (vid == -1) {
+        Q_ASSERT(item_id == -1);
+        createAndOpenNewChapter(-1);
+    } else if (vid != item_id) {
+        Q_ASSERT(item_id != -1);
+        Q_ASSERT(item_id == ui_book_dir_->selectedSubItem());
+        createAndOpenNewChapter(vid);
+    } else {
+        createAndOpenNewChapter(vid);
+    }
 }
 
 void EditPage::requestRenameTocItem() {
@@ -626,7 +658,7 @@ bool EditPage::handleShortcuts(QKeyEvent *event) {
                 ui_editor_->setSoftCenterMode(!ui_editor_->softCenterMode());
             } break;
             case GlobalCommand::CreateNewChapter: {
-                createAndOpenNewChapter();
+                createAndOpenNewChapterUnderActiveVolume();
             } break;
             case GlobalCommand::Rename: {
                 requestRenameTocItem();

@@ -75,6 +75,8 @@ bool TwoLevelTree::setSubItemSelected(int top_item_id, int sub_item_id) {
 
     selected_sub_item_ = sub_item_id;
     selected_item_     = selected_sub_item_;
+    setFocusedTopItem(top_item_id);
+
     emit itemSelected(false, top_item_id, sub_item_id);
     update();
 
@@ -376,6 +378,8 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
             break;
         }
 
+        ++item_info.global_index;
+
         const int total_sub_items = totalSubItemsUnderTopItem(top_id);
         if (!topItemEllapsed(top_id)) {
             int local_index = 0;
@@ -396,7 +400,7 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
             if (item_info.id != -1) { break; }
         }
 
-        item_info.global_index += total_sub_items + 1;
+        item_info.global_index += total_sub_items;
         level_index[Top]       += 1;
         level_index[Sub]       += total_sub_items;
         ++row_index;

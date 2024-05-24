@@ -65,7 +65,8 @@ protected:
     void updateWordsCount(const QString &text, bool text_changed);
     void flushWordsCount();
     void syncWordsStatus();
-    void createAndOpenNewChapter();
+    void createAndOpenNewChapter(int vid);
+    void createAndOpenNewChapterUnderActiveVolume();
     void requestRenameTocItem();
     bool handleShortcuts(QKeyEvent *event);
 
