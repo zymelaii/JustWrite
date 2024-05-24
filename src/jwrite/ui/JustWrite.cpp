@@ -102,6 +102,8 @@ void JustWrite::updateBookInfo(int index, const BookInfo &info) {
         auto bm        = new BookManager;
         bm->info_ref() = book_info;
         books_.insert(uuid, bm);
+    } else {
+        books_.value(uuid)->info_ref() = book_info;
     }
 }
 
