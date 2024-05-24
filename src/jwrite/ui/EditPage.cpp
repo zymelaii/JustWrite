@@ -138,7 +138,8 @@ EditPage::~EditPage() {
                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
 
     delete word_counter_;
-    if (book_manager_) { delete book_manager_; }
+
+    //! NOTE: do not release book_manager_, it will be released by the parent widget
 
     messy_input_->kill();
     delete messy_input_;
@@ -514,6 +515,7 @@ void EditPage::setupConnections() {
 
 void EditPage::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
     //! TODO: menu style & popup input to edit the new title
+    qDebug() << "show menu at" << pos << item_info;
 }
 
 void EditPage::requestExportToLocal() {
@@ -637,8 +639,8 @@ void EditPage::requestRenameTocItem() {
         return;
     }
 
-    //! ATTENTION: do not use focusTopItem() here to get the vid, it is not always the corresponding
-    //! top item to of the selected sub item
+    //! ATTENTION: do not use focusTopItem() here to get the vid, it is not always the
+    //! corresponding top item to of the selected sub item
 
     for (const int vid : book_manager_->get_volumes()) {
         if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }

@@ -133,3 +133,5 @@ private:
 };
 
 } // namespace jwrite::ui
+
+QDebug operator<<(QDebug stream, const jwrite::ui::TwoLevelTree::ItemInfo &item_info);

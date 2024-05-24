@@ -426,3 +426,11 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
 }
 
 } // namespace jwrite::ui
+
+QDebug operator<<(QDebug stream, const jwrite::ui::TwoLevelTree::ItemInfo &item_info) {
+    stream.nospace() << "ItemInfo::" << (item_info.is_top_item ? "Top" : "Sub")
+                     << "(id=" << item_info.id << ", index=[" << item_info.global_index << ","
+                     << item_info.local_index << "," << item_info.level_index
+                     << "], value=" << item_info.value << ")";
+    return stream;
+}
