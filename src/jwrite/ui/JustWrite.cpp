@@ -358,11 +358,25 @@ void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid
 
     showOverlay(input);
 
-    connect(input, &QuickTextInput::submitRequested, this, [this, cid](QString text) {
-        closeOverlay();
-        ui_edit_page_->renameBookDirItem(cid, text);
-    });
-    connect(input, &QuickTextInput::cancelRequested, this, &JustWrite::closeOverlay);
+    connect(
+        input,
+        &QuickTextInput::submitRequested,
+        this,
+        [this, cid](QString text) {
+            closeOverlay();
+            ui_edit_page_->renameBookDirItem(cid, text);
+            ui_edit_page_->focusOnEditor();
+        },
+        Qt::QueuedConnection);
+    connect(
+        input,
+        &QuickTextInput::cancelRequested,
+        this,
+        [this] {
+            closeOverlay();
+            ui_edit_page_->focusOnEditor();
+        },
+        Qt::QueuedConnection);
 }
 
 void JustWrite::requestInitFromLocalStorage() {

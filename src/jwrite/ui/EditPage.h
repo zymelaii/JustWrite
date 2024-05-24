@@ -48,6 +48,7 @@ public:
     int  addChapter(int volume_index, const QString &title);
     void openChapter(int cid);
     void syncAndClearEditor();
+    void focusOnEditor();
 
     void renameBookDirItem(int id, const QString &title);
     void exportToLocal(const QString &path, ExportType type);
@@ -66,7 +67,9 @@ protected:
     void syncWordsStatus();
     void createAndOpenNewChapter();
     void requestRenameTocItem();
+    bool handleShortcuts(QKeyEvent *event);
 
+    void keyPressEvent(QKeyEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
@@ -79,6 +82,7 @@ private:
     QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;
     int                                       chap_words_;
     int                                       total_words_;
+    VisualTextEditContext::TextLoc            last_loc_;
 
     Editor                  *ui_editor_;
     StatusBar               *ui_status_bar_;

@@ -46,7 +46,7 @@ protected:
     void paintEvent(QPaintEvent *e) override;
     void enterEvent(QEnterEvent *event) override;
     void leaveEvent(QEvent *event) override;
-    void mouseReleaseEvent(QMouseEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
 
 private:
     QString text_;

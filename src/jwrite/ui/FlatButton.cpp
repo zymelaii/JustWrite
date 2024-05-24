@@ -1,5 +1,6 @@
 #include <jwrite/ui/FlatButton.h>
 #include <QPainter>
+#include <QMouseEvent>
 
 namespace jwrite::ui {
 
@@ -91,8 +92,11 @@ void FlatButton::leaveEvent(QEvent *event) {
     update();
 }
 
-void FlatButton::mouseReleaseEvent(QMouseEvent *e) {
-    emit pressed();
+void FlatButton::mousePressEvent(QMouseEvent *e) {
+    if (e->button() == Qt::LeftButton) {
+        emit pressed();
+        e->accept();
+    }
 }
 
 } // namespace jwrite::ui

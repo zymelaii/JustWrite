@@ -123,6 +123,7 @@ EditPage::EditPage(QWidget *parent)
     setupUi();
     setupConnections();
 
+    last_loc_.block_index = -1;
     command_manager_.load_default();
 
     ui_editor_->installEventFilter(this);
@@ -306,6 +307,13 @@ void EditPage::syncAndClearEditor() {
     flushWordsCount();
 }
 
+void EditPage::focusOnEditor() {
+    if (ui_editor_->hasFocus()) { return; }
+    if (last_loc_.block_index != -1) { ui_editor_->setCursorToTextLoc(last_loc_); }
+    ui_editor_->setFocus();
+    Q_ASSERT(ui_editor_->hasFocus());
+}
+
 void EditPage::renameBookDirItem(int id, const QString &title) {
     Q_ASSERT(book_manager_);
     ui_book_dir_->setItemValue(id, title);
@@ -487,7 +495,8 @@ void EditPage::setupConnections() {
     connect(ui_new_chapter_, &FlatButton::pressed, this, &EditPage::createAndOpenNewChapter);
     connect(ui_export_to_local_, &FlatButton::pressed, this, &EditPage::requestExportToLocal);
     connect(&sec_timer_, SIGNAL(timeout()), this, SLOT(updateCurrentDateTime()));
-    connect(ui_editor_, &Editor::focusLost, this, [this] {
+    connect(ui_editor_, &Editor::focusLost, this, [this](VisualTextEditContext::TextLoc last_loc) {
+        last_loc_ = last_loc;
         messy_input_->kill();
     });
     connect(ui_book_dir_, &TwoLevelTree::contextMenuRequested, this, &EditPage::popupBookDirMenu);
@@ -589,6 +598,37 @@ void EditPage::requestRenameTocItem() {
     }
 }
 
+bool EditPage::handleShortcuts(QKeyEvent *event) {
+    if (auto opt = command_manager_.match(event)) {
+        const auto action = *opt;
+        qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
+        switch (action) {
+            case GlobalCommand::ToggleSidebar: {
+                ui_sidebar_->setVisible(!ui_sidebar_->isVisible());
+            } break;
+            case GlobalCommand::ToggleSoftCenterMode: {
+                ui_editor_->setSoftCenterMode(!ui_editor_->softCenterMode());
+            } break;
+            case GlobalCommand::CreateNewChapter: {
+                createAndOpenNewChapter();
+            } break;
+            case GlobalCommand::Rename: {
+                requestRenameTocItem();
+            } break;
+            case GlobalCommand::DEV_EnableMessyInput: {
+                ui_editor_->setFocus();
+                messy_input_->start();
+            } break;
+        }
+        return true;
+    }
+    return false;
+}
+
+void EditPage::keyPressEvent(QKeyEvent *event) {
+    handleShortcuts(event);
+}
+
 bool EditPage::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto e = static_cast<QKeyEvent *>(event);
@@ -600,29 +640,7 @@ bool EditPage::eventFilter(QObject *watched, QEvent *event) {
             return true;
         }
 
-        if (auto opt = command_manager_.match(e)) {
-            const auto action = *opt;
-            qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
-            switch (action) {
-                case GlobalCommand::ToggleSidebar: {
-                    ui_sidebar_->setVisible(!ui_sidebar_->isVisible());
-                } break;
-                case GlobalCommand::ToggleSoftCenterMode: {
-                    ui_editor_->setSoftCenterMode(!ui_editor_->softCenterMode());
-                } break;
-                case GlobalCommand::CreateNewChapter: {
-                    createAndOpenNewChapter();
-                } break;
-                case GlobalCommand::Rename: {
-                    requestRenameTocItem();
-                } break;
-                case GlobalCommand::DEV_EnableMessyInput: {
-                    ui_editor_->setFocus();
-                    messy_input_->start();
-                } break;
-            }
-            return true;
-        }
+        if (const bool done = handleShortcuts(e)) { return true; }
     }
 
     if (event->type() == QEvent::MouseButtonDblClick) {

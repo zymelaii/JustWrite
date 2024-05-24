@@ -717,8 +717,12 @@ void Editor::focusOutEvent(QFocusEvent *e) {
     QWidget::focusOutEvent(e);
     context_->unset_sel();
     blink_timer_.stop();
+
+    const auto text_loc = currentTextLoc();
+
     context_->engine.active_block_index = -1;
-    emit focusLost();
+
+    emit focusLost(text_loc);
 }
 
 void Editor::keyPressEvent(QKeyEvent *e) {
