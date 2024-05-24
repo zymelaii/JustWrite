@@ -45,6 +45,9 @@ public:
     virtual int add_volume(int index, const QString &title)           = 0;
     virtual int add_chapter(int vid, int index, const QString &title) = 0;
 
+    virtual bool add_volume_as(int index, int id, const QString &title)           = 0;
+    virtual bool add_chapter_as(int vid, int index, int id, const QString &title) = 0;
+
     virtual int  remove_volume(int vid)  = 0;
     virtual bool remove_chapter(int cid) = 0;
 
@@ -96,6 +99,9 @@ public:
     int add_volume(int index, const QString &title) override;
     int add_chapter(int vid, int index, const QString &title) override;
 
+    bool add_volume_as(int index, int id, const QString &title) override;
+    bool add_chapter_as(int vid, int index, int id, const QString &title) override;
+
     int  remove_volume(int vid) override;
     bool remove_chapter(int cid) override;
 
@@ -122,6 +128,9 @@ public:
         title_pool_[id] = title;
         return true;
     }
+
+protected:
+    int get_available_toc_id() const;
 
 private:
     BookInfo              info_;

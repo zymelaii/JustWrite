@@ -522,7 +522,7 @@ void JustWrite::loadDataFromLocalStorage() {
                 const auto &volume    = vol_ref.toObject();
                 const auto  vid       = volume["vid"].toInt();
                 const auto  vol_title = volume["title"].toString("");
-                bm->add_volume(vol_index++, vol_title);
+                bm->add_volume_as(vol_index++, vid, vol_title);
                 const auto &chapters   = volume["chapters"].toArray({});
                 int         chap_index = 0;
                 for (const auto &chap_ref : chapters) {
@@ -530,7 +530,7 @@ void JustWrite::loadDataFromLocalStorage() {
                     const auto &chapter    = chap_ref.toObject();
                     const auto  cid        = chapter["cid"].toInt();
                     const auto  chap_title = chapter["title"].toString("");
-                    bm->add_chapter(vid, chap_index++, chap_title);
+                    bm->add_chapter_as(vid, chap_index++, cid, chap_title);
                 }
             }
         }

@@ -1,5 +1,6 @@
 #include <jwrite/BookManager.h>
 #include <QUuid>
+#include <algorithm>
 
 namespace jwrite {
 
@@ -15,21 +16,36 @@ QList<int> InMemoryBookManager::get_all_chapters() const {
 
 int InMemoryBookManager::add_volume(int index, const QString &title) {
     Q_ASSERT(index >= 0 && index <= vid_list_.size());
-    const int id = title_pool_.size();
-    title_pool_.insert(id, title);
-    vid_list_.insert(index, id);
-    cid_list_set_.insert(id, {});
+    const int  id      = get_available_toc_id();
+    const bool succeed = add_volume_as(index, id, title);
+    Q_ASSERT(succeed);
     return id;
 }
 
 int InMemoryBookManager::add_chapter(int vid, int index, const QString &title) {
-    Q_ASSERT(cid_list_set_.contains(vid));
+    Q_ASSERT(has_volume(vid));
+    const int  id      = get_available_toc_id();
+    const bool succeed = add_chapter_as(vid, index, id, title);
+    Q_ASSERT(succeed);
+    return id;
+}
+
+bool InMemoryBookManager::add_volume_as(int index, int id, const QString &title) {
+    if (has_toc_item(id)) { return false; }
+    title_pool_.insert(id, title);
+    vid_list_.insert(index, id);
+    cid_list_set_.insert(id, {});
+    return true;
+}
+
+bool InMemoryBookManager::add_chapter_as(int vid, int index, int id, const QString &title) {
+    if (has_toc_item(id)) { return false; }
+    Q_ASSERT(has_volume(vid));
     auto &cid_list = cid_list_set_[vid];
     Q_ASSERT(index >= 0 && index <= cid_list.size());
-    const int id = title_pool_.size();
-    title_pool_.insert(id, title);
     cid_list.insert(index, id);
-    return id;
+    title_pool_.insert(id, title);
+    return true;
 }
 
 int InMemoryBookManager::remove_volume(int vid) {
@@ -61,6 +77,11 @@ bool InMemoryBookManager::remove_chapter(int cid) {
 
     Q_UNREACHABLE();
     return false;
+}
+
+int InMemoryBookManager::get_available_toc_id() const {
+    const auto &keys = title_pool_.keys();
+    return *std::max_element(keys.cbegin(), keys.cend()) + 1;
 }
 
 } // namespace jwrite
