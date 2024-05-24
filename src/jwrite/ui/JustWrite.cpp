@@ -299,7 +299,16 @@ void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
             const int result = dialog->exec();
             closeOverlay();
 
-            if (result == MessageBox::Yes) { ui_gallery_->removeDisplayCase(index); }
+            if (result == MessageBox::Yes) {
+                const auto uuid = ui_gallery_->bookInfoAt(index).uuid;
+                ui_gallery_->removeDisplayCase(index);
+                //! NOTE: remove the book-manager means remove the book from the local storage when
+                //! the jwrite exits, see syncToLocalStorage()
+                //! FIXME: that's not a good idea
+                auto bm = books_.value(uuid);
+                books_.remove(uuid);
+                delete bm;
+            }
         } break;
     }
 }
@@ -528,6 +537,12 @@ void JustWrite::syncToLocalStorage() {
     data_file.open(QIODevice::WriteOnly | QIODevice::Text);
     data_file.write(QJsonDocument(local_storage).toJson());
     data_file.close();
+
+    //! NOTE: here we simply sync to local according to the book set in the memory, and remove the
+    //! book from the set also means remove the book from the local storage, however, in the current
+    //! edition, we simply delete the record without removing the content from your machine, so you
+    //! can mannually recover it by adding the record to the mainfest.json file
+    //! FIXME: you know what I'm gonna say - yeah, that's not a good idea
 
     for (const auto &[uuid, bm] : books_.asKeyValueRange()) {
         if (!dir.exists(uuid)) { dir.mkdir(uuid); }
