@@ -322,11 +322,14 @@ void Editor::moveTo(int pos, bool extend_sel) {
 void Editor::insert(const QString &text) {
     if (context_->engine.preedit) { context_->commit_preedit(); }
 
-    if (inserted_filter_enabled_) {
-        if (insertedPairFilter(text)) { return; }
-    }
+    bool done = false;
 
-    context_->insert(text);
+    do {
+        if (!inserted_filter_enabled_) { break; }
+        done = insertedPairFilter(text);
+    } while (0);
+
+    if (!done) { context_->insert(text); }
 
     emit textChanged(context_->edit_text);
     requestUpdate(true);
@@ -371,6 +374,7 @@ void Editor::cut() {
         context_->move(-e.cursor.pos, false);
         context_->del(e.current_block()->text_len() + 1, false);
     }
+    emit textChanged(context_->edit_text);
     requestUpdate(true);
 }
 
@@ -379,6 +383,7 @@ void Editor::paste() {
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
     insertRawText(clipboard->text());
+    emit textChanged(context_->edit_text);
     scrollToCursor();
     requestUpdate(true);
 }

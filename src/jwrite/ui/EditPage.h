@@ -6,6 +6,7 @@
 #include <jwrite/ui/TwoLevelTree.h>
 #include <jwrite/MessyInput.h>
 #include <jwrite/VisualTextEditContext.h>
+#include <jwrite/WordCounter.h>
 #include <jwrite/GlobalCommand.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/BookManager.h>
@@ -60,7 +61,7 @@ protected:
 
     void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
     void requestExportToLocal();
-    void updateWordsCount(const QString &text);
+    void updateWordsCount(const QString &text, bool text_changed);
     void flushWordsCount();
     void syncWordsStatus();
     void createAndOpenNewChapter();
@@ -71,6 +72,7 @@ protected:
 private:
     GlobalCommandManager                      command_manager_;
     MessyInputWorker                         *messy_input_;
+    AbstractWordCounter                      *word_counter_;
     AbstractBookManager                      *book_manager_;
     QTimer                                    sec_timer_;
     int                                       current_cid_;

@@ -118,6 +118,7 @@ EditPage::EditPage(QWidget *parent)
     , chap_words_{0}
     , total_words_{0}
     , messy_input_{new MessyInputWorker(this)}
+    , word_counter_{new StrictWordCounter}
     , book_manager_{nullptr} {
     setupUi();
     setupConnections();
@@ -134,6 +135,9 @@ EditPage::EditPage(QWidget *parent)
 EditPage::~EditPage() {
     jwrite_profiler_dump(QStringLiteral("jwrite-profiler.%1.log")
                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
+
+    delete word_counter_;
+    if (book_manager_) { delete book_manager_; }
 
     messy_input_->kill();
     delete messy_input_;
@@ -227,6 +231,7 @@ AbstractBookManager *EditPage::takeBookSource() {
 
     total_words_ = 0;
     chap_words_  = 0;
+    syncWordsStatus();
 
     return old_book_manager;
 }
@@ -258,10 +263,11 @@ void EditPage::openChapter(int cid) {
     const int next_cid = cid;
     const int last_cid = current_cid_;
 
-    auto text   = book_manager_->has_chapter(next_cid)
-                    ? book_manager_->fetch_chapter_content(next_cid).value()
-                    : QString{};
-    chap_words_ = text.length();
+    auto text = book_manager_->has_chapter(next_cid)
+                  ? book_manager_->fetch_chapter_content(next_cid).value()
+                  : QString{};
+
+    updateWordsCount(text, false);
 
     if (last_cid != -1) {
         const auto loc = ui_editor_->currentTextLoc();
@@ -469,7 +475,9 @@ void EditPage::setupConnections() {
             openChapter(cid);
         }
     });
-    connect(ui_editor_, &Editor::textChanged, this, &EditPage::updateWordsCount);
+    connect(ui_editor_, &Editor::textChanged, this, [this](const QString &text) {
+        updateWordsCount(text, true);
+    });
     connect(ui_book_dir_, &TwoLevelTree::subItemSelected, this, [this](int vid, int cid) {
         openChapter(cid);
     });
@@ -522,10 +530,10 @@ void EditPage::requestExportToLocal() {
     exportToLocal(path, type);
 }
 
-void EditPage::updateWordsCount(const QString &text) {
-    const int words_diff  = text.length() - chap_words_;
-    chap_words_          += words_diff;
-    total_words_         += words_diff;
+void EditPage::updateWordsCount(const QString &text, bool text_changed) {
+    if (text_changed) { total_words_ -= chap_words_; }
+    chap_words_ = word_counter_->count_all(text);
+    if (text_changed) { total_words_ += chap_words_; }
     syncWordsStatus();
 }
 
