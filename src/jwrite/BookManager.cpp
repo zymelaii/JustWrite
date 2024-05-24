@@ -81,6 +81,7 @@ bool InMemoryBookManager::remove_chapter(int cid) {
 
 int InMemoryBookManager::get_available_toc_id() const {
     const auto &keys = title_pool_.keys();
+    if (keys.empty()) { return 0; }
     return *std::max_element(keys.cbegin(), keys.cend()) + 1;
 }
 
