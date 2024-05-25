@@ -5,6 +5,7 @@
 #include <jwrite/ui/Gallery.h>
 #include <jwrite/ui/ShadowOverlay.h>
 #include <jwrite/BookManager.h>
+#include <jwrite/GlobalCommand.h>
 #include <QWidget>
 #include <QStackedWidget>
 #include <QStackedLayout>
@@ -22,11 +23,6 @@ protected:
         Gallery,
     };
 
-    enum class Theme {
-        Light,
-        Dark,
-    };
-
 public:
     JustWrite();
     ~JustWrite();
@@ -35,7 +31,12 @@ signals:
     void pageChanged(PageType page);
 
 public:
-    void setTheme(Theme theme);
+    const ColorTheme &getColorTheme() const {
+        return color_theme_;
+    }
+
+    void setColorSchema(ColorSchema theme);
+    void updateColorTheme(const ColorTheme &theme);
     void updateBookInfo(int index, const BookInfo &info);
 
 protected:
@@ -68,19 +69,22 @@ protected:
     void switchToPage(PageType page);
     void closePage();
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     QMap<PageType, QWidget *>            page_map_;
+    ColorTheme                           color_theme_;
     PageType                             current_page_;
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;
-
-    TitleBar               *ui_title_bar_;
-    Gallery                *ui_gallery_;
-    EditPage               *ui_edit_page_;
-    ShadowOverlay          *ui_popup_layer_;
-    QStackedWidget         *ui_page_stack_;
-    QStackedLayout         *ui_top_most_layout_;
-    QWK::WidgetWindowAgent *ui_agent_;
+    GlobalCommandManager                 command_manager_;
+    TitleBar                            *ui_title_bar_;
+    Gallery                             *ui_gallery_;
+    EditPage                            *ui_edit_page_;
+    ShadowOverlay                       *ui_popup_layer_;
+    QStackedWidget                      *ui_page_stack_;
+    QStackedLayout                      *ui_top_most_layout_;
+    QWK::WidgetWindowAgent              *ui_agent_;
 };
 
 } // namespace jwrite::ui

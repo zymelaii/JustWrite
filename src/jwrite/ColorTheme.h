@@ -4,6 +4,11 @@
 
 namespace jwrite {
 
+enum class ColorSchema {
+    Light,
+    Dark,
+};
+
 struct ColorTheme {
     //! default background color
     QColor Window;
@@ -23,6 +28,8 @@ struct ColorTheme {
     QColor Hover;
     //! background color for the selected item
     QColor SelectedItem;
+
+    static ColorTheme from_schema(ColorSchema schema);
 };
 
 }; // namespace jwrite

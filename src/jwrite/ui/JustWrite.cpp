@@ -2,6 +2,7 @@
 #include <jwrite/ui/ScrollArea.h>
 #include <jwrite/ui/BookInfoEdit.h>
 #include <jwrite/ui/QuickTextInput.h>
+#include <jwrite/ui/ColorThemeDialog.h>
 #include <jwrite/ui/MessageBox.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/ProfileUtils.h>
@@ -70,17 +71,22 @@ JustWrite::JustWrite() {
     setupUi();
     setupConnections();
 
+    page_map_[PageType::Gallery]->installEventFilter(this);
+    page_map_[PageType::Edit]->installEventFilter(this);
+
     switchToPage(PageType::Gallery);
-    setTheme(Theme::Dark);
+    setColorSchema(ColorSchema::Dark);
 
     //! NOTE: Qt gives out an unexpected minimum height to my widgets and QLayout::invalidate()
-    //! could not solve the problem, maybe there is some dirty cached data at the bottom level. I
-    //! eventually found that an explicit call to the expcted-to-be-readonly method sizeHint() could
-    //! make effects on the confusing issue. so, **DO NOT TOUCH THE CODE** unless you figure out a
-    //! better way to solve the problem
+    //! could not solve the problem, maybe there is some dirty cached data at the bottom level.
+    //! I eventually found that an explicit call to the expcted-to-be-readonly method sizeHint()
+    //! could make effects on the confusing issue. so, **DO NOT TOUCH THE CODE** unless you
+    //! figure out a better way to solve the problem
     const auto DO_NOT_REMOVE_THIS_STATEMENT = sizeHint();
 
     requestInitFromLocalStorage();
+
+    command_manager_.load_default();
 }
 
 JustWrite::~JustWrite() {
@@ -125,53 +131,33 @@ void JustWrite::updateLikelyAuthor(const QString &author) {
     }
 }
 
-void JustWrite::setTheme(Theme theme) {
-    ColorTheme color_theme;
+void JustWrite::setColorSchema(ColorSchema schema) {
+    ColorTheme theme = ColorTheme::from_schema(schema);
+    updateColorTheme(theme);
+}
 
-    switch (theme) {
-        case Theme::Light: {
-            color_theme.Window       = QColor(255, 255, 255);
-            color_theme.WindowText   = QColor(23, 24, 27);
-            color_theme.Border       = QColor(200, 200, 200);
-            color_theme.Panel        = QColor(228, 228, 215);
-            color_theme.Text         = QColor(31, 32, 33);
-            color_theme.TextBase     = QColor(241, 223, 222);
-            color_theme.SelectedText = QColor(140, 180, 100);
-            color_theme.Hover        = QColor(30, 30, 80, 50);
-            color_theme.SelectedItem = QColor(196, 165, 146, 60);
-        } break;
-        case Theme::Dark: {
-            color_theme.Window       = QColor(60, 60, 60);
-            color_theme.WindowText   = QColor(160, 160, 160);
-            color_theme.Border       = QColor(70, 70, 70);
-            color_theme.Panel        = QColor(38, 38, 38);
-            color_theme.Text         = QColor(255, 255, 255);
-            color_theme.TextBase     = QColor(30, 30, 30);
-            color_theme.SelectedText = QColor(60, 60, 255, 80);
-            color_theme.Hover        = QColor(255, 255, 255, 30);
-            color_theme.SelectedItem = QColor(255, 255, 255, 10);
-        } break;
-    }
+void JustWrite::updateColorTheme(const ColorTheme &theme) {
+    color_theme_ = theme;
 
     auto pal = palette();
-    pal.setColor(QPalette::Window, color_theme.Window);
-    pal.setColor(QPalette::WindowText, color_theme.WindowText);
-    pal.setColor(QPalette::Base, color_theme.TextBase);
-    pal.setColor(QPalette::Text, color_theme.Text);
-    pal.setColor(QPalette::Highlight, color_theme.SelectedText);
-    pal.setColor(QPalette::Button, color_theme.Window);
-    pal.setColor(QPalette::ButtonText, color_theme.WindowText);
+    pal.setColor(QPalette::Window, color_theme_.Window);
+    pal.setColor(QPalette::WindowText, color_theme_.WindowText);
+    pal.setColor(QPalette::Base, color_theme_.TextBase);
+    pal.setColor(QPalette::Text, color_theme_.Text);
+    pal.setColor(QPalette::Highlight, color_theme_.SelectedText);
+    pal.setColor(QPalette::Button, color_theme_.Window);
+    pal.setColor(QPalette::ButtonText, color_theme_.WindowText);
     setPalette(pal);
 
     if (auto w = static_cast<QScrollArea *>(page_map_[PageType::Gallery])->verticalScrollBar()) {
         auto pal = w->palette();
-        pal.setColor(w->backgroundRole(), color_theme.TextBase);
-        pal.setColor(w->foregroundRole(), color_theme.Window);
+        pal.setColor(w->backgroundRole(), color_theme_.TextBase);
+        pal.setColor(w->foregroundRole(), color_theme_.Window);
         w->setPalette(pal);
     }
 
-    ui_gallery_->updateColorTheme(color_theme);
-    ui_edit_page_->updateColorTheme(color_theme);
+    ui_gallery_->updateColorTheme(color_theme_);
+    ui_edit_page_->updateColorTheme(color_theme_);
 }
 
 void JustWrite::toggleMaximize() {
@@ -667,6 +653,25 @@ void JustWrite::closePage() {
             requestQuitApp();
         } break;
     }
+}
+
+bool JustWrite::eventFilter(QObject *watched, QEvent *event) {
+    if (event->type() == QEvent::KeyPress) {
+        auto e = static_cast<QKeyEvent *>(event);
+        if (auto opt = command_manager_.match(e)) {
+            if (*opt == GlobalCommand::ShowColorThemeDialog) {
+                ColorThemeDialog dialog(getColorTheme(), this);
+                connect(&dialog, &ColorThemeDialog::themeApplied, this, [this, &dialog] {
+                    updateColorTheme(dialog.getTheme());
+                });
+                dialog.exec();
+                disconnect(&dialog, &ColorThemeDialog::themeApplied, this, nullptr);
+                updateColorTheme(dialog.getTheme());
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 } // namespace jwrite::ui
