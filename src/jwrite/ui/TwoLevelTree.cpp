@@ -213,6 +213,9 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     QPainter   p(this);
     const auto pal = palette();
 
+    const auto clip_bb    = event->rect();
+    bool       clip_begin = false;
+
     p.setPen(pal.color(QPalette::WindowText));
     p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
 
@@ -250,16 +253,21 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
         item_info.level_index = level_index[Top];
         item_info.value       = itemValue(top_id);
 
-        drawIndicator(&p, indicator_bb, item_info);
-        render_func_(&p, item_bb, item_info);
+        if (clip_bb.intersects(item_bb)) {
+            drawIndicator(&p, indicator_bb, item_info);
+            render_func_(&p, item_bb, item_info);
 
-        if (row_index == ui_hover_row_index_) {
-            hover_bb          = item_bb;
-            hover_item_id     = top_id;
-            should_draw_hover = true;
-        } else if (selected_item_ == top_id) {
-            sel_bb              = item_bb;
-            found_selected_item = true;
+            if (row_index == ui_hover_row_index_) {
+                hover_bb          = item_bb;
+                hover_item_id     = top_id;
+                should_draw_hover = true;
+            } else if (selected_item_ == top_id) {
+                sel_bb              = item_bb;
+                found_selected_item = true;
+            }
+            clip_begin = true;
+        } else if (clip_begin) {
+            break;
         }
 
         ++row_index;
@@ -279,16 +287,20 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
                 item_info.level_index   = level_index[Sub];
                 item_info.value         = itemValue(sub_id);
 
-                drawIndicator(&p, indicator_bb, item_info);
-                render_func_(&p, item_bb, item_info);
-
-                if (row_index == ui_hover_row_index_) {
-                    hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
-                    hover_item_id     = sub_id;
-                    should_draw_hover = true;
-                } else if (selected_item_ == sub_id) {
-                    sel_bb              = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
-                    found_selected_item = true;
+                if (clip_bb.intersects(item_bb)) {
+                    drawIndicator(&p, indicator_bb, item_info);
+                    render_func_(&p, item_bb, item_info);
+                    if (row_index == ui_hover_row_index_) {
+                        hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
+                        hover_item_id     = sub_id;
+                        should_draw_hover = true;
+                    } else if (selected_item_ == sub_id) {
+                        sel_bb              = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
+                        found_selected_item = true;
+                    }
+                    clip_begin = true;
+                } else if (clip_begin) {
+                    break;
                 }
 
                 ++row_index;
