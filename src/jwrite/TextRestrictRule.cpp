@@ -54,7 +54,8 @@ std::optional<QString>
 
     if (c2 == Category::Space) {
         if ((c1 == Category::Digit || c1 == Category::Alpha)
-            && (c3 == Category::Digit || c3 == Category::Alpha || c3 == Category::Null)) {
+            && (c3 == Category::Digit || c3 == Category::Alpha || c3 == Category::Null
+                || c3 == Category::Normal)) {
             return {QChar(QChar::Space)};
         }
         if (c1 == Category::LatinPunct && c3 != Category::LatinPunct) {
@@ -68,7 +69,8 @@ std::optional<QString>
         if (c1 == Category::LatinPunct || c1 == Category::Normal) {
             result.prepend(QChar(QChar::Space));
         }
-        if (c3 == Category::Normal) { result.append(QChar(QChar::Space)); }
+        //! FIXME: this would break continous digits/alphas input
+        // if (c3 == Category::Normal) { result.append(QChar(QChar::Space)); }
         return result;
     }
 
