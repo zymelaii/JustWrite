@@ -12,7 +12,8 @@ TwoLevelTree::TwoLevelTree(QWidget *parent)
     , selected_sub_item_{-1}
     , focused_top_item_{-1}
     , render_proxy_{nullptr}
-    , ui_hover_row_index_{-1} {
+    , ui_hover_row_index_{-1}
+    , ui_hover_on_indicator_{false} {
     setupUi();
     setMouseTracking(true);
     setItemRenderProxy(nullptr);
@@ -121,9 +122,10 @@ void TwoLevelTree::clearTopItemFocus() {
 }
 
 QSize TwoLevelTree::minimumSizeHint() const {
-    const auto fm         = fontMetrics();
-    const auto row_height = fm.height() + fm.descent();
-    const auto height     = fm.descent() + row_height * totalVisibleItems();
+    QRect      indicator_bb{};
+    auto       bb     = getFirstRowItemRect(&indicator_bb, nullptr);
+    const auto fm     = fontMetrics();
+    const int  height = bb.bottom() + bb.height() * totalVisibleItems();
     QRect      rect(0, 0, fm.averageCharWidth() * 4, height);
     return rect.marginsAdded(contentsMargins()).size();
 }
@@ -160,8 +162,12 @@ QRect TwoLevelTree::getFirstRowItemRect(QRect *out_indicator_bb, int *out_sub_in
     return bb;
 }
 
-int TwoLevelTree::rowIndexAtPos(const QPoint &pos) const {
-    auto bb = getFirstRowItemRect(nullptr, nullptr);
+int TwoLevelTree::rowIndexAtPos(const QPoint &pos, bool *out_is_indicator) const {
+    QRect indicator_bb{};
+    auto  bb = getFirstRowItemRect(&indicator_bb, nullptr);
+
+    //! FIXME: validity check
+    bb.setTopLeft(indicator_bb.topLeft());
 
     const int row_height = bb.height();
     const int total_rows = totalVisibleItems();
@@ -169,7 +175,11 @@ int TwoLevelTree::rowIndexAtPos(const QPoint &pos) const {
 
     if (!bb.contains(pos)) { return -1; }
 
-    return qBound(0, (pos.y() - bb.top()) / row_height, total_rows - 1);
+    const int row = qBound(0, (pos.y() - bb.top()) / row_height, total_rows - 1);
+
+    if (out_is_indicator) { *out_is_indicator = indicator_bb.contains(pos); }
+
+    return row;
 }
 
 void TwoLevelTree::renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
@@ -219,9 +229,10 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
     p.setPen(pal.color(QPalette::WindowText));
     p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
 
-    int   sub_item_indent = 0;
-    QRect indicator_bb{};
-    auto  item_bb = getFirstRowItemRect(&indicator_bb, &sub_item_indent);
+    int       sub_item_indent = 0;
+    QRect     indicator_bb{};
+    auto      item_bb = getFirstRowItemRect(&indicator_bb, &sub_item_indent);
+    const int h_slack = 4;
 
     const int row_height = item_bb.height();
 
@@ -255,7 +266,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
 
         if (clip_bb.intersects(item_bb)) {
             drawIndicator(&p, indicator_bb, item_info);
-            render_func_(&p, item_bb, item_info);
+            render_func_(&p, item_bb.adjusted(h_slack, 0, -h_slack, 0), item_info);
 
             if (row_index == ui_hover_row_index_) {
                 hover_bb          = item_bb;
@@ -288,8 +299,8 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
                 item_info.value         = itemValue(sub_id);
 
                 if (clip_bb.intersects(item_bb)) {
-                    drawIndicator(&p, indicator_bb, item_info);
-                    render_func_(&p, item_bb, item_info);
+                    drawIndicator(&p, indicator_bb.translated(h_slack, 0), item_info);
+                    render_func_(&p, item_bb.adjusted(h_slack, 0, -h_slack, 0), item_info);
                     if (row_index == ui_hover_row_index_) {
                         hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
                         hover_item_id     = sub_id;
@@ -321,6 +332,7 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
         level_index[Top]       += 1;
     }
 
+    should_draw_hover = should_draw_hover && !ui_hover_on_indicator_;
     if (should_draw_hover) { p.fillRect(hover_bb, hover_color); }
 
     if (found_selected_item) {
@@ -336,9 +348,11 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
 void TwoLevelTree::mouseMoveEvent(QMouseEvent *e) {
     QWidget::mouseMoveEvent(e);
 
-    const int last_row_index = ui_hover_row_index_;
-    ui_hover_row_index_      = rowIndexAtPos(e->pos());
-    if (ui_hover_row_index_ != last_row_index) { update(); }
+    const QPair<int, bool> old_hover_hint{ui_hover_row_index_, ui_hover_on_indicator_};
+    ui_hover_row_index_ = rowIndexAtPos(e->pos(), &ui_hover_on_indicator_);
+    const QPair<int, bool> hover_hint{ui_hover_row_index_, ui_hover_on_indicator_};
+
+    if (hover_hint != old_hover_hint) { update(); }
 }
 
 void TwoLevelTree::leaveEvent(QEvent *e) {
@@ -421,16 +435,23 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
     Q_ASSERT(item_info.id != -1);
 
     if (e->button() == Qt::LeftButton) {
-        if (item_info.is_top_item) {
+        QRect indicator_bb{};
+        getFirstRowItemRect(&indicator_bb, nullptr);
+        indicator_bb.translate(0, ui_hover_row_index_ * indicator_bb.height());
+        const bool indicator_clicked = indicator_bb.contains(e->pos());
+        if (indicator_clicked && item_info.is_top_item) {
             toggleEllapsedTopItem(item_info.id);
-            selected_item_ = item_id[Top];
         } else {
-            Q_ASSERT(item_id[Sub] == item_info.id);
-            selected_item_     = item_id[Sub];
-            selected_sub_item_ = selected_item_;
+            if (item_info.is_top_item) {
+                selected_item_ = item_id[Top];
+            } else {
+                Q_ASSERT(item_id[Sub] == item_info.id);
+                selected_item_     = item_id[Sub];
+                selected_sub_item_ = selected_item_;
+            }
+            emit itemSelected(item_info.is_top_item, item_id[Top], item_id[Sub]);
+            setFocusedTopItem(item_id[Top]);
         }
-        emit itemSelected(item_info.is_top_item, item_id[Top], item_id[Sub]);
-        setFocusedTopItem(item_id[Top]);
         update();
     } else if (e->button() == Qt::RightButton) {
         emit contextMenuRequested(e->pos(), item_info);

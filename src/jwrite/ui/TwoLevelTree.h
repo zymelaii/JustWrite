@@ -108,7 +108,7 @@ protected:
     void setupUi();
 
     QRect getFirstRowItemRect(QRect *out_indicator_bb, int *out_sub_indent) const;
-    int   rowIndexAtPos(const QPoint &pos) const;
+    int   rowIndexAtPos(const QPoint &pos, bool *out_is_indicator) const;
 
     void renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info);
     void drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &item_info);
@@ -129,7 +129,8 @@ private:
 
     std::function<void(QPainter *, const QRect &, const ItemInfo &)> render_func_;
 
-    int ui_hover_row_index_;
+    int  ui_hover_row_index_;
+    bool ui_hover_on_indicator_;
 };
 
 } // namespace jwrite::ui
