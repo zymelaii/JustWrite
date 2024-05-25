@@ -296,6 +296,8 @@ void EditPage::openChapter(int cid) {
     jwrite_profiler_record(SwitchChapter);
 
     focusOnEditor();
+
+    //! TODO: scroll book dir to the selected chapter
 }
 
 void EditPage::syncAndClearEditor() {

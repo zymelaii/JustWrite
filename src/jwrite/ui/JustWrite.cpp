@@ -344,6 +344,12 @@ void JustWrite::requestStartEditBook(int index) {
     ui_edit_page_->resetBookSource(bm);
 
     switchToPage(PageType::Edit);
+
+    ui_edit_page_->focusOnEditor();
+
+    if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
+        ui_edit_page_->openChapter(chapters.back());
+    }
 }
 
 void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid) {
