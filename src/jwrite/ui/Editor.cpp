@@ -47,6 +47,8 @@ Editor::Editor(QWidget *parent)
     context_             = new VisualTextEditContext(fontMetrics(), text_area.width());
     context_->resize_viewport(context_->viewport_width, text_area.height());
 
+    restrict_rule_ = new TextRestrictRule;
+
     update_requested_ = false;
     stable_timer_.setInterval(16);
     stable_timer_.setSingleShot(false);
@@ -71,6 +73,7 @@ Editor::Editor(QWidget *parent)
 
 Editor::~Editor() {
     delete context_;
+    delete restrict_rule_;
     delete input_manager_;
 }
 
@@ -322,14 +325,19 @@ void Editor::moveTo(int pos, bool extend_sel) {
 void Editor::insert(const QString &text) {
     if (context_->engine.preedit) { context_->commit_preedit(); }
 
+    const auto block_text = context_->engine.current_block()->text();
+    const auto insert_pos = context_->engine.cursor.pos;
+    const auto text_in    = restrict_rule_->restrict(
+        text, block_text.left(insert_pos), block_text.right(block_text.length() - insert_pos));
+
     bool done = false;
 
     do {
         if (!inserted_filter_enabled_) { break; }
-        done = insertedPairFilter(text);
+        done = insertedPairFilter(text_in);
     } while (0);
 
-    if (!done) { context_->insert(text); }
+    if (!done) { context_->insert(text_in); }
 
     emit textChanged(context_->edit_text);
     requestUpdate(true);
@@ -389,6 +397,7 @@ void Editor::paste() {
 }
 
 void Editor::breakIntoNewLine() {
+    if (context_->engine.current_block()->text_len() == 0) { return; }
     context_->remove_sel_region();
     context_->engine.break_block_at_cursor_pos();
     context_->cursor_moved = true;
@@ -939,6 +948,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             select(0, context_->engine.text_ref->length());
         } break;
         case TextInputCommand::InsertBeforeBlock: {
+            if (engine.current_block()->text_len() == 0) { break; }
             engine.insert_block(engine.active_block_index);
             --engine.active_block_index;
             cursor.reset();
@@ -946,6 +956,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             requestUpdate(true);
         } break;
         case TextInputCommand::InsertAfterBlock: {
+            if (engine.current_block()->text_len() == 0) { break; }
             engine.insert_block(engine.active_block_index + 1);
             auto block = engine.current_block();
             move(block->text_len() - cursor.pos + 1, false);

@@ -2,6 +2,7 @@
 
 #include <jwrite/VisualTextEditContext.h>
 #include <jwrite/TextInputCommand.h>
+#include <jwrite/TextRestrictRule.h>
 #include <QTimer>
 #include <QWidget>
 
@@ -13,8 +14,8 @@ class Editor : public QWidget {
     Q_OBJECT
 
 public:
-    explicit Editor(QWidget *parent = nullptr);
     virtual ~Editor();
+    explicit Editor(QWidget *parent = nullptr);
 
 signals:
     void textAreaChanged(QRect area);
@@ -94,8 +95,9 @@ protected:
     void dropEvent(QDropEvent *e) override;
 
 private:
-    VisualTextEditContext   *context_;
-    TextInputCommandManager *input_manager_;
+    VisualTextEditContext    *context_;
+    AbstractTextRestrictRule *restrict_rule_;
+    TextInputCommandManager  *input_manager_;
 
     int    min_text_line_chars_;
     bool   soft_center_mode_;
