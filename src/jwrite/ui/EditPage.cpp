@@ -275,8 +275,9 @@ void EditPage::openChapter(int cid) {
     book_manager_->sync_chapter_content(last_cid, text);
 
     if (chapter_locs_.contains(next_cid)) {
-        const auto loc = chapter_locs_[next_cid];
-        ui_editor_->setCursorToTextLoc(loc);
+        last_loc_ = chapter_locs_[next_cid];
+    } else {
+        last_loc_.block_index = -1;
     }
 
     current_cid_ = next_cid;
@@ -504,6 +505,7 @@ void EditPage::setupConnections() {
     connect(ui_export_to_local_, &FlatButton::pressed, this, &EditPage::requestExportToLocal);
     connect(&sec_timer_, &QTimer::timeout, this, &EditPage::updateCurrentDateTime);
     connect(ui_editor_, &Editor::focusLost, this, [this](VisualTextEditContext::TextLoc last_loc) {
+        if (current_cid_ != -1) { chapter_locs_[current_cid_] = last_loc; }
         last_loc_ = last_loc;
         messy_input_->kill();
     });
