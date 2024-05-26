@@ -35,7 +35,7 @@ bool OverlaySurface::setup(QWidget *widget) {
     layout->setCurrentWidget(this);
     layout->setStackingMode(QStackedLayout::StackAll);
 
-    setVisible(false);
+    hide();
 
     return true;
 }
@@ -73,18 +73,24 @@ void OverlaySurface::reload(OverlayDialog *overlay) {
 
 bool OverlaySurface::showOverlay() {
     if (!overlay_) { return false; }
-    setVisible(true);
+
+    show();
+
+    overlay_->setVisible(true);
+    overlay_->raise();
+    overlay_->activateWindow();
+    overlay_->setFocus();
+
     return true;
 }
 
 void OverlaySurface::closeOverlay() {
-    setVisible(false);
+    if (!overlay_) { return; }
+
+    hide();
     reload(nullptr);
 
-    // bool should_delete_on_close = testAttribute(Qt::WA_DeleteOnClose);
-    // overlay_->setAttribute(Qt::WA_DeleteOnClose, false);
-    ////! TODO: ...
-    // if (should_delete_on_close) { overlay_->deleteLater(); }
+    //! TODO: delete overlay is required?
 }
 
 void OverlaySurface::setupUi() {

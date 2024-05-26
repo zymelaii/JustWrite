@@ -38,6 +38,9 @@ std::optional<QString> TextInputDialog::getInputText(
     const QString  &caption,
     const QString  &placeholder) {
     auto dialog = std::make_unique<TextInputDialog>();
+    dialog->setCaption(caption);
+    dialog->setText(initial);
+    dialog->setPlaceholderText(placeholder);
     dialog->exec(surface);
     return dialog->isAccepted() ? std::make_optional(dialog->text()) : std::nullopt;
 }

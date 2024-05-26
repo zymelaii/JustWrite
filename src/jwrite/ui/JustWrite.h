@@ -3,7 +3,6 @@
 #include <jwrite/ui/TitleBar.h>
 #include <jwrite/ui/EditPage.h>
 #include <jwrite/ui/Gallery.h>
-#include <jwrite/ui/ShadowOverlay.h>
 #include <jwrite/BookManager.h>
 #include <jwrite/GlobalCommand.h>
 #include <widget-kit/OverlaySurface.h>

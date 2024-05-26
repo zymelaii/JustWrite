@@ -35,11 +35,10 @@ protected:
 
 private:
     OverlayDialog *overlay_;
-
-    QWidget     *ui_widget_;
-    QColor       ui_color_;
-    int          ui_opacity_;
-    QHBoxLayout *ui_layout_;
+    QWidget       *ui_widget_;
+    QColor         ui_color_;
+    int            ui_opacity_;
+    QHBoxLayout   *ui_layout_;
 };
 
 } // namespace widgetkit

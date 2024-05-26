@@ -357,7 +357,7 @@ void Gallery::mouseMoveEvent(QMouseEvent *event) {
     update();
 }
 
-void Gallery::mouseReleaseEvent(QMouseEvent *event) {
+void Gallery::mousePressEvent(QMouseEvent *event) {
     if (hover_index_ == -1) { return; }
     if (hover_index_ == items_.size()) {
         emit clicked(hover_index_);

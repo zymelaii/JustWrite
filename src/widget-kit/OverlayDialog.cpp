@@ -36,9 +36,9 @@ int OverlayDialog::exec(OverlaySurface *surface) {
     surface->reload(this);
     surface->showOverlay();
 
-    QEventLoop loop{};
+    QEventLoop loop;
     event_loop_ = &loop;
-    loop.exec();
+    event_loop_->exec();
     event_loop_ = nullptr;
 
     if (this == surface->overlay()) { surface->closeOverlay(); }
