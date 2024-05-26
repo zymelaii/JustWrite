@@ -11,7 +11,7 @@ enum class GlobalCommand {
     ToggleSoftCenterMode,
     CreateNewChapter,
     Rename,
-    ShowColorThemeDialog,
+    ShowColorSchemeDialog,
     DEV_EnableMessyInput,
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <jwrite/ui/SystemButton.h>
+#include <jwrite/ColorScheme.h>
 #include <QWidget>
 #include <magic_enum.hpp>
 #include <array>
@@ -24,6 +25,8 @@ public:
     void    setTitle(const QString &title);
 
     SystemButton *systemButton(SystemButton::SystemCommand command_type) const;
+
+    void updateColorScheme(const ColorScheme &scheme);
 
 protected slots:
     void requestMinimize();

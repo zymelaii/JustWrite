@@ -1,6 +1,8 @@
 #include <jwrite/ui/SystemButton.h>
+#include <jwrite/AppConfig.h>
 #include <QStyleOptionButton>
 #include <QPainter>
+#include <magic_enum.hpp>
 
 namespace jwrite::ui {
 
@@ -10,32 +12,34 @@ SystemButton::SystemButton(SystemCommand command_type, QWidget *parent)
     setupUi();
 }
 
+SystemButton::~SystemButton() {}
+
+void SystemButton::reloadIcon() {
+    auto &config = AppConfig::get_instance();
+
+    if (cmd_ == SystemCommand::Close) {
+        background_color_ = QColor(232, 17, 35);
+    } else if (config.theme() == ColorTheme::Dark) {
+        background_color_ = QColor(255, 255, 255, 38);
+    } else if (config.theme() == ColorTheme::Light) {
+        background_color_ = QColor(0, 0, 0, 38);
+    } else {
+        Q_UNREACHABLE();
+    }
+
+    const auto name      = magic_enum::enum_name<SystemCommand>(cmd_);
+    const auto icon_path = config.icon(QString("sys-%1.svg").arg(name.data()).toLower());
+    QIcon      icon(icon_path);
+    Q_ASSERT(!icon.isNull());
+
+    setIcon(icon);
+}
+
 void SystemButton::setupUi() {
     reloadIcon();
 
     setMinimumWidth(50);
     setSizePolicy(QSizePolicy::Minimum, QSizePolicy::MinimumExpanding);
-}
-
-void SystemButton::reloadIcon() {
-    QString name{};
-
-    switch (cmd_) {
-        case SystemCommand::Close: {
-            name              = "close";
-            background_color_ = QColor(232, 17, 35);
-        } break;
-        case SystemCommand::Minimize: {
-            name              = "minimize";
-            background_color_ = QColor(255, 255, 255, 38);
-        } break;
-        case SystemCommand::Maximize: {
-            name              = "maximize";
-            background_color_ = QColor(255, 255, 255, 38);
-        } break;
-    }
-
-    setIcon(QIcon(QString(":/res/icons/system/%1.svg").arg(name)));
 }
 
 void SystemButton::paintEvent(QPaintEvent *event) {

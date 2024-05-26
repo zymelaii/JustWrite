@@ -1,9 +1,8 @@
 #pragma once
 
-#include <jwrite/ColorTheme.h>
+#include <jwrite/ColorScheme.h>
 #include <jwrite/BookManager.h>
 #include <QWidget>
-#include <QUrl>
 
 namespace jwrite::ui {
 
@@ -28,7 +27,8 @@ signals:
 public:
     void removeDisplayCase(int index);
     void updateDisplayCaseItem(int index, const BookInfo &book_info);
-    void updateColorTheme(const ColorTheme &color_theme);
+
+    void updateColorScheme(const ColorScheme &scheme);
 
     int totalItems() const {
         return items_.size();

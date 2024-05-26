@@ -1,9 +1,11 @@
-#include <widget-kit/TwoLevelTree.h>
+#include <jwrite/ui/TwoLevelTree.h>
+#include <jwrite/AppConfig.h>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QMouseEvent>
+#include <magic_enum.hpp>
 
-namespace widgetkit {
+namespace jwrite::ui {
 
 void DefaultTwoLevelTreeItemRender::render(
     QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
@@ -115,6 +117,18 @@ void TwoLevelTree::clearTopItemFocus() {
     return;
 }
 
+void TwoLevelTree::reloadIndicator() {
+    auto      &config = AppConfig::get_instance();
+    const auto size   = indicatorSize();
+    for (const auto type : magic_enum::enum_values<Indicator>()) {
+        const auto name      = magic_enum::enum_name(type);
+        const auto icon_path = config.icon(QString("indicator-%1.svg").arg(name.data()).toLower());
+        QIcon      icon(icon_path);
+        Q_ASSERT(!icon.isNull());
+        ui_indicators_[type] = icon.pixmap(size);
+    }
+}
+
 QSize TwoLevelTree::minimumSizeHint() const {
     QRect      indicator_bb{};
     auto       bb     = getFirstRowItemRect(&indicator_bb, nullptr);
@@ -129,6 +143,7 @@ QSize TwoLevelTree::sizeHint() const {
 }
 
 void TwoLevelTree::setupUi() {
+    reloadIndicator();
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 }
 
@@ -151,7 +166,7 @@ QRect TwoLevelTree::getFirstRowItemRect(QRect *out_indicator_bb, int *out_sub_in
         *out_indicator_bb = indicator;
     }
 
-    if (out_sub_indent) { *out_sub_indent = 16; }
+    if (out_sub_indent) { *out_sub_indent = 12; }
 
     return bb;
 }
@@ -177,26 +192,15 @@ int TwoLevelTree::rowIndexAtPos(const QPoint &pos, bool *out_is_indicator) const
 }
 
 void TwoLevelTree::drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &item_info) {
-    QString svg_name{};
-    if (item_info.is_top_item) {
-        const bool ellapsed = ellapsed_top_items_.contains(item_info.id);
-        svg_name            = ellapsed ? "ellapse" : "expand";
-    } else if (selectedSubItem() == item_info.id) {
-        svg_name = "edit";
-    } else {
-        return;
-    }
-
-    const auto svg_file = QString(":/res/icons/indicator/%1.svg").arg(svg_name);
-
-    const auto size  = QSize(12, 12);
-    const auto delta = (bb.size() - size) / 2;
-
-    QIcon indicator(svg_file);
-
-    const auto pos = bb.topLeft() + QPoint(delta.width(), delta.height());
-
-    p->drawPixmap(pos, indicator.pixmap(size));
+    if (!item_info.is_top_item && selectedSubItem() != item_info.id) { return; }
+    const auto type = !item_info.is_top_item                     ? Indicator::Edit
+                    : ellapsed_top_items_.contains(item_info.id) ? Indicator::Ellapse
+                                                                 : Indicator::Expand;
+    Q_ASSERT(ui_indicators_.contains(type));
+    const auto &indicator = ui_indicators_[type];
+    const auto  delta     = (bb.size() - indicatorSize()) / 2;
+    const auto  pos       = bb.topLeft() + QPoint(delta.width(), delta.height());
+    p->drawPixmap(pos, indicator);
 }
 
 int TwoLevelTree::totalVisibleItems() const {
@@ -503,4 +507,4 @@ QDebug operator<<(QDebug stream, const TwoLevelTreeItemInfo &item_info) {
     return stream;
 }
 
-} // namespace widgetkit
+} // namespace jwrite::ui

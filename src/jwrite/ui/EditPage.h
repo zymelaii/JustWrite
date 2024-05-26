@@ -2,18 +2,17 @@
 
 #include <jwrite/ui/Editor.h>
 #include <jwrite/ui/StatusBar.h>
+#include <jwrite/ui/TwoLevelTree.h>
 #include <jwrite/MessyInput.h>
+#include <jwrite/ColorScheme.h>
 #include <jwrite/VisualTextEditContext.h>
 #include <jwrite/WordCounter.h>
 #include <jwrite/GlobalCommand.h>
-#include <jwrite/ColorTheme.h>
 #include <jwrite/BookManager.h>
 #include <widget-kit/FlatButton.h>
-#include <widget-kit/TwoLevelTree.h>
 #include <QWidget>
 #include <QTimer>
 #include <QLabel>
-#include <QAction>
 
 namespace jwrite::ui {
 
@@ -28,13 +27,13 @@ protected:
 
 public:
     explicit EditPage(QWidget *parent = nullptr);
-    virtual ~EditPage();
+    ~EditPage() override;
 
 signals:
     void renameTocItemRequested(const BookInfo &book_info, int vid, int cid);
 
 public:
-    void updateColorTheme(const ColorTheme &color_theme);
+    void updateColorScheme(const ColorScheme &scheme);
 
     AbstractBookManager *resetBookSource(AbstractBookManager *book_manager);
     AbstractBookManager *takeBookSource();
@@ -60,7 +59,7 @@ protected:
     void setupUi();
     void setupConnections();
 
-    void popupBookDirMenu(QPoint pos, widgetkit::TwoLevelTree::ItemInfo item_info);
+    void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
     void requestExportToLocal();
     void updateWordsCount(const QString &text, bool text_changed);
     void flushWordsCount();
@@ -91,7 +90,7 @@ private:
     widgetkit::FlatButton   *ui_new_volume_;
     widgetkit::FlatButton   *ui_new_chapter_;
     widgetkit::FlatButton   *ui_export_to_local_;
-    widgetkit::TwoLevelTree *ui_book_dir_;
+    TwoLevelTree            *ui_book_dir_;
     QLabel                  *ui_total_words_;
     QLabel                  *ui_datetime_;
     QWidget                 *ui_sidebar_;

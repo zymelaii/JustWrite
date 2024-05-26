@@ -1,9 +1,10 @@
 #include <jwrite/ui/JustWrite.h>
 #include <jwrite/ui/ScrollArea.h>
 #include <jwrite/ui/BookInfoEdit.h>
-#include <jwrite/ui/ColorThemeDialog.h>
+#include <jwrite/ui/ColorSchemeDialog.h>
 #include <jwrite/ui/MessageBox.h>
-#include <jwrite/ColorTheme.h>
+#include <jwrite/ColorScheme.h>
+#include <jwrite/AppConfig.h>
 #include <jwrite/ProfileUtils.h>
 #include <widget-kit/TextInputDialog.h>
 #include <widget-kit/OverlaySurface.h>
@@ -57,8 +58,7 @@ public:
     }
 
     QString get_path_to_chapter(int cid) const {
-        QDir dir{QCoreApplication::applicationDirPath()};
-        dir.cd("data");
+        QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
         dir.cd(AbstractBookManager::info_ref().uuid);
         return dir.filePath(QString::number(cid));
     }
@@ -76,7 +76,6 @@ JustWrite::JustWrite() {
     page_map_[PageType::Edit]->installEventFilter(this);
 
     switchToPage(PageType::Gallery);
-    setColorSchema(ColorSchema::Dark);
 
     //! NOTE: Qt gives out an unexpected minimum height to my widgets and QLayout::invalidate()
     //! could not solve the problem, maybe there is some dirty cached data at the bottom level.
@@ -91,11 +90,36 @@ JustWrite::JustWrite() {
 }
 
 JustWrite::~JustWrite() {
+    AppConfig::get_instance().save();
+
     for (auto book : books_) { delete book; }
     books_.clear();
 
     jwrite_profiler_dump(QString("jwrite-profiler.%1.log")
                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
+}
+
+void JustWrite::updateColorScheme(const ColorScheme &scheme) {
+    auto pal = palette();
+    pal.setColor(QPalette::Window, scheme.window());
+    pal.setColor(QPalette::WindowText, scheme.window_text());
+    pal.setColor(QPalette::Base, scheme.text_base());
+    pal.setColor(QPalette::Text, scheme.text());
+    pal.setColor(QPalette::Highlight, scheme.selected_text());
+    pal.setColor(QPalette::Button, scheme.window());
+    pal.setColor(QPalette::ButtonText, scheme.window_text());
+    setPalette(pal);
+
+    if (auto w = static_cast<QScrollArea *>(page_map_[PageType::Gallery])->verticalScrollBar()) {
+        auto pal = w->palette();
+        pal.setColor(w->backgroundRole(), scheme.text_base());
+        pal.setColor(w->foregroundRole(), scheme.window());
+        w->setPalette(pal);
+    }
+
+    ui_title_bar_->updateColorScheme(scheme);
+    ui_gallery_->updateColorScheme(scheme);
+    ui_edit_page_->updateColorScheme(scheme);
 }
 
 void JustWrite::updateBookInfo(int index, const BookInfo &info) {
@@ -130,35 +154,6 @@ void JustWrite::updateLikelyAuthor(const QString &author) {
     if (!author.isEmpty() && likely_author_.isEmpty() && author != getLikelyAuthor()) {
         likely_author_ = author;
     }
-}
-
-void JustWrite::setColorSchema(ColorSchema schema) {
-    ColorTheme theme = ColorTheme::from_schema(schema);
-    updateColorTheme(theme);
-}
-
-void JustWrite::updateColorTheme(const ColorTheme &theme) {
-    color_theme_ = theme;
-
-    auto pal = palette();
-    pal.setColor(QPalette::Window, color_theme_.Window);
-    pal.setColor(QPalette::WindowText, color_theme_.WindowText);
-    pal.setColor(QPalette::Base, color_theme_.TextBase);
-    pal.setColor(QPalette::Text, color_theme_.Text);
-    pal.setColor(QPalette::Highlight, color_theme_.SelectedText);
-    pal.setColor(QPalette::Button, color_theme_.Window);
-    pal.setColor(QPalette::ButtonText, color_theme_.WindowText);
-    setPalette(pal);
-
-    if (auto w = static_cast<QScrollArea *>(page_map_[PageType::Gallery])->verticalScrollBar()) {
-        auto pal = w->palette();
-        pal.setColor(w->backgroundRole(), color_theme_.TextBase);
-        pal.setColor(w->foregroundRole(), color_theme_.Window);
-        w->setPalette(pal);
-    }
-
-    ui_gallery_->updateColorTheme(color_theme_);
-    ui_edit_page_->updateColorTheme(color_theme_);
 }
 
 void JustWrite::toggleMaximize() {
@@ -211,9 +206,17 @@ void JustWrite::setupUi() {
     tray_icon_->setIcon(QIcon(":/app.ico"));
     tray_icon_->setToolTip("只写");
     tray_icon_->setVisible(false);
+
+    updateColorScheme(AppConfig::get_instance().scheme());
 }
 
 void JustWrite::setupConnections() {
+    auto &config = AppConfig::get_instance();
+
+    connect(&config, &AppConfig::on_theme_change, this, [this, &config] {
+        updateColorScheme(config.scheme());
+    });
+    connect(&config, &AppConfig::on_scheme_change, this, &JustWrite::updateColorScheme);
     connect(ui_gallery_, &Gallery::clicked, this, [this](int index) {
         if (index == ui_gallery_->totalItems()) { requestUpdateBookInfo(index); }
     });
@@ -322,8 +325,8 @@ void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid
 }
 
 void JustWrite::requestInitFromLocalStorage() {
-    const QDir home_dir{QCoreApplication::applicationDirPath()};
-    if (home_dir.exists("data")) {
+    const QDir data_dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
+    if (data_dir.exists()) {
         loadDataFromLocalStorage();
     } else {
         initLocalStorage();
@@ -340,14 +343,12 @@ void JustWrite::requestQuitApp() {
 }
 
 void JustWrite::initLocalStorage() {
-    QDir dir{QCoreApplication::applicationDirPath()};
+    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
 
-    if (!dir.exists("data")) {
-        const bool succeed = dir.mkdir("data");
+    if (!dir.exists()) {
+        const bool succeed = dir.mkdir(".");
         Q_ASSERT(succeed);
     }
-
-    dir.cd("data");
 
     QJsonObject local_storage;
     local_storage["major_author"]     = QString{};
@@ -379,10 +380,8 @@ void JustWrite::initLocalStorage() {
 }
 
 void JustWrite::loadDataFromLocalStorage() {
-    QDir dir{QCoreApplication::applicationDirPath()};
-
-    Q_ASSERT(dir.exists("data"));
-    dir.cd("data");
+    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
+    Q_ASSERT(dir.exists());
 
     Q_ASSERT(dir.exists("mainfest.json"));
 
@@ -495,10 +494,8 @@ void JustWrite::syncToLocalStorage() {
     local_storage["last_update_time"] = QDateTime::currentDateTimeUtc().toString();
     local_storage["data"]             = book_data;
 
-    QDir dir{QCoreApplication::applicationDirPath()};
-
-    Q_ASSERT(dir.exists("data"));
-    dir.cd("data");
+    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
+    Q_ASSERT(dir.exists());
 
     //! TODO: check validity of local storage file
 
@@ -595,14 +592,34 @@ bool JustWrite::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto e = static_cast<QKeyEvent *>(event);
         if (auto opt = command_manager_.match(e)) {
-            if (*opt == GlobalCommand::ShowColorThemeDialog) {
-                ColorThemeDialog dialog(getColorTheme(), this);
-                connect(&dialog, &ColorThemeDialog::themeApplied, this, [this, &dialog] {
-                    updateColorTheme(dialog.getTheme());
-                });
-                dialog.exec();
-                disconnect(&dialog, &ColorThemeDialog::themeApplied, this, nullptr);
-                updateColorTheme(dialog.getTheme());
+            if (*opt == GlobalCommand::ShowColorSchemeDialog) {
+                auto      &config     = AppConfig::get_instance();
+                const auto old_theme  = config.theme();
+                const auto old_scheme = config.scheme();
+
+                auto dialog = std::make_unique<ColorSchemeDialog>(old_theme, old_scheme, this);
+
+                connect(
+                    dialog.get(),
+                    &ColorSchemeDialog::applyRequested,
+                    this,
+                    [this, &config](ColorTheme theme, const ColorScheme &scheme) {
+                        config.set_theme(theme);
+                        config.set_scheme(scheme);
+                    });
+
+                const int result = dialog->exec();
+
+                if (result != QDialog::Accepted) {
+                    config.set_theme(old_theme);
+                    config.set_scheme(old_scheme);
+                    updateColorScheme(old_scheme);
+                } else {
+                    config.set_theme(dialog->getTheme());
+                    config.set_scheme(dialog->getScheme());
+                    updateColorScheme(config.scheme());
+                }
+
                 return true;
             }
         }

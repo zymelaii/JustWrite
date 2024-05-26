@@ -16,11 +16,13 @@
 #include <QFileDialog>
 #include <QMessageBox>
 
+using namespace widgetkit;
+
 namespace jwrite::ui {
 
 using epub::EpubBuilder;
 
-class BookModel : public widgetkit::TwoLevelDataModel {
+class BookModel : public TwoLevelDataModel {
 public:
     explicit BookModel(AbstractBookManager *bm, QObject *parent)
         : TwoLevelDataModel(parent)
@@ -94,7 +96,7 @@ private:
     AbstractBookManager *const bm_;
 };
 
-class BookDirItemRenderProxy : public widgetkit::TwoLevelTreeItemRenderProxy {
+class BookDirItemRenderProxy : public TwoLevelTreeItemRenderProxy {
 public:
     void render(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
         const auto fm    = p->fontMetrics();
@@ -140,62 +142,63 @@ EditPage::~EditPage() {
     delete messy_input_;
 }
 
-void EditPage::updateColorTheme(const ColorTheme &color_theme) {
+void EditPage::updateColorScheme(const ColorScheme &scheme) {
     auto pal = palette();
-    pal.setColor(QPalette::Window, color_theme.Window);
-    pal.setColor(QPalette::WindowText, color_theme.WindowText);
-    pal.setColor(QPalette::Base, color_theme.TextBase);
-    pal.setColor(QPalette::Text, color_theme.Text);
-    pal.setColor(QPalette::Highlight, color_theme.SelectedText);
-    pal.setColor(QPalette::Button, color_theme.Window);
-    pal.setColor(QPalette::ButtonText, color_theme.WindowText);
+    pal.setColor(QPalette::Window, scheme.window());
+    pal.setColor(QPalette::WindowText, scheme.window_text());
+    pal.setColor(QPalette::Base, scheme.text_base());
+    pal.setColor(QPalette::Text, scheme.text());
+    pal.setColor(QPalette::Highlight, scheme.selected_text());
+    pal.setColor(QPalette::Button, scheme.window());
+    pal.setColor(QPalette::ButtonText, scheme.window_text());
     setPalette(pal);
 
     if (auto w = ui_named_widgets_.value("sidebar.splitter")) {
         auto pal = w->palette();
-        pal.setColor(QPalette::Window, color_theme.TextBase);
+        pal.setColor(QPalette::Window, scheme.text_base());
         w->setPalette(pal);
     }
 
     if (auto w = ui_sidebar_) {
         auto pal = w->palette();
-        pal.setColor(QPalette::Window, color_theme.Panel);
+        pal.setColor(QPalette::Window, scheme.panel());
         w->setPalette(pal);
     }
 
     if (auto w = ui_editor_) {
         auto pal = w->palette();
-        pal.setColor(QPalette::Window, color_theme.TextBase);
-        pal.setColor(QPalette::HighlightedText, color_theme.SelectedItem);
+        pal.setColor(QPalette::Window, scheme.text_base());
+        pal.setColor(QPalette::HighlightedText, scheme.selected_item());
         w->setPalette(pal);
     }
 
     if (auto w = ui_named_widgets_.value("sidebar.button-line")) {
         auto pal = w->palette();
-        pal.setColor(QPalette::Base, color_theme.Panel);
-        pal.setColor(QPalette::Button, color_theme.Hover);
+        pal.setColor(QPalette::Base, scheme.panel());
+        pal.setColor(QPalette::Button, scheme.hover());
         w->setPalette(pal);
     }
 
     if (auto w = ui_named_widgets_.value("sidebar.sep-line")) {
         auto pal = w->palette();
-        pal.setColor(QPalette::WindowText, color_theme.Border);
+        pal.setColor(QPalette::WindowText, scheme.border());
         w->setPalette(pal);
     }
 
     if (auto w = static_cast<QScrollArea *>(ui_named_widgets_.value("sidebar.book-dir-container"))
                      ->verticalScrollBar()) {
         auto pal = w->palette();
-        pal.setColor(w->backgroundRole(), color_theme.Panel);
-        pal.setColor(w->foregroundRole(), color_theme.Window);
+        pal.setColor(w->backgroundRole(), scheme.panel());
+        pal.setColor(w->foregroundRole(), scheme.window());
         w->setPalette(pal);
     }
 
     if (auto w = ui_book_dir_) {
         auto pal = w->palette();
-        pal.setColor(QPalette::Highlight, color_theme.SelectedItem);
-        pal.setColor(QPalette::HighlightedText, color_theme.Hover);
+        pal.setColor(QPalette::Highlight, scheme.selected_item());
+        pal.setColor(QPalette::HighlightedText, scheme.hover());
         w->setPalette(pal);
+        ui_book_dir_->reloadIndicator();
     }
 }
 
@@ -397,10 +400,10 @@ void EditPage::setupUi() {
     ui_status_bar_ = new StatusBar;
 
     ui_sidebar_         = new QWidget;
-    ui_new_volume_      = new widgetkit::FlatButton;
-    ui_new_chapter_     = new widgetkit::FlatButton;
-    ui_export_to_local_ = new widgetkit::FlatButton;
-    ui_book_dir_        = new widgetkit::TwoLevelTree;
+    ui_new_volume_      = new FlatButton;
+    ui_new_chapter_     = new FlatButton;
+    ui_export_to_local_ = new FlatButton;
+    ui_book_dir_        = new TwoLevelTree;
 
     auto btn_line        = new QWidget;
     auto btn_line_layout = new QHBoxLayout(btn_line);
@@ -485,44 +488,36 @@ void EditPage::setupConnections() {
     });
     connect(
         ui_book_dir_,
-        &widgetkit::TwoLevelTree::itemSelected,
+        &TwoLevelTree::itemSelected,
         this,
         [this](bool is_top_item, int top_item_id, int sub_item_id) {
             if (!is_top_item) { openChapter(sub_item_id); }
         });
-    connect(ui_new_volume_, &widgetkit::FlatButton::pressed, this, [this] {
+    connect(ui_new_volume_, &FlatButton::pressed, this, [this] {
         addVolume(ui_book_dir_->totalTopItems(), "");
     });
     connect(
         ui_new_chapter_,
-        &widgetkit::FlatButton::pressed,
+        &FlatButton::pressed,
         this,
         &EditPage::createAndOpenNewChapterUnderActiveVolume);
-    connect(
-        ui_export_to_local_,
-        &widgetkit::FlatButton::pressed,
-        this,
-        &EditPage::requestExportToLocal);
+    connect(ui_export_to_local_, &FlatButton::pressed, this, &EditPage::requestExportToLocal);
     connect(&sec_timer_, &QTimer::timeout, this, &EditPage::updateCurrentDateTime);
     connect(ui_editor_, &Editor::focusLost, this, [this](VisualTextEditContext::TextLoc last_loc) {
         last_loc_ = last_loc;
         messy_input_->kill();
     });
+    connect(ui_book_dir_, &TwoLevelTree::contextMenuRequested, this, &EditPage::popupBookDirMenu);
     connect(
         ui_book_dir_,
-        &widgetkit::TwoLevelTree::contextMenuRequested,
-        this,
-        &EditPage::popupBookDirMenu);
-    connect(
-        ui_book_dir_,
-        &widgetkit::TwoLevelTree::itemDoubleClicked,
+        &TwoLevelTree::itemDoubleClicked,
         this,
         [this](bool is_top_item, int top_item_id, int sub_item_id) {
             requestRenameTocItem(top_item_id, sub_item_id);
         });
 }
 
-void EditPage::popupBookDirMenu(QPoint pos, widgetkit::TwoLevelTree::ItemInfo item_info) {
+void EditPage::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
     //! TODO: menu style & popup input to edit the new title
 }
 
@@ -682,7 +677,7 @@ bool EditPage::handleShortcuts(QKeyEvent *event) {
                 ui_editor_->setFocus();
                 messy_input_->start();
             } break;
-            case GlobalCommand::ShowColorThemeDialog: {
+            case GlobalCommand::ShowColorSchemeDialog: {
             } break;
         }
         return true;

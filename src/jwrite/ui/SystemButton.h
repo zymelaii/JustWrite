@@ -16,10 +16,12 @@ public:
 
 public:
     explicit SystemButton(SystemCommand command_type, QWidget* parent = nullptr);
+    ~SystemButton() override;
+
+    void reloadIcon();
 
 protected:
     void setupUi();
-    void reloadIcon();
 
     void paintEvent(QPaintEvent* event) override;
 

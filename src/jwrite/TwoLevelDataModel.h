@@ -2,7 +2,7 @@
 
 #include <QObject>
 
-namespace widgetkit {
+namespace jwrite {
 
 class TwoLevelDataModel : public QObject {
     Q_OBJECT
@@ -36,4 +36,4 @@ public:
     virtual void    set_value(int id, const QString &value) = 0;
 };
 
-} // namespace widgetkit
+} // namespace jwrite

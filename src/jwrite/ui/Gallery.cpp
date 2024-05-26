@@ -60,11 +60,11 @@ void Gallery::updateDisplayCaseItem(int index, const BookInfo &book_info) {
     update();
 }
 
-void Gallery::updateColorTheme(const ColorTheme &color_theme) {
+void Gallery::updateColorScheme(const ColorScheme &scheme) {
     auto pal = palette();
-    pal.setColor(QPalette::Base, color_theme.TextBase);
-    pal.setColor(QPalette::Window, color_theme.Window);
-    pal.setColor(QPalette::WindowText, color_theme.WindowText);
+    pal.setColor(QPalette::Base, scheme.text_base());
+    pal.setColor(QPalette::Window, scheme.window());
+    pal.setColor(QPalette::WindowText, scheme.window_text());
     setPalette(pal);
 }
 
@@ -361,7 +361,7 @@ void Gallery::mousePressEvent(QMouseEvent *event) {
     if (hover_index_ == -1) { return; }
     if (hover_index_ == items_.size()) {
         emit clicked(hover_index_);
-    } else if (hover_btn_index_ != -1) {
+    } else if (hover_index_ >= 0 && hover_index_ < totalItems() && hover_btn_index_ != -1) {
         emit menuClicked(hover_index_, magic_enum::enum_value<MenuAction>(hover_btn_index_));
     }
 }

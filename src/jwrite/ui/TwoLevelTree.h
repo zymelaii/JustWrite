@@ -1,12 +1,12 @@
 #pragma once
 
-#include <widget-kit/TwoLevelDataModel.h>
+#include <jwrite/TwoLevelDataModel.h>
 #include <QWidget>
 #include <QTimer>
 #include <memory>
 #include <functional>
 
-namespace widgetkit {
+namespace jwrite::ui {
 
 struct TwoLevelTreeItemInfo {
     //! whether the item is a top-level item or a sub-item
@@ -49,6 +49,12 @@ public:
 public:
     using ItemInfo        = TwoLevelTreeItemInfo;
     using ItemRenderProxy = TwoLevelTreeItemRenderProxy;
+
+    enum class Indicator {
+        Edit,
+        Ellapse,
+        Expand,
+    };
 
 signals:
     void itemSelected(bool is_top_item, int top_item_id, int sub_item_id);
@@ -135,6 +141,12 @@ public:
         double_click_interval_ = qBound(50, interval_ms, 3000);
     }
 
+    void reloadIndicator();
+
+    QSize indicatorSize() const {
+        return QSize(12, 12);
+    }
+
 public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
@@ -179,10 +191,11 @@ private:
     QTimer          single_click_timer_;
     int             double_click_interval_;
 
-    int  ui_hover_row_index_;
-    bool ui_hover_on_indicator_;
+    int                      ui_hover_row_index_;
+    bool                     ui_hover_on_indicator_;
+    QMap<Indicator, QPixmap> ui_indicators_;
 };
 
 QDebug operator<<(QDebug stream, const TwoLevelTreeItemInfo &item_info);
 
-} // namespace widgetkit
+} // namespace jwrite::ui

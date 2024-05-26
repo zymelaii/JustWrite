@@ -31,12 +31,8 @@ signals:
     void pageChanged(PageType page);
 
 public:
-    const ColorTheme &getColorTheme() const {
-        return color_theme_;
-    }
+    void updateColorScheme(const ColorScheme &scheme);
 
-    void setColorSchema(ColorSchema theme);
-    void updateColorTheme(const ColorTheme &theme);
     void updateBookInfo(int index, const BookInfo &info);
 
 protected:
@@ -72,7 +68,6 @@ protected:
 
 private:
     QMap<PageType, QWidget *>            page_map_;
-    ColorTheme                           color_theme_;
     PageType                             current_page_;
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;

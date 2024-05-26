@@ -25,6 +25,10 @@ SystemButton *TitleBar::systemButton(SystemButton::SystemCommand command_type) c
     return sys_buttons_[magic_enum::enum_index(command_type).value()];
 }
 
+void TitleBar::updateColorScheme(const ColorScheme &scheme) {
+    for (auto &button : sys_buttons_) { button->reloadIcon(); }
+}
+
 void TitleBar::requestMinimize() {
     emit minimizeRequested();
 }
