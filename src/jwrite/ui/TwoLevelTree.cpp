@@ -393,11 +393,13 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
             drawIndicator(&p, indicator_bb, item_info);
             item_render_proxy_->render(&p, item_bb.adjusted(h_slack, 0, -h_slack, 0), item_info);
 
+            //! NOTE: indicator can be in the same row with the hover item and the selected item
             if (row_index == ui_hover_row_index_) {
                 hover_bb          = item_bb;
                 hover_item_id     = top_id;
                 should_draw_hover = true;
-            } else if (selected_item_ == top_id) {
+            }
+            if (selected_item_ == top_id) {
                 sel_bb              = item_bb;
                 found_selected_item = true;
             }
@@ -431,7 +433,8 @@ void TwoLevelTree::paintEvent(QPaintEvent *event) {
                         hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
                         hover_item_id     = sub_id;
                         should_draw_hover = true;
-                    } else if (selected_item_ == sub_id) {
+                    }
+                    if (selected_item_ == sub_id) {
                         sel_bb              = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
                         found_selected_item = true;
                     }
