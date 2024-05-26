@@ -122,7 +122,7 @@ void AppConfig::save() {
     settings.setValue("theme", QString{magic_enum::enum_name(theme_).data()}.toLower());
     settings.endGroup();
     settings.beginGroup("scheme");
-    for (const auto& [name, role] : color_roles) { settings.setValue(name, scheme_[role].name()); }
+    for (const auto& [name, role] : color_roles) { settings.setValue(name, scheme_[role].rgba()); }
     settings.endGroup();
 }
 

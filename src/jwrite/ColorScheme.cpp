@@ -12,9 +12,9 @@ ColorScheme ColorScheme::get_default_scheme_of_theme(ColorTheme theme) {
             scheme[ColorRole::Panel]        = QColor(228, 228, 215);
             scheme[ColorRole::Text]         = QColor(31, 32, 33);
             scheme[ColorRole::TextBase]     = QColor(241, 223, 222);
-            scheme[ColorRole::SelectedText] = QColor(140, 180, 100);
-            scheme[ColorRole::Hover]        = QColor(30, 30, 80, 50);
-            scheme[ColorRole::SelectedItem] = QColor(196, 165, 146, 60);
+            scheme[ColorRole::SelectedText] = QColor(140, 180, 100, 80);
+            scheme[ColorRole::Hover]        = QColor(30, 30, 80, 30);
+            scheme[ColorRole::SelectedItem] = QColor(196, 165, 146, 50);
         } break;
         case ColorTheme::Dark: {
             scheme[ColorRole::Window]       = QColor(60, 60, 60);
