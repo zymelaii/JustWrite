@@ -1,5 +1,5 @@
 #include <jwrite/ui/ColorThemeDialog.h>
-#include <jwrite/ui/ColorSelectorButton.h>
+#include <widget-kit/ColorPreviewItem.h>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -53,7 +53,7 @@ void ColorThemeDialog::setupUi() {
         auto container        = new QWidget;
         auto layout_container = new QHBoxLayout(container);
         auto label            = new QLabel(desc);
-        auto selector         = new ColorSelectorButton;
+        auto selector         = new widgetkit::ColorPreviewItem;
         layout_container->addWidget(selector);
         layout_container->addWidget(label);
         layout_color_picker->addWidget(container, index / 2, index % 2);
@@ -61,9 +61,12 @@ void ColorThemeDialog::setupUi() {
         selector->setFixedWidth(40);
         selector->setColor(*color_ref);
 
-        connect(selector, &ColorSelectorButton::colorChanged, [&ref = *color_ref](QColor color) {
-            ref = color;
-        });
+        connect(
+            selector,
+            &widgetkit::ColorPreviewItem::colorChanged,
+            [&ref = *color_ref](QColor color) {
+                ref = color;
+            });
         connect(
             this, &ColorThemeDialog::themeChanged, selector, [this, selector, &ref = *color_ref] {
                 blockSignals(true);
@@ -88,11 +91,14 @@ void ColorThemeDialog::setupUi() {
     layout->addWidget(color_picker_conatiner);
     layout->addWidget(button_container);
 
-    connect(ok_button, SIGNAL(clicked()), this, SLOT(accept()));
-    connect(apply_button, SIGNAL(clicked()), this, SLOT(notifyThemeApplied()));
-    connect(cancel_button, SIGNAL(clicked()), this, SLOT(reject()));
+    connect(ok_button, &QPushButton::clicked, this, &ColorThemeDialog::accept);
+    connect(apply_button, &QPushButton::clicked, this, &ColorThemeDialog::notifyThemeApplied);
+    connect(cancel_button, &QPushButton::clicked, this, &ColorThemeDialog::reject);
     connect(
-        ui_schema_select_, SIGNAL(currentIndexChanged(int)), this, SLOT(notifyThemeChanged(int)));
+        ui_schema_select_,
+        &QComboBox::currentIndexChanged,
+        this,
+        &ColorThemeDialog::notifyThemeChanged);
 
     ui_schema_select_->addItem("亮色", QVariant::fromValue(ColorSchema::Light));
     ui_schema_select_->addItem("暗色", QVariant::fromValue(ColorSchema::Dark));

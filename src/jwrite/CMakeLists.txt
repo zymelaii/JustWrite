@@ -23,6 +23,7 @@ target_link_libraries(
 	${CMAKE_PROJECT_NAME}
 	PRIVATE qt-material
 	PRIVATE minizip
+	PRIVATE widget-kit
 	PRIVATE jwrite-core
 	PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
 	PRIVATE QWindowKit::Widgets

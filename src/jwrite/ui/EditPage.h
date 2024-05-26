@@ -2,14 +2,14 @@
 
 #include <jwrite/ui/Editor.h>
 #include <jwrite/ui/StatusBar.h>
-#include <jwrite/ui/FlatButton.h>
-#include <jwrite/ui/TwoLevelTree.h>
 #include <jwrite/MessyInput.h>
 #include <jwrite/VisualTextEditContext.h>
 #include <jwrite/WordCounter.h>
 #include <jwrite/GlobalCommand.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/BookManager.h>
+#include <widget-kit/FlatButton.h>
+#include <widget-kit/TwoLevelTree.h>
 #include <QWidget>
 #include <QTimer>
 #include <QLabel>
@@ -60,7 +60,7 @@ protected:
     void setupUi();
     void setupConnections();
 
-    void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
+    void popupBookDirMenu(QPoint pos, widgetkit::TwoLevelTree::ItemInfo item_info);
     void requestExportToLocal();
     void updateWordsCount(const QString &text, bool text_changed);
     void flushWordsCount();
@@ -87,10 +87,10 @@ private:
 
     Editor                  *ui_editor_;
     StatusBar               *ui_status_bar_;
-    FlatButton              *ui_new_volume_;
-    FlatButton              *ui_new_chapter_;
-    FlatButton              *ui_export_to_local_;
-    TwoLevelTree            *ui_book_dir_;
+    widgetkit::FlatButton   *ui_new_volume_;
+    widgetkit::FlatButton   *ui_new_chapter_;
+    widgetkit::FlatButton   *ui_export_to_local_;
+    widgetkit::TwoLevelTree *ui_book_dir_;
     QLabel                  *ui_total_words_;
     QLabel                  *ui_datetime_;
     QWidget                 *ui_sidebar_;

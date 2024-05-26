@@ -349,39 +349,21 @@ void Gallery::paintEvent(QPaintEvent *event) {
 }
 
 void Gallery::leaveEvent(QEvent *event) {
-    QWidget::leaveEvent(event);
-
     resetHoverState();
 }
 
 void Gallery::mouseMoveEvent(QMouseEvent *event) {
-    QWidget::mouseMoveEvent(event);
-
     hover_index_ = getItemIndex(event->pos(), &hover_btn_index_);
-
     update();
 }
 
-void Gallery::mousePressEvent(QMouseEvent *event) {
-    QWidget::mousePressEvent(event);
-
+void Gallery::mouseReleaseEvent(QMouseEvent *event) {
     if (hover_index_ == -1) { return; }
-
     if (hover_index_ == items_.size()) {
         emit clicked(hover_index_);
     } else if (hover_btn_index_ != -1) {
         emit menuClicked(hover_index_, magic_enum::enum_value<MenuAction>(hover_btn_index_));
     }
-}
-
-void Gallery::mouseDoubleClickEvent(QMouseEvent *event) {
-    QWidget::mouseDoubleClickEvent(event);
-
-    if (hover_index_ == -1) { return; }
-
-    if (hover_index_ != items_.size()) { return; }
-
-    emit clicked(hover_index_);
 }
 
 void Gallery::resizeEvent(QResizeEvent *event) {

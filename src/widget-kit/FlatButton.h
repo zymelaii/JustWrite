@@ -1,16 +1,16 @@
 #pragma once
 
 #include <QWidget>
-#include <QFrame>
 
-namespace jwrite::ui {
+namespace widgetkit {
 
 class FlatButton : public QWidget {
     Q_OBJECT
 
 public:
     explicit FlatButton(QWidget *parent = nullptr);
-    virtual ~FlatButton();
+
+    ~FlatButton() override;
 
 signals:
     void pressed();
@@ -57,4 +57,4 @@ private:
     bool          ui_mouse_entered_;
 };
 
-} // namespace jwrite::ui
+} // namespace widgetkit

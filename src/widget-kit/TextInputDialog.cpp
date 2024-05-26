@@ -1,36 +1,48 @@
-#include <jwrite/ui/QuickTextInput.h>
+#include <widget-kit/TextInputDialog.h>
+#include <qt-material/qtmaterialtextfield.h>
 #include <QVBoxLayout>
 #include <QPainter>
 #include <QKeyEvent>
+#include <memory>
 
-namespace jwrite::ui {
+namespace widgetkit {
 
-QuickTextInput::QuickTextInput(QWidget *parent)
-    : QWidget(parent) {
+TextInputDialog::TextInputDialog()
+    : OverlayDialog() {
     setupUi();
     setFocusProxy(ui_input_);
     ui_input_->installEventFilter(this);
 }
 
-QuickTextInput::~QuickTextInput() {}
+TextInputDialog::~TextInputDialog() {}
 
-void QuickTextInput::setText(const QString &text) {
-    ui_input_->setText(text);
-}
-
-QString QuickTextInput::text() const {
-    return ui_input_->text();
-}
-
-void QuickTextInput::setPlaceholderText(const QString &text) {
-    ui_input_->setPlaceholderText(text);
-}
-
-void QuickTextInput::setLabel(const QString &label) {
+void TextInputDialog::setCaption(const QString &label) {
     ui_input_->setLabel(label);
 }
 
-void QuickTextInput::setupUi() {
+void TextInputDialog::setPlaceholderText(const QString &text) {
+    ui_input_->setPlaceholderText(text);
+}
+
+void TextInputDialog::setText(const QString &text) {
+    ui_input_->setText(text);
+}
+
+QString TextInputDialog::text() const {
+    return ui_input_->text();
+}
+
+std::optional<QString> TextInputDialog::getInputText(
+    OverlaySurface *surface,
+    const QString  &initial,
+    const QString  &caption,
+    const QString  &placeholder) {
+    auto dialog = std::make_unique<TextInputDialog>();
+    dialog->exec(surface);
+    return dialog->isAccepted() ? std::make_optional(dialog->text()) : std::nullopt;
+}
+
+void TextInputDialog::setupUi() {
     auto layout = new QVBoxLayout(this);
 
     ui_input_ = new QtMaterialTextField;
@@ -53,7 +65,7 @@ void QuickTextInput::setupUi() {
     setFixedWidth(480);
 }
 
-void QuickTextInput::paintEvent(QPaintEvent *event) {
+void TextInputDialog::paintEvent(QPaintEvent *event) {
     QPainter    p(this);
     const auto &pal = palette();
 
@@ -62,7 +74,7 @@ void QuickTextInput::paintEvent(QPaintEvent *event) {
     p.drawRoundedRect(rect(), 8, 8);
 }
 
-bool QuickTextInput::eventFilter(QObject *watched, QEvent *event) {
+bool TextInputDialog::eventFilter(QObject *watched, QEvent *event) {
     if (watched != ui_input_ || !ui_input_->hasFocus() || event->type() == QEvent::KeyPress) {
         return false;
     }
@@ -70,15 +82,15 @@ bool QuickTextInput::eventFilter(QObject *watched, QEvent *event) {
     const auto key = static_cast<QKeyEvent *>(event)->key();
 
     if (key == Qt::Key_Return || key == Qt::Key_Enter) {
-        emit submitRequested(ui_input_->text());
+        accept();
         return true;
     }
     if (key == Qt::Key_Escape) {
-        emit cancelRequested();
+        reject();
         return true;
     }
 
     return false;
 }
 
-} // namespace jwrite::ui
+} // namespace widgetkit

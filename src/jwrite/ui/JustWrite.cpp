@@ -1,11 +1,12 @@
 #include <jwrite/ui/JustWrite.h>
 #include <jwrite/ui/ScrollArea.h>
 #include <jwrite/ui/BookInfoEdit.h>
-#include <jwrite/ui/QuickTextInput.h>
 #include <jwrite/ui/ColorThemeDialog.h>
 #include <jwrite/ui/MessageBox.h>
 #include <jwrite/ColorTheme.h>
 #include <jwrite/ProfileUtils.h>
+#include <widget-kit/TextInputDialog.h>
+#include <widget-kit/OverlaySurface.h>
 #include <qt-material/qtmaterialcircularprogress.h>
 #include <QScrollBar>
 #include <QVBoxLayout>
@@ -170,19 +171,12 @@ void JustWrite::toggleMaximize() {
 }
 
 void JustWrite::setupUi() {
-    auto top_layout     = new QVBoxLayout(this);
-    auto container      = new QWidget;
-    ui_top_most_layout_ = new QStackedLayout(container);
+    auto top_layout = new QVBoxLayout(this);
 
-    ui_title_bar_ = new TitleBar;
-
-    top_layout->addWidget(ui_title_bar_);
-    top_layout->addWidget(container);
-
-    ui_page_stack_  = new QStackedWidget;
-    ui_gallery_     = new Gallery;
-    ui_edit_page_   = new EditPage;
-    ui_popup_layer_ = new ShadowOverlay;
+    ui_title_bar_  = new TitleBar;
+    ui_page_stack_ = new QStackedWidget;
+    ui_gallery_    = new Gallery;
+    ui_edit_page_  = new EditPage;
 
     auto gallery_page = new ScrollArea;
     gallery_page->setWidget(ui_gallery_);
@@ -190,8 +184,12 @@ void JustWrite::setupUi() {
     ui_page_stack_->addWidget(gallery_page);
     ui_page_stack_->addWidget(ui_edit_page_);
 
-    ui_top_most_layout_->addWidget(ui_page_stack_);
-    ui_top_most_layout_->addWidget(ui_popup_layer_);
+    top_layout->addWidget(ui_title_bar_);
+    top_layout->addWidget(ui_page_stack_);
+
+    ui_surface_        = new widgetkit::OverlaySurface;
+    const bool succeed = ui_surface_->setup(ui_page_stack_);
+    Q_ASSERT(succeed);
 
     ui_agent_ = new QWK::WidgetWindowAgent(this);
     ui_agent_->setup(this);
@@ -206,13 +204,13 @@ void JustWrite::setupUi() {
     top_layout->setContentsMargins({});
     top_layout->setSpacing(0);
 
-    container->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
-
-    ui_top_most_layout_->setStackingMode(QStackedLayout::StackAll);
-    ui_top_most_layout_->setCurrentWidget(ui_popup_layer_);
-
     page_map_[PageType::Gallery] = gallery_page;
     page_map_[PageType::Edit]    = ui_edit_page_;
+
+    tray_icon_ = new QSystemTrayIcon(this);
+    tray_icon_->setIcon(QIcon(":/app.ico"));
+    tray_icon_->setToolTip("只写");
+    tray_icon_->setVisible(false);
 }
 
 void JustWrite::setupConnections() {
@@ -248,38 +246,7 @@ void JustWrite::requestUpdateBookInfo(int index) {
     if (info.author.isEmpty()) { info.author = getLikelyAuthor(); }
     if (info.title.isEmpty()) { info.title = QString("未命名书籍-%1").arg(index + 1); }
 
-    auto edit = new BookInfoEdit;
-    edit->setBookInfo(info);
-
-    showOverlay(edit);
-
-    connect(edit, &BookInfoEdit::submitRequested, this, [this, index](BookInfo info) {
-        updateBookInfo(index, info);
-        closeOverlay();
-    });
-    connect(edit, &BookInfoEdit::cancelRequested, this, &JustWrite::closeOverlay);
-    connect(edit, &BookInfoEdit::changeCoverRequested, this, [this, edit] {
-        QImage     image;
-        const auto path = requestImagePath(true, &image);
-        if (path.isEmpty()) { return; }
-        edit->setCover(path);
-    });
-}
-
-QString JustWrite::requestImagePath(bool validate, QImage *out_image) {
-    const auto filter = "图片 (*.bmp *.jpg *.jpeg *.png)";
-    auto       path   = QFileDialog::getOpenFileName(this, "选择封面", "", filter);
-
-    if (path.isEmpty()) { return ""; }
-
-    if (!validate) { return path; }
-
-    QImage image(path);
-    if (image.isNull()) { return ""; }
-
-    if (out_image) { *out_image = std::move(image); }
-
-    return path;
+    if (auto opt = BookInfoEdit::getBookInfo(ui_surface_, info)) { updateBookInfo(index, *opt); }
 }
 
 void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
@@ -292,15 +259,12 @@ void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
             requestUpdateBookInfo(index);
         } break;
         case Gallery::Delete: {
-            auto dialog = new MessageBox;
-            dialog->setCaption("删除书籍");
-            dialog->setText("删除后，作品将无法恢复，请谨慎操作。");
-
-            showOverlay(dialog);
-            const int result = dialog->exec();
-            closeOverlay();
-
-            if (result == MessageBox::Yes) {
+            const auto choice = MessageBox::show(
+                ui_surface_,
+                "删除书籍",
+                "删除后，作品将无法恢复，请谨慎操作。",
+                MessageBox::StandardIcon::Warning);
+            if (choice == MessageBox::Yes) {
                 const auto uuid = ui_gallery_->bookInfoAt(index).uuid;
                 ui_gallery_->removeDisplayCase(index);
                 //! NOTE: remove the book-manager means remove the book from the local storage
@@ -339,64 +303,40 @@ void JustWrite::requestStartEditBook(int index) {
 }
 
 void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid) {
-    auto input = new QuickTextInput;
-
     auto bm = books_.value(book_info.uuid);
     Q_ASSERT(bm);
 
     const int toc_id = cid == -1 ? vid : cid;
     Q_ASSERT(bm->has_toc_item(toc_id));
+    const bool is_volume = cid == -1;
 
-    if (cid == -1) {
-        input->setPlaceholderText("请输入新分卷名");
-        input->setLabel("分卷名");
-    } else {
-        input->setPlaceholderText("请输入新章节名");
-        input->setLabel("章节名");
-    }
-    input->setText(bm->get_title(toc_id).value());
+    const auto caption     = is_volume ? "分卷名" : "章节名";
+    const auto placeholder = is_volume ? "请输入新分卷名" : "请输入新章节名";
+    const auto title       = bm->get_title(toc_id).value();
 
-    showOverlay(input);
+    const auto opt_new_title =
+        widgetkit::TextInputDialog::getInputText(ui_surface_, title, caption, placeholder);
 
-    connect(
-        input,
-        &QuickTextInput::submitRequested,
-        this,
-        [this, toc_id](QString text) {
-            closeOverlay();
-            ui_edit_page_->renameBookDirItem(toc_id, text);
-            ui_edit_page_->focusOnEditor();
-        },
-        Qt::QueuedConnection);
-    connect(
-        input,
-        &QuickTextInput::cancelRequested,
-        this,
-        [this] {
-            closeOverlay();
-            ui_edit_page_->focusOnEditor();
-        },
-        Qt::QueuedConnection);
+    if (opt_new_title) { ui_edit_page_->renameBookDirItem(toc_id, opt_new_title.value()); }
+    ui_edit_page_->focusOnEditor();
 }
 
 void JustWrite::requestInitFromLocalStorage() {
-    showProgressOverlay();
-
     const QDir home_dir{QCoreApplication::applicationDirPath()};
     if (home_dir.exists("data")) {
         loadDataFromLocalStorage();
     } else {
         initLocalStorage();
     }
-
-    closeOverlay();
 }
 
 void JustWrite::requestQuitApp() {
-    showProgressOverlay();
+    hide();
+
     //! TODO: wait other background jobs to be finished
     syncToLocalStorage();
-    close();
+
+    QCoreApplication::exit();
 }
 
 void JustWrite::initLocalStorage() {
@@ -615,26 +555,14 @@ void JustWrite::syncToLocalStorage() {
     }
 }
 
-void JustWrite::showOverlay(QWidget *widget) {
-    ui_popup_layer_->setWidget(widget);
-    ui_popup_layer_->show();
-    widget->setFocus();
-}
-
-void JustWrite::closeOverlay() {
-    ui_popup_layer_->hide();
-    if (auto w = ui_popup_layer_->take()) { delete w; }
-}
-
-void JustWrite::showProgressOverlay() {
-    showOverlay(new QtMaterialCircularProgress);
+void JustWrite::showProgress() {
+    //! TODO: show progress overlay
 }
 
 void JustWrite::switchToPage(PageType page) {
     Q_ASSERT(page_map_.contains(page));
     Q_ASSERT(page_map_.value(page, nullptr));
     if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
-        closeOverlay();
         ui_page_stack_->setCurrentWidget(w);
     }
     current_page_ = page;
@@ -653,6 +581,14 @@ void JustWrite::closePage() {
             requestQuitApp();
         } break;
     }
+}
+
+void JustWrite::showEvent(QShowEvent *event) {
+    tray_icon_->hide();
+}
+
+void JustWrite::hideEvent(QHideEvent *event) {
+    tray_icon_->show();
 }
 
 bool JustWrite::eventFilter(QObject *watched, QEvent *event) {

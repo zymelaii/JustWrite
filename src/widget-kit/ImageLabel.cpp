@@ -1,45 +1,45 @@
-#include <jwrite/ui/PlainImageView.h>
+#include <widget-kit/ImageLabel.h>
 #include <QPainter>
 
-namespace jwrite::ui {
+namespace widgetkit {
 
-PlainImageView::PlainImageView(QWidget *parent)
+ImageLabel::ImageLabel(QWidget *parent)
     : QWidget(parent)
     , border_visible_{true} {
     setupUi();
 }
 
-PlainImageView::~PlainImageView() {}
+ImageLabel::~ImageLabel() {}
 
-void PlainImageView::setImage(const QString &path) {
+void ImageLabel::setImage(const QString &path) {
     image_path_ = path;
     reloadImage();
 }
 
-void PlainImageView::setViewSize(const QSize &size) {
+void ImageLabel::setViewSize(const QSize &size) {
     view_size_ = size;
     updateGeometry();
     reloadImage();
 }
 
-void PlainImageView::setBorderVisible(bool visible) {
+void ImageLabel::setBorderVisible(bool visible) {
     border_visible_ = visible;
     update();
 }
 
-QSize PlainImageView::minimumSizeHint() const {
+QSize ImageLabel::minimumSizeHint() const {
     return QRect(QPoint(0, 0), view_size_).marginsAdded(contentsMargins()).size();
 }
 
-QSize PlainImageView::sizeHint() const {
+QSize ImageLabel::sizeHint() const {
     return minimumSizeHint();
 }
 
-void PlainImageView::setupUi() {
+void ImageLabel::setupUi() {
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }
 
-void PlainImageView::reloadImage() {
+void ImageLabel::reloadImage() {
     QPixmap pixmap(image_path_);
     if (pixmap.isNull()) { return; }
     cached_pixmap_ =
@@ -47,7 +47,7 @@ void PlainImageView::reloadImage() {
     update();
 }
 
-void PlainImageView::paintEvent(QPaintEvent *event) {
+void ImageLabel::paintEvent(QPaintEvent *event) {
     if (view_size_.isEmpty()) { return; }
 
     QPainter    p(this);
@@ -65,4 +65,4 @@ void PlainImageView::paintEvent(QPaintEvent *event) {
     }
 }
 
-} // namespace jwrite::ui
+} // namespace widgetkit

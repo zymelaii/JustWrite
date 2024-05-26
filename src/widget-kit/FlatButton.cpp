@@ -1,8 +1,8 @@
-#include <jwrite/ui/FlatButton.h>
+#include <widget-kit/FlatButton.h>
 #include <QPainter>
 #include <QMouseEvent>
 
-namespace jwrite::ui {
+namespace widgetkit {
 
 FlatButton::FlatButton(QWidget *parent)
     : QWidget(parent)
@@ -99,4 +99,4 @@ void FlatButton::mousePressEvent(QMouseEvent *e) {
     }
 }
 
-} // namespace jwrite::ui
+} // namespace widgetkit

@@ -1,64 +1,56 @@
-#include <jwrite/ui/TwoLevelTree.h>
+#include <widget-kit/TwoLevelTree.h>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QMouseEvent>
 
-namespace jwrite::ui {
+namespace widgetkit {
+
+void DefaultTwoLevelTreeItemRender::render(
+    QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
+    const auto flags = Qt::AlignLeft | Qt::AlignVCenter;
+    p->drawText(clip_bb, flags, item_info.value);
+}
 
 TwoLevelTree::TwoLevelTree(QWidget *parent)
-    : QWidget(parent)
-    , model_{nullptr}
-    , selected_item_{-1}
-    , selected_sub_item_{-1}
-    , focused_top_item_{-1}
-    , render_proxy_{nullptr}
-    , ui_hover_row_index_{-1}
-    , ui_hover_on_indicator_{false} {
+    : QWidget(parent) {
     setupUi();
     setMouseTracking(true);
-    setItemRenderProxy(nullptr);
+
+    resetState();
+    setItemRenderProxy(std::make_unique<DefaultTwoLevelTreeItemRender>());
 }
 
 TwoLevelTree::~TwoLevelTree() {}
 
-TwoLevelDataModel *TwoLevelTree::setModel(TwoLevelDataModel *model) {
-    auto old_model = model_;
-    model_         = model;
-
-    auto update_slot = static_cast<void (QWidget::*)()>(&QWidget::update);
-
-    if (old_model) {
-        old_model->setParent(nullptr);
-        disconnect(old_model, &TwoLevelDataModel::valueChanged, this, update_slot);
-        disconnect(old_model, &TwoLevelDataModel::valueChanged, this, &QWidget::updateGeometry);
-    }
-
-    connect(model, &TwoLevelDataModel::valueChanged, this, update_slot);
-    connect(model, &TwoLevelDataModel::valueChanged, this, &QWidget::updateGeometry);
-    model->setParent(this);
-
-    selected_item_    = -1;
-    focused_top_item_ = -1;
-
+void TwoLevelTree::resetState() {
+    selected_item_         = -1;
+    selected_sub_item_     = -1;
+    focused_top_item_      = -1;
+    ui_hover_row_index_    = -1;
+    ui_hover_on_indicator_ = false;
     ellapsed_top_items_.clear();
-    ui_hover_row_index_ = -1;
-
     update();
-
-    return old_model;
 }
 
-void TwoLevelTree::setItemRenderProxy(ItemRenderProxy *proxy) {
-    render_proxy_ = proxy;
-    if (render_proxy_) {
-        render_func_ = [this](QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
-            render_proxy_->render(p, clip_bb, item_info);
-        };
-    } else {
-        render_func_ = [this](QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
-            renderItem(p, clip_bb, item_info);
-        };
-    }
+void TwoLevelTree::setModel(std::unique_ptr<TwoLevelDataModel> model) {
+    Q_ASSERT(model);
+
+    model_ = std::move(model);
+    model_->setParent(this);
+
+    connect(
+        model_.get(),
+        &TwoLevelDataModel::valueChanged,
+        this,
+        static_cast<void (QWidget::*)()>(&QWidget::update));
+    connect(model_.get(), &TwoLevelDataModel::valueChanged, this, &QWidget::updateGeometry);
+
+    resetState();
+}
+
+void TwoLevelTree::setItemRenderProxy(std::unique_ptr<ItemRenderProxy> proxy) {
+    Q_ASSERT(proxy);
+    item_render_proxy_ = std::move(proxy);
 }
 
 int TwoLevelTree::selectedItem() const {
@@ -182,11 +174,6 @@ int TwoLevelTree::rowIndexAtPos(const QPoint &pos, bool *out_is_indicator) const
     return row;
 }
 
-void TwoLevelTree::renderItem(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
-    const auto flags = Qt::AlignLeft | Qt::AlignVCenter;
-    p->drawText(clip_bb, flags, item_info.value);
-}
-
 void TwoLevelTree::drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &item_info) {
     QString svg_name{};
     if (item_info.is_top_item) {
@@ -217,154 +204,7 @@ int TwoLevelTree::totalVisibleItems() const {
     return size;
 }
 
-void TwoLevelTree::paintEvent(QPaintEvent *event) {
-    if (!model_) { return; }
-
-    QPainter   p(this);
-    const auto pal = palette();
-
-    const auto clip_bb    = event->rect();
-    bool       clip_begin = false;
-
-    p.setPen(pal.color(QPalette::WindowText));
-    p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
-
-    int       sub_item_indent = 0;
-    QRect     indicator_bb{};
-    auto      item_bb = getFirstRowItemRect(&indicator_bb, &sub_item_indent);
-    const int h_slack = 4;
-
-    const int row_height = item_bb.height();
-
-    ItemInfo item_info{};
-    item_info.global_index = 0;
-
-    enum {
-        Top = 0,
-        Sub = 1,
-    };
-
-    int level_index[2] = {0, 0};
-    int row_index      = 0;
-
-    const auto hover_color         = pal.color(QPalette::HighlightedText);
-    const auto selected_color      = pal.color(QPalette::Highlight);
-    bool       should_draw_hover   = false;
-    bool       found_selected_item = false;
-    int        hover_item_id       = -1;
-    QRect      hover_bb{};
-    QRect      sel_bb{};
-
-    const int total_top_items = totalTopItems();
-    for (int i = 0; i < total_top_items; ++i) {
-        const int top_id      = topItemAt(i);
-        item_info.is_top_item = true;
-        item_info.id          = top_id;
-        item_info.local_index = 0;
-        item_info.level_index = level_index[Top];
-        item_info.value       = itemValue(top_id);
-
-        if (clip_bb.intersects(item_bb)) {
-            drawIndicator(&p, indicator_bb, item_info);
-            render_func_(&p, item_bb.adjusted(h_slack, 0, -h_slack, 0), item_info);
-
-            if (row_index == ui_hover_row_index_) {
-                hover_bb          = item_bb;
-                hover_item_id     = top_id;
-                should_draw_hover = true;
-            } else if (selected_item_ == top_id) {
-                sel_bb              = item_bb;
-                found_selected_item = true;
-            }
-            clip_begin = true;
-        } else if (clip_begin) {
-            break;
-        }
-
-        ++row_index;
-        item_bb.translate(0, row_height);
-        indicator_bb.translate(0, row_height);
-
-        const int total_sub_items = totalSubItemsUnderTopItem(top_id);
-        if (!topItemEllapsed(top_id)) {
-            item_bb.adjust(sub_item_indent, 0, 0, 0);
-            indicator_bb.translate(sub_item_indent, 0);
-
-            for (const int sub_id : getSubItems(top_id)) {
-                item_info.is_top_item   = false;
-                item_info.id            = sub_id;
-                item_info.global_index += 1;
-                item_info.local_index  += 1;
-                item_info.level_index   = level_index[Sub];
-                item_info.value         = itemValue(sub_id);
-
-                if (clip_bb.intersects(item_bb)) {
-                    drawIndicator(&p, indicator_bb.translated(h_slack, 0), item_info);
-                    render_func_(&p, item_bb.adjusted(h_slack, 0, -h_slack, 0), item_info);
-                    if (row_index == ui_hover_row_index_) {
-                        hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
-                        hover_item_id     = sub_id;
-                        should_draw_hover = true;
-                    } else if (selected_item_ == sub_id) {
-                        sel_bb              = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
-                        found_selected_item = true;
-                    }
-                    clip_begin = true;
-                } else if (clip_begin) {
-                    break;
-                }
-
-                ++row_index;
-                item_bb.translate(0, row_height);
-                indicator_bb.translate(0, row_height);
-
-                level_index[Sub] += 1;
-            }
-
-            item_bb.adjust(-sub_item_indent, 0, 0, 0);
-            indicator_bb.translate(-sub_item_indent, 0);
-        } else {
-            level_index[Sub]       += total_sub_items;
-            item_info.global_index += total_sub_items;
-        }
-
-        item_info.global_index += 1;
-        level_index[Top]       += 1;
-    }
-
-    should_draw_hover = should_draw_hover && !ui_hover_on_indicator_;
-    if (should_draw_hover) { p.fillRect(hover_bb, hover_color); }
-
-    if (found_selected_item) {
-        //! FIXME: assertion not complete
-        //! HINT: case 1: selected_item_ != -1
-        //! HINT: case 2: should_draw_hover && hover_item_id == selected_item_
-        //! HINT: case 3: selected_item_ is an available sub item but the corresponding top item is
-        //! ellapsed and the target sub item becomes a dirty value without being noticed
-        p.fillRect(sel_bb, selected_color);
-    }
-}
-
-void TwoLevelTree::mouseMoveEvent(QMouseEvent *e) {
-    QWidget::mouseMoveEvent(e);
-
-    const QPair<int, bool> old_hover_hint{ui_hover_row_index_, ui_hover_on_indicator_};
-    ui_hover_row_index_ = rowIndexAtPos(e->pos(), &ui_hover_on_indicator_);
-    const QPair<int, bool> hover_hint{ui_hover_row_index_, ui_hover_on_indicator_};
-
-    if (hover_hint != old_hover_hint) { update(); }
-}
-
-void TwoLevelTree::leaveEvent(QEvent *e) {
-    QWidget::leaveEvent(e);
-
-    ui_hover_row_index_ = -1;
-    update();
-}
-
-void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
-    QWidget::mousePressEvent(e);
-
+void TwoLevelTree::handleButtonClick(const QPoint &pos, Qt::MouseButton button) {
     if (!model_) { return; }
 
     if (ui_hover_row_index_ == -1) {
@@ -376,7 +216,7 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
     //! NOTE: only accept left or right button
     //! HINT: left-button: toggle ellasped top-item or select sub-item
     //! HINT: right-button: request context menu on the hover item
-    if (!(e->buttons() & (Qt::LeftButton | Qt::RightButton))) { return; }
+    if (button != Qt::LeftButton && button != Qt::RightButton) { return; }
 
     ItemInfo item_info{};
     item_info.global_index = 0;
@@ -434,11 +274,11 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
 
     Q_ASSERT(item_info.id != -1);
 
-    if (e->button() == Qt::LeftButton) {
+    if (button == Qt::LeftButton) {
         QRect indicator_bb{};
         getFirstRowItemRect(&indicator_bb, nullptr);
         indicator_bb.translate(0, ui_hover_row_index_ * indicator_bb.height());
-        const bool indicator_clicked = indicator_bb.contains(e->pos());
+        const bool indicator_clicked = indicator_bb.contains(pos);
         if (indicator_clicked && item_info.is_top_item) {
             toggleEllapsedTopItem(item_info.id);
         } else {
@@ -453,17 +293,164 @@ void TwoLevelTree::mousePressEvent(QMouseEvent *e) {
             setFocusedTopItem(item_id[Top]);
         }
         update();
-    } else if (e->button() == Qt::RightButton) {
-        emit contextMenuRequested(e->pos(), item_info);
+    } else if (button == Qt::RightButton) {
+        emit contextMenuRequested(pos, item_info);
     }
 }
 
-} // namespace jwrite::ui
+void TwoLevelTree::paintEvent(QPaintEvent *event) {
+    if (!model_) { return; }
+    if (!item_render_proxy_) { return; }
 
-QDebug operator<<(QDebug stream, const jwrite::ui::TwoLevelTree::ItemInfo &item_info) {
+    QPainter   p(this);
+    const auto pal = palette();
+
+    const auto clip_bb    = event->rect();
+    bool       clip_begin = false;
+
+    p.setPen(pal.color(QPalette::WindowText));
+    p.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
+
+    int       sub_item_indent = 0;
+    QRect     indicator_bb{};
+    auto      item_bb = getFirstRowItemRect(&indicator_bb, &sub_item_indent);
+    const int h_slack = 4;
+
+    const int row_height = item_bb.height();
+
+    ItemInfo item_info{};
+    item_info.global_index = 0;
+
+    enum {
+        Top = 0,
+        Sub = 1,
+    };
+
+    int level_index[2] = {0, 0};
+    int row_index      = 0;
+
+    const auto hover_color         = pal.color(QPalette::HighlightedText);
+    const auto selected_color      = pal.color(QPalette::Highlight);
+    bool       should_draw_hover   = false;
+    bool       found_selected_item = false;
+    int        hover_item_id       = -1;
+    QRect      hover_bb{};
+    QRect      sel_bb{};
+
+    const int total_top_items = totalTopItems();
+    for (int i = 0; i < total_top_items; ++i) {
+        const int top_id      = topItemAt(i);
+        item_info.is_top_item = true;
+        item_info.id          = top_id;
+        item_info.local_index = 0;
+        item_info.level_index = level_index[Top];
+        item_info.value       = itemValue(top_id);
+
+        if (clip_bb.intersects(item_bb)) {
+            drawIndicator(&p, indicator_bb, item_info);
+            item_render_proxy_->render(&p, item_bb.adjusted(h_slack, 0, -h_slack, 0), item_info);
+
+            if (row_index == ui_hover_row_index_) {
+                hover_bb          = item_bb;
+                hover_item_id     = top_id;
+                should_draw_hover = true;
+            } else if (selected_item_ == top_id) {
+                sel_bb              = item_bb;
+                found_selected_item = true;
+            }
+            clip_begin = true;
+        } else if (clip_begin) {
+            break;
+        }
+
+        ++row_index;
+        item_bb.translate(0, row_height);
+        indicator_bb.translate(0, row_height);
+
+        const int total_sub_items = totalSubItemsUnderTopItem(top_id);
+        if (!topItemEllapsed(top_id)) {
+            item_bb.adjust(sub_item_indent, 0, 0, 0);
+            indicator_bb.translate(sub_item_indent, 0);
+
+            for (const int sub_id : getSubItems(top_id)) {
+                item_info.is_top_item   = false;
+                item_info.id            = sub_id;
+                item_info.global_index += 1;
+                item_info.local_index  += 1;
+                item_info.level_index   = level_index[Sub];
+                item_info.value         = itemValue(sub_id);
+
+                if (clip_bb.intersects(item_bb)) {
+                    drawIndicator(&p, indicator_bb.translated(h_slack, 0), item_info);
+                    item_render_proxy_->render(
+                        &p, item_bb.adjusted(h_slack, 0, -h_slack, 0), item_info);
+                    if (row_index == ui_hover_row_index_) {
+                        hover_bb          = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
+                        hover_item_id     = sub_id;
+                        should_draw_hover = true;
+                    } else if (selected_item_ == sub_id) {
+                        sel_bb              = item_bb.adjusted(-sub_item_indent, 0, 0, 0);
+                        found_selected_item = true;
+                    }
+                    clip_begin = true;
+                } else if (clip_begin) {
+                    break;
+                }
+
+                ++row_index;
+                item_bb.translate(0, row_height);
+                indicator_bb.translate(0, row_height);
+
+                level_index[Sub] += 1;
+            }
+
+            item_bb.adjust(-sub_item_indent, 0, 0, 0);
+            indicator_bb.translate(-sub_item_indent, 0);
+        } else {
+            level_index[Sub]       += total_sub_items;
+            item_info.global_index += total_sub_items;
+        }
+
+        item_info.global_index += 1;
+        level_index[Top]       += 1;
+    }
+
+    should_draw_hover = should_draw_hover && !ui_hover_on_indicator_;
+    if (should_draw_hover) { p.fillRect(hover_bb, hover_color); }
+
+    if (found_selected_item) {
+        //! FIXME: assertion not complete
+        //! HINT: case 1: selected_item_ != -1
+        //! HINT: case 2: should_draw_hover && hover_item_id == selected_item_
+        //! HINT: case 3: selected_item_ is an available sub item but the corresponding top item is
+        //! ellapsed and the target sub item becomes a dirty value without being noticed
+        p.fillRect(sel_bb, selected_color);
+    }
+}
+
+void TwoLevelTree::mouseMoveEvent(QMouseEvent *event) {
+    const QPair<int, bool> old_hover_hint{ui_hover_row_index_, ui_hover_on_indicator_};
+    ui_hover_row_index_ = rowIndexAtPos(event->pos(), &ui_hover_on_indicator_);
+    const QPair<int, bool> hover_hint{ui_hover_row_index_, ui_hover_on_indicator_};
+
+    if (hover_hint != old_hover_hint) { update(); }
+}
+
+void TwoLevelTree::leaveEvent(QEvent *event) {
+    ui_hover_row_index_ = -1;
+    update();
+}
+
+void TwoLevelTree::mousePressEvent(QMouseEvent *event) {
+    handleButtonClick(event->pos(), event->button());
+}
+
+QDebug operator<<(QDebug stream, const TwoLevelTreeItemInfo &item_info) {
     stream.nospace() << "ItemInfo::" << (item_info.is_top_item ? "Top" : "Sub")
                      << "(id=" << item_info.id << ", index=[" << item_info.global_index << ","
                      << item_info.local_index << "," << item_info.level_index
                      << "], value=" << item_info.value << ")";
     return stream;
 }
+
+} // namespace widgetkit

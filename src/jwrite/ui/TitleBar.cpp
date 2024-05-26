@@ -73,19 +73,19 @@ void TitleBar::setupUi() {
 void TitleBar::setupConnections() {
     connect(
         sys_buttons_[magic_enum::enum_index<SystemButton::Minimize>()],
-        SIGNAL(clicked(bool)),
+        &SystemButton::clicked,
         this,
-        SLOT(requestMinimize()));
+        &TitleBar::requestMinimize);
     connect(
         sys_buttons_[magic_enum::enum_index<SystemButton::Maximize>()],
-        SIGNAL(clicked(bool)),
+        &SystemButton::clicked,
         this,
-        SLOT(requestMaximize()));
+        &TitleBar::requestMaximize);
     connect(
         sys_buttons_[magic_enum::enum_index<SystemButton::Close>()],
-        SIGNAL(clicked(bool)),
+        &SystemButton::clicked,
         this,
-        SLOT(requestClose()));
+        &TitleBar::requestClose);
 }
 
 void TitleBar::paintEvent(QPaintEvent *event) {

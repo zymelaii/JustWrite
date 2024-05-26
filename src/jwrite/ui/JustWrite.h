@@ -6,11 +6,12 @@
 #include <jwrite/ui/ShadowOverlay.h>
 #include <jwrite/BookManager.h>
 #include <jwrite/GlobalCommand.h>
+#include <widget-kit/OverlaySurface.h>
 #include <QWidget>
 #include <QStackedWidget>
 #include <QStackedLayout>
+#include <QSystemTrayIcon>
 #include <QWKWidgets/widgetwindowagent.h>
-#include <optional>
 
 namespace jwrite::ui {
 
@@ -47,13 +48,12 @@ public:
     void toggleMaximize();
 
 protected:
-    void    setupUi();
-    void    setupConnections();
-    void    requestUpdateBookInfo(int index);
-    QString requestImagePath(bool validate, QImage *out_image);
-    void    requestBookAction(int index, Gallery::MenuAction action);
-    void    requestStartEditBook(int index);
-    void    requestRenameTocItem(const BookInfo &book_info, int vid, int cid);
+    void setupUi();
+    void setupConnections();
+    void requestUpdateBookInfo(int index);
+    void requestBookAction(int index, Gallery::MenuAction action);
+    void requestStartEditBook(int index);
+    void requestRenameTocItem(const BookInfo &book_info, int vid, int cid);
 
     void requestInitFromLocalStorage();
     void requestQuitApp();
@@ -62,13 +62,13 @@ protected:
     void loadDataFromLocalStorage();
     void syncToLocalStorage();
 
-    void showOverlay(QWidget *widget);
-    void closeOverlay();
-    void showProgressOverlay();
+    void showProgress();
 
     void switchToPage(PageType page);
     void closePage();
 
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
@@ -78,12 +78,12 @@ private:
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;
     GlobalCommandManager                 command_manager_;
+    QSystemTrayIcon                     *tray_icon_;
     TitleBar                            *ui_title_bar_;
     Gallery                             *ui_gallery_;
     EditPage                            *ui_edit_page_;
-    ShadowOverlay                       *ui_popup_layer_;
+    widgetkit::OverlaySurface           *ui_surface_;
     QStackedWidget                      *ui_page_stack_;
-    QStackedLayout                      *ui_top_most_layout_;
     QWK::WidgetWindowAgent              *ui_agent_;
 };
 

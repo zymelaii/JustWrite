@@ -97,8 +97,6 @@ if(WIN32)
     add_custom_target(
         deploy
         COMMAND windeployqt ${CMAKE_INSTALL_PREFIX}/$<TARGET_FILE_NAME:${CMAKE_PROJECT_NAME}>
-            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Debug>:--debug>
-            $<$<STREQUAL:${CMAKE_BUILD_TYPE},Release>:--release>
         COMMENT "Deploy the application..."
         DEPENDS install-runtime-deps
     )

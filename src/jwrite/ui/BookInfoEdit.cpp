@@ -1,11 +1,12 @@
 #include <jwrite/ui/BookInfoEdit.h>
 #include <QVBoxLayout>
 #include <QPainter>
+#include <QFileDialog>
 
 namespace jwrite::ui {
 
-BookInfoEdit::BookInfoEdit(QWidget *parent)
-    : QWidget(parent) {
+BookInfoEdit::BookInfoEdit()
+    : widgetkit::OverlayDialog() {
     setupUi();
     setupConnections();
 }
@@ -39,13 +40,48 @@ void BookInfoEdit::setBookInfo(const BookInfo &info) {
     book_info_.uuid = info.uuid;
 }
 
+QString BookInfoEdit::getCoverPath(QWidget *parent, bool validate, QImage *out_image) {
+    const auto filter = "图片 (*.bmp *.jpg *.jpeg *.png)";
+    auto       path   = QFileDialog::getOpenFileName(parent, "选择封面", "", filter);
+
+    if (path.isEmpty()) { return ""; }
+
+    if (!validate) { return path; }
+
+    QImage image(path);
+    if (image.isNull()) { return ""; }
+
+    if (out_image) { *out_image = std::move(image); }
+
+    return path;
+}
+
+std::optional<BookInfo>
+    BookInfoEdit::getBookInfo(widgetkit::OverlaySurface *surface, const BookInfo &initial) {
+    auto edit = std::make_unique<BookInfoEdit>();
+    edit->setBookInfo(initial);
+    const int request = edit->exec(surface);
+    if (request == BookInfoEdit::Submit) {
+        return {edit->book_info_};
+    } else {
+        return std::nullopt;
+    }
+}
+
+void BookInfoEdit::selectCoverImage() {
+    QImage     image{};
+    const auto path = getCoverPath(this, true, &image);
+    if (path.isEmpty()) { return; }
+    setCover(path);
+}
+
 void BookInfoEdit::setupUi() {
     ui_title_edit_   = new QtMaterialTextField;
     ui_author_edit_  = new QtMaterialTextField;
-    ui_cover_        = new PlainImageView;
-    ui_cover_select_ = new FlatButton;
-    ui_submit_       = new FlatButton;
-    ui_cancel_       = new FlatButton;
+    ui_cover_        = new widgetkit::ImageLabel;
+    ui_cover_select_ = new widgetkit::FlatButton;
+    ui_submit_       = new widgetkit::FlatButton;
+    ui_cancel_       = new widgetkit::FlatButton;
 
     auto row_container = new QWidget;
     auto btn_container = new QWidget;
@@ -131,13 +167,16 @@ void BookInfoEdit::setupUi() {
 }
 
 void BookInfoEdit::setupConnections() {
-    connect(ui_submit_, &FlatButton::pressed, this, [this] {
+    connect(ui_submit_, &widgetkit::FlatButton::pressed, this, [this] {
         book_info_.title  = ui_title_edit_->text();
         book_info_.author = ui_author_edit_->text();
-        emit submitRequested(book_info_);
+        exit(Request::Submit);
     });
-    connect(ui_cancel_, &FlatButton::pressed, this, &BookInfoEdit::cancelRequested);
-    connect(ui_cover_select_, &FlatButton::pressed, this, &BookInfoEdit::changeCoverRequested);
+    connect(ui_cancel_, &widgetkit::FlatButton::pressed, this, [this] {
+        exit(Request::Cancel);
+    });
+    connect(
+        ui_cover_select_, &widgetkit::FlatButton::pressed, this, &BookInfoEdit::selectCoverImage);
 }
 
 void BookInfoEdit::paintEvent(QPaintEvent *event) {

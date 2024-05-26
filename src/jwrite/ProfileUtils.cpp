@@ -13,7 +13,7 @@ void Profiler::setup(int interval_sec) {
     timer_->setInterval(interval_sec_ * 1000);
     timer_->setSingleShot(false);
     timer_->start();
-    connect(timer_, SIGNAL(timeout()), this, SLOT(summary_collected_data()));
+    connect(timer_, &QTimer::timeout, this, &Profiler::summary_collected_data);
 }
 
 void Profiler::start(ProfileTarget target) {

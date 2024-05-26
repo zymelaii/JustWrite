@@ -20,7 +20,7 @@ namespace jwrite::ui {
 
 using epub::EpubBuilder;
 
-class BookModel : public TwoLevelDataModel {
+class BookModel : public widgetkit::TwoLevelDataModel {
 public:
     explicit BookModel(AbstractBookManager *bm, QObject *parent)
         : TwoLevelDataModel(parent)
@@ -40,7 +40,7 @@ public:
         return bm_->get_chapters_of_volume(top_item_id).size();
     }
 
-    int top_item_at(int index) override {
+    int top_item_at(int index) const override {
         return bm_->get_volumes()[index];
     }
 
@@ -94,14 +94,9 @@ private:
     AbstractBookManager *const bm_;
 };
 
-class BookDirItemRenderProxy
-    : public TwoLevelTree::ItemRenderProxy
-    , public QObject {
+class BookDirItemRenderProxy : public widgetkit::TwoLevelTreeItemRenderProxy {
 public:
-    explicit BookDirItemRenderProxy(QObject *parent)
-        : QObject(parent) {}
-
-    void render(QPainter *p, const QRect &clip_bb, const TwoLevelTree::ItemInfo &item_info) {
+    void render(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
         const auto fm    = p->fontMetrics();
         const auto flags = Qt::AlignLeft | Qt::AlignVCenter;
         const auto format =
@@ -213,10 +208,7 @@ AbstractBookManager *EditPage::resetBookSource(AbstractBookManager *book_manager
 
     book_manager_ = book_manager;
 
-    if (auto last_model = ui_book_dir_->setModel(new BookModel(book_manager_, ui_book_dir_))) {
-        delete last_model;
-    }
-
+    ui_book_dir_->setModel(std::make_unique<BookModel>(book_manager_, ui_book_dir_));
     flushWordsCount();
 
     return old_book_manager;
@@ -405,10 +397,10 @@ void EditPage::setupUi() {
     ui_status_bar_ = new StatusBar;
 
     ui_sidebar_         = new QWidget;
-    ui_new_volume_      = new FlatButton;
-    ui_new_chapter_     = new FlatButton;
-    ui_export_to_local_ = new FlatButton;
-    ui_book_dir_        = new TwoLevelTree;
+    ui_new_volume_      = new widgetkit::FlatButton;
+    ui_new_chapter_     = new widgetkit::FlatButton;
+    ui_export_to_local_ = new widgetkit::FlatButton;
+    ui_book_dir_        = new widgetkit::TwoLevelTree;
 
     auto btn_line        = new QWidget;
     auto btn_line_layout = new QHBoxLayout(btn_line);
@@ -470,7 +462,7 @@ void EditPage::setupUi() {
     content->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 
     //! install book dir item render proxy
-    ui_book_dir_->setItemRenderProxy(new BookDirItemRenderProxy(this));
+    ui_book_dir_->setItemRenderProxy(std::make_unique<BookDirItemRenderProxy>());
 
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
     setAutoFillBackground(true);
@@ -493,31 +485,38 @@ void EditPage::setupConnections() {
     });
     connect(
         ui_book_dir_,
-        &TwoLevelTree::itemSelected,
+        &widgetkit::TwoLevelTree::itemSelected,
         this,
         [this](bool is_top_item, int top_item_id, int sub_item_id) {
             if (!is_top_item) { openChapter(sub_item_id); }
         });
-    connect(ui_new_volume_, &FlatButton::pressed, this, [this] {
+    connect(ui_new_volume_, &widgetkit::FlatButton::pressed, this, [this] {
         addVolume(ui_book_dir_->totalTopItems(), "");
     });
     connect(
         ui_new_chapter_,
-        &FlatButton::pressed,
+        &widgetkit::FlatButton::pressed,
         this,
         &EditPage::createAndOpenNewChapterUnderActiveVolume);
-    connect(ui_export_to_local_, &FlatButton::pressed, this, &EditPage::requestExportToLocal);
-    connect(&sec_timer_, SIGNAL(timeout()), this, SLOT(updateCurrentDateTime()));
+    connect(
+        ui_export_to_local_,
+        &widgetkit::FlatButton::pressed,
+        this,
+        &EditPage::requestExportToLocal);
+    connect(&sec_timer_, &QTimer::timeout, this, &EditPage::updateCurrentDateTime);
     connect(ui_editor_, &Editor::focusLost, this, [this](VisualTextEditContext::TextLoc last_loc) {
         last_loc_ = last_loc;
         messy_input_->kill();
     });
-    connect(ui_book_dir_, &TwoLevelTree::contextMenuRequested, this, &EditPage::popupBookDirMenu);
+    connect(
+        ui_book_dir_,
+        &widgetkit::TwoLevelTree::contextMenuRequested,
+        this,
+        &EditPage::popupBookDirMenu);
 }
 
-void EditPage::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
+void EditPage::popupBookDirMenu(QPoint pos, widgetkit::TwoLevelTree::ItemInfo item_info) {
     //! TODO: menu style & popup input to edit the new title
-    qDebug() << "show menu at" << pos << item_info;
 }
 
 void EditPage::requestExportToLocal() {

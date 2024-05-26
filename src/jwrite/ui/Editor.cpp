@@ -65,8 +65,8 @@ Editor::Editor(QWidget *parent)
         context_->resize_viewport(area.width(), area.height());
         requestUpdate(false);
     });
-    connect(&blink_timer_, SIGNAL(timeout()), this, SLOT(renderBlinkCursor()));
-    connect(&stable_timer_, SIGNAL(timeout()), this, SLOT(render()));
+    connect(&blink_timer_, &QTimer::timeout, this, &Editor::renderBlinkCursor);
+    connect(&stable_timer_, &QTimer::timeout, this, &Editor::render);
 
     stable_timer_.start();
 }

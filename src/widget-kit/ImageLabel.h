@@ -2,14 +2,15 @@
 
 #include <QWidget>
 
-namespace jwrite::ui {
+namespace widgetkit {
 
-class PlainImageView : public QWidget {
+class ImageLabel : public QWidget {
     Q_OBJECT
 
 public:
-    explicit PlainImageView(QWidget *parent = nullptr);
-    ~PlainImageView();
+    explicit ImageLabel(QWidget *parent = nullptr);
+
+    ~ImageLabel() override;
 
 public:
     void setImage(const QString &path);
@@ -33,4 +34,4 @@ public:
     QString image_path_;
 };
 
-} // namespace jwrite::ui
+} // namespace widgetkit

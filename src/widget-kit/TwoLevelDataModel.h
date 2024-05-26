@@ -2,7 +2,7 @@
 
 #include <QObject>
 
-namespace jwrite {
+namespace widgetkit {
 
 class TwoLevelDataModel : public QObject {
     Q_OBJECT
@@ -20,7 +20,7 @@ public:
     virtual int total_sub_items() const                           = 0;
     virtual int total_items_under_top_item(int top_item_id) const = 0;
 
-    virtual int top_item_at(int index)                        = 0;
+    virtual int top_item_at(int index) const                  = 0;
     virtual int sub_item_at(int top_item_id, int index) const = 0;
 
     virtual QList<int> get_sub_items(int top_item_id) const = 0;
@@ -36,4 +36,4 @@ public:
     virtual void    set_value(int id, const QString &value) = 0;
 };
 
-} // namespace jwrite
+} // namespace widgetkit

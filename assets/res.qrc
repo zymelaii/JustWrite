@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/">
+        <file alias="app.ico">icon/jwrite-icon-1.ico</file>
         <file>res/default-cover.png</file>
         <file>res/icons/warning.svg</file>
         <file>res/icons/close-large.svg</file>
