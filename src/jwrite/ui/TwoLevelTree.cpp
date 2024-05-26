@@ -210,7 +210,8 @@ int TwoLevelTree::totalVisibleItems() const {
     return size;
 }
 
-void TwoLevelTree::handleButtonClick(const QPoint &pos, Qt::MouseButton button) {
+void TwoLevelTree::handleButtonClick(
+    const QPoint &pos, Qt::MouseButton button, bool test_single_click) {
     if (!model_) { return; }
 
     if (ui_hover_row_index_ == -1) {
@@ -288,7 +289,7 @@ void TwoLevelTree::handleButtonClick(const QPoint &pos, Qt::MouseButton button) 
         if (indicator_clicked && item_info.is_top_item) {
             toggleEllapsedTopItem(item_info.id);
             update();
-        } else {
+        } else if (test_single_click) {
             handleSingleClick(item_info, item_id[Top], item_id[Sub]);
         }
     } else if (button == Qt::RightButton) {
@@ -488,18 +489,21 @@ void TwoLevelTree::leaveEvent(QEvent *event) {
 }
 
 void TwoLevelTree::mousePressEvent(QMouseEvent *event) {
-    handleButtonClick(event->pos(), event->button());
+    handleButtonClick(event->pos(), event->button(), true);
 }
 
 void TwoLevelTree::mouseDoubleClickEvent(QMouseEvent *event) {
-    if (!single_click_timer_.isActive()) { return; }
+    if (event->button() != Qt::LeftButton) { return; }
 
-    cancelSingleClickEvent();
-
-    emit itemDoubleClicked(
-        clicked_item_info_.item_info.is_top_item,
-        clicked_item_info_.top_item_id,
-        clicked_item_info_.sub_item_id);
+    if (single_click_timer_.isActive()) {
+        cancelSingleClickEvent();
+        emit itemDoubleClicked(
+            clicked_item_info_.item_info.is_top_item,
+            clicked_item_info_.top_item_id,
+            clicked_item_info_.sub_item_id);
+    } else {
+        handleButtonClick(event->pos(), event->button(), false);
+    }
 }
 
 QDebug operator<<(QDebug stream, const TwoLevelTreeItemInfo &item_info) {

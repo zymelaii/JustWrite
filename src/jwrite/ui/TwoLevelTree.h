@@ -161,7 +161,7 @@ protected:
     void drawIndicator(QPainter *p, const QRect &bb, const ItemInfo &item_info);
     int  totalVisibleItems() const;
 
-    void handleButtonClick(const QPoint &pos, Qt::MouseButton button);
+    void handleButtonClick(const QPoint &pos, Qt::MouseButton button, bool test_single_click);
     void handleSingleClick(const ItemInfo &item_info, int top_item_id, int sub_item_id);
     void cancelSingleClickEvent();
     void prepareSingleClickEvent(std::function<void()> action);
