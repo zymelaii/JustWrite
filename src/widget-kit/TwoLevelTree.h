@@ -2,7 +2,9 @@
 
 #include <widget-kit/TwoLevelDataModel.h>
 #include <QWidget>
+#include <QTimer>
 #include <memory>
+#include <functional>
 
 namespace widgetkit {
 
@@ -50,6 +52,7 @@ public:
 
 signals:
     void itemSelected(bool is_top_item, int top_item_id, int sub_item_id);
+    void itemDoubleClicked(bool is_top_item, int top_item_id, int sub_item_id);
     void contextMenuRequested(QPoint pos, ItemInfo item_info);
 
 public:
@@ -124,6 +127,14 @@ public:
     void setFocusedTopItem(int top_item_id);
     void clearTopItemFocus();
 
+    int doubleClickInterval() const {
+        return double_click_interval_;
+    }
+
+    void setDoubleClickInterval(int interval_ms) {
+        double_click_interval_ = qBound(50, interval_ms, 3000);
+    }
+
 public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
@@ -139,13 +150,23 @@ protected:
     int  totalVisibleItems() const;
 
     void handleButtonClick(const QPoint &pos, Qt::MouseButton button);
+    void handleSingleClick(const ItemInfo &item_info, int top_item_id, int sub_item_id);
+    void cancelSingleClickEvent();
+    void prepareSingleClickEvent(std::function<void()> action);
 
     void paintEvent(QPaintEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
+    struct ClickedItemInfo {
+        ItemInfo item_info;
+        int      top_item_id;
+        int      sub_item_id;
+    };
+
     std::unique_ptr<TwoLevelDataModel> model_;
     std::unique_ptr<ItemRenderProxy>   item_render_proxy_;
 
@@ -153,6 +174,10 @@ private:
     int       selected_item_;
     int       selected_sub_item_;
     int       focused_top_item_;
+
+    ClickedItemInfo clicked_item_info_;
+    QTimer          single_click_timer_;
+    int             double_click_interval_;
 
     int  ui_hover_row_index_;
     bool ui_hover_on_indicator_;

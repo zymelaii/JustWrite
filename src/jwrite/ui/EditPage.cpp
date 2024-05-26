@@ -513,6 +513,13 @@ void EditPage::setupConnections() {
         &widgetkit::TwoLevelTree::contextMenuRequested,
         this,
         &EditPage::popupBookDirMenu);
+    connect(
+        ui_book_dir_,
+        &widgetkit::TwoLevelTree::itemDoubleClicked,
+        this,
+        [this](bool is_top_item, int top_item_id, int sub_item_id) {
+            requestRenameTocItem(top_item_id, sub_item_id);
+        });
 }
 
 void EditPage::popupBookDirMenu(QPoint pos, widgetkit::TwoLevelTree::ItemInfo item_info) {
@@ -626,7 +633,7 @@ void EditPage::createAndOpenNewChapterUnderActiveVolume() {
     }
 }
 
-void EditPage::requestRenameTocItem() {
+void EditPage::requestRenameCurrentTocItem() {
     if (!book_manager_) { return; }
 
     const int item_id = ui_book_dir_->selectedItem();
@@ -636,7 +643,7 @@ void EditPage::requestRenameTocItem() {
 
     if (cid != item_id) {
         Q_ASSERT(item_id == ui_book_dir_->focusedTopItem());
-        emit renameTocItemRequested(book_manager_->info_ref(), item_id, -1);
+        requestRenameTocItem(item_id, -1);
         return;
     }
 
@@ -645,8 +652,13 @@ void EditPage::requestRenameTocItem() {
 
     for (const int vid : book_manager_->get_volumes()) {
         if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }
-        emit renameTocItemRequested(book_manager_->info_ref(), vid, cid);
+        requestRenameTocItem(vid, cid);
     }
+}
+
+void EditPage::requestRenameTocItem(int vid, int cid) {
+    if (!book_manager_) { return; }
+    emit renameTocItemRequested(book_manager_->info_ref(), vid, cid);
 }
 
 bool EditPage::handleShortcuts(QKeyEvent *event) {
@@ -664,7 +676,7 @@ bool EditPage::handleShortcuts(QKeyEvent *event) {
                 createAndOpenNewChapterUnderActiveVolume();
             } break;
             case GlobalCommand::Rename: {
-                requestRenameTocItem();
+                requestRenameCurrentTocItem();
             } break;
             case GlobalCommand::DEV_EnableMessyInput: {
                 ui_editor_->setFocus();

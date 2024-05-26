@@ -12,7 +12,9 @@ void DefaultTwoLevelTreeItemRender::render(
 }
 
 TwoLevelTree::TwoLevelTree(QWidget *parent)
-    : QWidget(parent) {
+    : QWidget(parent)
+    , single_click_timer_(this)
+    , double_click_interval_{200} {
     setupUi();
     setMouseTracking(true);
 
@@ -281,21 +283,58 @@ void TwoLevelTree::handleButtonClick(const QPoint &pos, Qt::MouseButton button) 
         const bool indicator_clicked = indicator_bb.contains(pos);
         if (indicator_clicked && item_info.is_top_item) {
             toggleEllapsedTopItem(item_info.id);
+            update();
         } else {
-            if (item_info.is_top_item) {
-                selected_item_ = item_id[Top];
-            } else {
-                Q_ASSERT(item_id[Sub] == item_info.id);
-                selected_item_     = item_id[Sub];
-                selected_sub_item_ = selected_item_;
-            }
-            emit itemSelected(item_info.is_top_item, item_id[Top], item_id[Sub]);
-            setFocusedTopItem(item_id[Top]);
+            handleSingleClick(item_info, item_id[Top], item_id[Sub]);
         }
-        update();
     } else if (button == Qt::RightButton) {
         emit contextMenuRequested(pos, item_info);
     }
+}
+
+void TwoLevelTree::handleSingleClick(const ItemInfo &item_info, int top_item_id, int sub_item_id) {
+    cancelSingleClickEvent();
+
+    clicked_item_info_.item_info   = item_info;
+    clicked_item_info_.top_item_id = top_item_id;
+    clicked_item_info_.sub_item_id = sub_item_id;
+
+    prepareSingleClickEvent([this] {
+        if (clicked_item_info_.item_info.is_top_item) {
+            selected_item_ = clicked_item_info_.top_item_id;
+        } else {
+            Q_ASSERT(clicked_item_info_.sub_item_id == clicked_item_info_.item_info.id);
+            selected_item_     = clicked_item_info_.sub_item_id;
+            selected_sub_item_ = selected_item_;
+        }
+
+        emit itemSelected(
+            clicked_item_info_.item_info.is_top_item,
+            clicked_item_info_.top_item_id,
+            clicked_item_info_.sub_item_id);
+        setFocusedTopItem(clicked_item_info_.top_item_id);
+
+        update();
+
+        disconnect(&single_click_timer_, &QTimer::timeout, this, nullptr);
+    });
+}
+
+void TwoLevelTree::cancelSingleClickEvent() {
+    single_click_timer_.stop();
+    disconnect(&single_click_timer_, &QTimer::timeout, this, nullptr);
+}
+
+void TwoLevelTree::prepareSingleClickEvent(std::function<void()> action) {
+    Q_ASSERT(!single_click_timer_.isActive());
+
+    //! NOTE: QApplication::doubleClickInterval() seems too long to wait a double click
+
+    single_click_timer_.setSingleShot(true);
+    single_click_timer_.setInterval(double_click_interval_);
+    connect(&single_click_timer_, &QTimer::timeout, this, action);
+
+    single_click_timer_.start();
 }
 
 void TwoLevelTree::paintEvent(QPaintEvent *event) {
@@ -443,6 +482,17 @@ void TwoLevelTree::leaveEvent(QEvent *event) {
 
 void TwoLevelTree::mousePressEvent(QMouseEvent *event) {
     handleButtonClick(event->pos(), event->button());
+}
+
+void TwoLevelTree::mouseDoubleClickEvent(QMouseEvent *event) {
+    if (!single_click_timer_.isActive()) { return; }
+
+    cancelSingleClickEvent();
+
+    emit itemDoubleClicked(
+        clicked_item_info_.item_info.is_top_item,
+        clicked_item_info_.top_item_id,
+        clicked_item_info_.sub_item_id);
 }
 
 QDebug operator<<(QDebug stream, const TwoLevelTreeItemInfo &item_info) {

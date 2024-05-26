@@ -67,7 +67,8 @@ protected:
     void syncWordsStatus();
     void createAndOpenNewChapter(int vid);
     void createAndOpenNewChapterUnderActiveVolume();
-    void requestRenameTocItem();
+    void requestRenameCurrentTocItem();
+    void requestRenameTocItem(int vid, int cid);
     bool handleShortcuts(QKeyEvent *event);
 
     void keyPressEvent(QKeyEvent *event) override;
