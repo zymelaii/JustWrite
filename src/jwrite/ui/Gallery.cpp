@@ -74,6 +74,13 @@ BookInfo Gallery::bookInfoAt(int index) const {
     return item.book_info;
 }
 
+int Gallery::indexOf(const QString &book_id) const {
+    for (int i = 0; i < items_.size(); ++i) {
+        if (items_[i].book_info.uuid == book_id) { return i; }
+    }
+    return -1;
+}
+
 QSize Gallery::minimumSizeHint() const {
     const auto margins = contentsMargins();
     return getItemRect(0, 0).marginsAdded(margins).size();

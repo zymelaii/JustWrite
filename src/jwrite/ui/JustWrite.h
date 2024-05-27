@@ -6,6 +6,7 @@
 #include <jwrite/BookManager.h>
 #include <jwrite/GlobalCommand.h>
 #include <widget-kit/OverlaySurface.h>
+#include <widget-kit/Progress.h>
 #include <QWidget>
 #include <QStackedWidget>
 #include <QStackedLayout>
@@ -18,11 +19,53 @@ namespace jwrite::ui {
 class JustWrite : public QWidget {
     Q_OBJECT
 
-protected:
-    enum class PageType {
-        Edit,
-        Gallery,
+public:
+    enum class TocType {
+        Volume,
+        Chapter,
     };
+
+    enum class PageType {
+        Gallery,
+        Edit,
+    };
+
+protected:
+    void request_create_new_book();
+    void do_create_book(BookInfo &book_info);
+
+    void request_remove_book(const QString &book_id);
+    void do_remove_book(const QString &book_id);
+
+    void request_open_book(const QString &book_id);
+    void do_open_book(const QString &book_id);
+
+    void request_close_opened_book();
+    void do_close_book(const QString &book_id);
+
+    void do_update_book_info(BookInfo &book_info);
+    void request_update_book_info(const QString &book_id);
+
+    void request_rename_toc_item(const QString &book_id, int toc, TocType type);
+    void do_rename_toc_item(const QString &book_id, int toc, const QString &title);
+
+public slots:
+    void handle_gallery_on_click(int index);
+    void handle_gallery_on_menu_action(int index, Gallery::MenuAction action);
+    void handle_gallery_on_load_book(const BookInfo &book_info);
+    void handle_book_dir_on_rename_toc_item(const QString &book_id, int toc_id, TocType type);
+    void handle_book_dir_on_rename_toc_item__adapter(const BookInfo &book_info, int vid, int cid);
+    void handle_on_page_change(PageType page);
+
+public:
+    QString get_default_author() const;
+    void    set_default_author(const QString &author, bool force);
+
+    void wait(std::function<void()> job);
+
+    static widgetkit::Progress::Builder waitTaskBuilder() {
+        return widgetkit::Progress::Builder{};
+    }
 
 public:
     JustWrite();
@@ -32,14 +75,7 @@ signals:
     void pageChanged(PageType page);
 
 public:
-    void wait(std::function<void()> job);
-
     void updateColorScheme(const ColorScheme &scheme);
-    void updateBookInfo(int index, const BookInfo &info);
-
-protected:
-    QString getLikelyAuthor() const;
-    void    updateLikelyAuthor(const QString &author);
 
 public:
     void toggleMaximize();
@@ -47,10 +83,7 @@ public:
 protected:
     void setupUi();
     void setupConnections();
-    void requestUpdateBookInfo(int index);
-    void requestBookAction(int index, Gallery::MenuAction action);
     void requestStartEditBook(int index);
-    void requestRenameTocItem(const BookInfo &book_info, int vid, int cid);
 
     void requestInitFromLocalStorage();
     void requestQuitApp();

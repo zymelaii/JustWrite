@@ -34,10 +34,10 @@ void BookInfoEdit::setCover(const QString &cover_url) {
 }
 
 void BookInfoEdit::setBookInfo(const BookInfo &info) {
+    book_info_ = info;
     setTitle(info.title);
     setAuthor(info.author);
     setCover(info.cover_url);
-    book_info_.uuid = info.uuid;
 }
 
 QString BookInfoEdit::getCoverPath(QWidget *parent, bool validate, QImage *out_image) {

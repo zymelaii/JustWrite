@@ -2,14 +2,17 @@
 
 #include <QMap>
 #include <QUuid>
+#include <QDateTime>
 
 namespace jwrite {
 
 struct BookInfo {
-    QString uuid;
-    QString title;
-    QString author;
-    QString cover_url;
+    QString   uuid;
+    QString   title;
+    QString   author;
+    QString   cover_url;
+    QDateTime creation_time;
+    QDateTime last_update_time;
 };
 
 class AbstractBookManager {
@@ -47,6 +50,13 @@ public:
 
     virtual bool add_volume_as(int index, int id, const QString &title)           = 0;
     virtual bool add_chapter_as(int vid, int index, int id, const QString &title) = 0;
+
+    virtual int get_volume_of_chapter(int cid) const {
+        for (const int vid : get_volumes()) {
+            if (get_chapters_of_volume(vid).contains(cid)) { return vid; }
+        }
+        return -1;
+    }
 
     virtual int  remove_volume(int vid)  = 0;
     virtual bool remove_chapter(int cid) = 0;

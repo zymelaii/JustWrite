@@ -35,6 +35,7 @@ public:
     }
 
     BookInfo bookInfoAt(int index) const;
+    int      indexOf(const QString &book_id) const;
 
 public:
     QSize minimumSizeHint() const override;

@@ -8,7 +8,6 @@
 #include <jwrite/ProfileUtils.h>
 #include <widget-kit/TextInputDialog.h>
 #include <widget-kit/OverlaySurface.h>
-#include <widget-kit/Progress.h>
 #include <QScrollBar>
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -20,6 +19,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QApplication>
+
+using namespace widgetkit;
 
 namespace jwrite::ui {
 
@@ -69,6 +70,161 @@ private:
     QSet<int>          modified_;
 };
 
+void JustWrite::request_create_new_book() {
+    BookInfo book_info{.uuid = BookManager::alloc_uuid()};
+    Q_ASSERT(!books_.contains(book_info.uuid));
+    do_create_book(book_info);
+    ui_gallery_->updateDisplayCaseItem(ui_gallery_->totalItems(), book_info);
+    request_update_book_info(book_info.uuid);
+}
+
+void JustWrite::do_create_book(BookInfo &book_info) {
+    Q_ASSERT(!books_.contains(book_info.uuid));
+
+    book_info.title            = "未命名书籍";
+    book_info.author           = get_default_author();
+    book_info.cover_url        = ":/res/default-cover.png";
+    book_info.creation_time    = QDateTime::currentDateTimeUtc();
+    book_info.last_update_time = QDateTime::currentDateTimeUtc();
+
+    auto bm        = new BookManager;
+    bm->info_ref() = book_info;
+    books_.insert(book_info.uuid, bm);
+}
+
+void JustWrite::request_remove_book(const QString &book_id) {
+    Q_ASSERT(books_.contains(book_id));
+    const auto choice = MessageBox::show(
+        ui_surface_,
+        "删除书籍",
+        "删除后，作品将无法恢复，请谨慎操作。",
+        MessageBox::StandardIcon::Warning);
+    if (choice == MessageBox::Yes) {
+        const int item_index = ui_gallery_->indexOf(book_id);
+        Q_ASSERT(item_index != -1);
+        ui_gallery_->removeDisplayCase(item_index);
+        do_remove_book(book_id);
+    }
+}
+
+void JustWrite::do_remove_book(const QString &book_id) {
+    Q_ASSERT(books_.contains(book_id));
+    auto bm = books_.take(book_id);
+    delete bm;
+}
+
+void JustWrite::request_open_book(const QString &book_id) {}
+
+void JustWrite::do_open_book(const QString &book_id) {}
+
+void JustWrite::request_close_opened_book() {}
+
+void JustWrite::do_close_book(const QString &book_id) {}
+
+void JustWrite::request_update_book_info(const QString &book_id) {
+    Q_ASSERT(books_.contains(book_id));
+    const auto &initial = books_.value(book_id)->info_ref();
+    if (auto opt = BookInfoEdit::getBookInfo(ui_surface_, initial)) {
+        auto &book_info = *opt;
+        Q_ASSERT(book_info.uuid == book_id);
+        do_update_book_info(book_info);
+        const int item_index = ui_gallery_->indexOf(book_id);
+        Q_ASSERT(item_index != -1);
+        ui_gallery_->updateDisplayCaseItem(item_index, book_info);
+        set_default_author(book_info.author, false);
+    }
+}
+
+void JustWrite::do_update_book_info(BookInfo &book_info) {
+    Q_ASSERT(books_.contains(book_info.uuid));
+    if (book_info.title.isEmpty()) { book_info.title = "未命名书籍"; }
+    if (book_info.author.isEmpty()) { book_info.author = get_default_author(); }
+    if (book_info.cover_url.isEmpty()) { book_info.cover_url = ":/res/default-cover.png"; }
+    Q_ASSERT(book_info.creation_time.isValid());
+    Q_ASSERT(book_info.last_update_time.isValid());
+    books_.value(book_info.uuid)->info_ref() = book_info;
+}
+
+void JustWrite::request_rename_toc_item(const QString &book_id, int toc_id, TocType type) {
+    Q_ASSERT(books_.contains(book_id));
+
+    auto bm = books_.value(book_id);
+    Q_ASSERT(bm->has_toc_item(toc_id));
+    Q_ASSERT(type != TocType::Volume || bm->has_volume(toc_id));
+    Q_ASSERT(type != TocType::Chapter || bm->has_chapter(toc_id));
+
+    const auto caption = type == TocType::Volume ? "分卷名" : "章节名";
+    const auto hint    = "请输入新标题";
+    if (auto opt = TextInputDialog::getInputText(
+            ui_surface_, bm->get_title(toc_id).value(), caption, hint)) {
+        const auto &title = *opt;
+        do_rename_toc_item(book_id, toc_id, title);
+        //! FIXME: just notify the book dir to update
+        ui_edit_page_->renameBookDirItem(toc_id, title);
+    }
+}
+
+void JustWrite::do_rename_toc_item(const QString &book_id, int toc_id, const QString &title) {
+    auto bm = books_.value(book_id);
+    Q_ASSERT(bm->has_toc_item(toc_id));
+    const bool succeed = bm->update_title(toc_id, title);
+    Q_ASSERT(succeed);
+}
+
+void JustWrite::handle_gallery_on_click(int index) {
+    if (index == ui_gallery_->totalItems()) { request_create_new_book(); }
+}
+
+void JustWrite::handle_gallery_on_menu_action(int index, Gallery::MenuAction action) {
+    Q_ASSERT(index >= 0 && index < ui_gallery_->totalItems());
+    const auto &book_id = ui_gallery_->bookInfoAt(index).uuid;
+    switch (action) {
+        case Gallery::Open: {
+            requestStartEditBook(index);
+        } break;
+        case Gallery::Edit: {
+            request_update_book_info(book_id);
+        } break;
+        case Gallery::Delete: {
+            request_remove_book(book_id);
+        } break;
+    }
+}
+
+void JustWrite::handle_gallery_on_load_book(const BookInfo &book_info) {
+    if (!books_.contains(book_info.uuid)) {
+        auto bm        = new BookManager;
+        bm->info_ref() = book_info;
+        books_.insert(book_info.uuid, bm);
+    }
+    ui_gallery_->updateDisplayCaseItem(ui_gallery_->totalItems(), book_info);
+}
+
+void JustWrite::handle_book_dir_on_rename_toc_item(
+    const QString &book_id, int toc_id, TocType type) {
+    request_rename_toc_item(book_id, toc_id, type);
+}
+
+void JustWrite::handle_book_dir_on_rename_toc_item__adapter(
+    const BookInfo &book_info, int vid, int cid) {
+    const auto type   = cid == -1 ? TocType::Volume : TocType::Chapter;
+    const auto toc_id = type == TocType::Volume ? vid : cid;
+    handle_book_dir_on_rename_toc_item(book_info.uuid, toc_id, type);
+}
+
+void JustWrite::handle_on_page_change(PageType page) {
+    switch (page) {
+        case PageType::Gallery: {
+            ui_title_bar_->setTitle("只写 丶 阐释你的梦");
+        } break;
+        case PageType::Edit: {
+            const auto &info  = ui_edit_page_->bookSource().info_ref();
+            const auto  title = QString("%1\u3000%2 [著]").arg(info.title).arg(info.author);
+            ui_title_bar_->setTitle(title);
+        } break;
+    }
+}
+
 JustWrite::JustWrite() {
     setupUi();
     setupConnections();
@@ -97,11 +253,11 @@ JustWrite::~JustWrite() {
     books_.clear();
 
     jwrite_profiler_dump(QString("jwrite-profiler.%1.log")
-                             .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
+                             .arg(QDateTime::currentDateTimeUtc().toString("yyyyMMddHHmmss")));
 }
 
 void JustWrite::wait(std::function<void()> job) {
-    widgetkit::Progress::wait(ui_surface_, job);
+    Progress::wait(ui_surface_, job);
 }
 
 void JustWrite::updateColorScheme(const ColorScheme &scheme) {
@@ -127,38 +283,12 @@ void JustWrite::updateColorScheme(const ColorScheme &scheme) {
     ui_edit_page_->updateColorScheme(scheme);
 }
 
-void JustWrite::updateBookInfo(int index, const BookInfo &info) {
-    auto book_info = info;
-
-    if (book_info.author.isEmpty()) {
-        book_info.author = getLikelyAuthor();
-    } else {
-        updateLikelyAuthor(book_info.author);
-    }
-    if (book_info.title.isEmpty()) { book_info.title = QString("未命名书籍-%1").arg(index + 1); }
-
-    ui_gallery_->updateDisplayCaseItem(index, book_info);
-
-    //! FIXME: only to ensure the sync-to-local-storage is available to access all the book
-    //! items, remeber to remove this later as long as realtime sync has been done
-    if (const auto &uuid = book_info.uuid; !books_.contains(uuid)) {
-        auto bm        = new BookManager;
-        bm->info_ref() = book_info;
-        books_.insert(uuid, bm);
-    } else {
-        books_.value(uuid)->info_ref() = book_info;
-    }
-}
-
-QString JustWrite::getLikelyAuthor() const {
+QString JustWrite::get_default_author() const {
     return likely_author_.isEmpty() ? "佚名" : likely_author_;
 }
 
-void JustWrite::updateLikelyAuthor(const QString &author) {
-    //! TODO: save likely author to local storage
-    if (!author.isEmpty() && likely_author_.isEmpty() && author != getLikelyAuthor()) {
-        likely_author_ = author;
-    }
+void JustWrite::set_default_author(const QString &author, bool force) {
+    if (likely_author_.isEmpty() || force) { likely_author_ = author; }
 }
 
 void JustWrite::toggleMaximize() {
@@ -189,7 +319,7 @@ void JustWrite::setupUi() {
     top_layout->addWidget(ui_title_bar_);
     top_layout->addWidget(ui_page_stack_);
 
-    ui_surface_        = new widgetkit::OverlaySurface;
+    ui_surface_        = new OverlaySurface;
     const bool succeed = ui_surface_->setup(ui_page_stack_);
     Q_ASSERT(succeed);
 
@@ -224,68 +354,22 @@ void JustWrite::setupConnections() {
         updateColorScheme(config.scheme());
     });
     connect(&config, &AppConfig::on_scheme_change, this, &JustWrite::updateColorScheme);
-    connect(ui_gallery_, &Gallery::clicked, this, [this](int index) {
-        if (index == ui_gallery_->totalItems()) { requestUpdateBookInfo(index); }
-    });
-    connect(ui_gallery_, &Gallery::menuClicked, this, &JustWrite::requestBookAction);
-    connect(this, &JustWrite::pageChanged, this, [this](PageType page) {
-        switch (page) {
-            case PageType::Gallery: {
-                ui_title_bar_->setTitle("只写 丶 阐释你的梦");
-            } break;
-            case PageType::Edit: {
-                const auto &info  = ui_edit_page_->bookSource().info_ref();
-                const auto  title = QString("%1\u3000%2 [著]").arg(info.title).arg(info.author);
-                ui_title_bar_->setTitle(title);
-            } break;
-        }
-    });
+    connect(ui_gallery_, &Gallery::clicked, this, &JustWrite::handle_gallery_on_click);
+    connect(ui_gallery_, &Gallery::menuClicked, this, &JustWrite::handle_gallery_on_menu_action);
+    connect(
+        ui_edit_page_,
+        &EditPage::renameTocItemRequested,
+        this,
+        &JustWrite::handle_book_dir_on_rename_toc_item__adapter);
+    connect(
+        this,
+        &JustWrite::pageChanged,
+        this,
+        &JustWrite::handle_on_page_change,
+        Qt::QueuedConnection);
     connect(ui_title_bar_, &TitleBar::minimizeRequested, this, &QWidget::showMinimized);
     connect(ui_title_bar_, &TitleBar::maximizeRequested, this, &JustWrite::toggleMaximize);
     connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::closePage);
-    connect(
-        ui_edit_page_, &EditPage::renameTocItemRequested, this, &JustWrite::requestRenameTocItem);
-}
-
-void JustWrite::requestUpdateBookInfo(int index) {
-    Q_ASSERT(index >= 0 && index <= ui_gallery_->totalItems());
-    const bool on_insert = index == ui_gallery_->totalItems();
-
-    auto info = on_insert ? BookInfo{.uuid = AbstractBookManager::alloc_uuid()}
-                          : ui_gallery_->bookInfoAt(index);
-    if (info.author.isEmpty()) { info.author = getLikelyAuthor(); }
-    if (info.title.isEmpty()) { info.title = QString("未命名书籍-%1").arg(index + 1); }
-
-    if (auto opt = BookInfoEdit::getBookInfo(ui_surface_, info)) { updateBookInfo(index, *opt); }
-}
-
-void JustWrite::requestBookAction(int index, Gallery::MenuAction action) {
-    Q_ASSERT(index >= 0 && index < ui_gallery_->totalItems());
-    switch (action) {
-        case Gallery::Open: {
-            requestStartEditBook(index);
-        } break;
-        case Gallery::Edit: {
-            requestUpdateBookInfo(index);
-        } break;
-        case Gallery::Delete: {
-            const auto choice = MessageBox::show(
-                ui_surface_,
-                "删除书籍",
-                "删除后，作品将无法恢复，请谨慎操作。",
-                MessageBox::StandardIcon::Warning);
-            if (choice == MessageBox::Yes) {
-                const auto uuid = ui_gallery_->bookInfoAt(index).uuid;
-                ui_gallery_->removeDisplayCase(index);
-                //! NOTE: remove the book-manager means remove the book from the local storage
-                //! when the jwrite exits, see syncToLocalStorage()
-                //! FIXME: that's not a good idea
-                auto bm = books_.value(uuid);
-                books_.remove(uuid);
-                delete bm;
-            }
-        } break;
-    }
 }
 
 void JustWrite::requestStartEditBook(int index) {
@@ -301,41 +385,24 @@ void JustWrite::requestStartEditBook(int index) {
     auto bm = books_.value(uuid);
     Q_ASSERT(bm);
 
-    const bool book_changed = ui_edit_page_->resetBookSource(bm);
-
-    switchToPage(PageType::Edit);
-    QApplication::processEvents();
-
-    ui_edit_page_->resetWordsCount();
-
-    wait([this, bm] {
-        if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
-            ui_edit_page_->openChapter(chapters.back());
-        }
-        ui_edit_page_->flushWordsCount();
-    });
+    waitTaskBuilder()
+        .withPolicy(Progress::UseMinimumDisplayTime, false)
+        .withBlockingJob([this, bm] {
+            ui_edit_page_->resetBookSource(bm);
+            switchToPage(PageType::Edit);
+        })
+        .withAsyncJob([this, bm] {
+            ui_edit_page_->resetWordsCount();
+            ui_edit_page_->flushWordsCount();
+            if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
+                ui_edit_page_->openChapter(chapters.back());
+            }
+            ui_edit_page_->editor()->prepareRenderData();
+        })
+        .exec(ui_surface_);
 
     ui_edit_page_->focusOnEditor();
     ui_edit_page_->syncWordsStatus();
-}
-
-void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid) {
-    auto bm = books_.value(book_info.uuid);
-    Q_ASSERT(bm);
-
-    const int toc_id = cid == -1 ? vid : cid;
-    Q_ASSERT(bm->has_toc_item(toc_id));
-    const bool is_volume = cid == -1;
-
-    const auto caption     = is_volume ? "分卷名" : "章节名";
-    const auto placeholder = is_volume ? "请输入新分卷名" : "请输入新章节名";
-    const auto title       = bm->get_title(toc_id).value();
-
-    const auto opt_new_title =
-        widgetkit::TextInputDialog::getInputText(ui_surface_, title, caption, placeholder);
-
-    if (opt_new_title) { ui_edit_page_->renameBookDirItem(toc_id, opt_new_title.value()); }
-    ui_edit_page_->focusOnEditor();
 }
 
 void JustWrite::requestInitFromLocalStorage() {
@@ -348,11 +415,7 @@ void JustWrite::requestInitFromLocalStorage() {
 }
 
 void JustWrite::requestQuitApp() {
-    hide();
-
-    //! TODO: wait other background jobs to be finished
-    syncToLocalStorage();
-
+    wait(std::bind(&JustWrite::syncToLocalStorage, this));
     QCoreApplication::exit();
 }
 
@@ -419,13 +482,23 @@ void JustWrite::loadDataFromLocalStorage() {
         Q_ASSERT(!uuid.isEmpty() && !name.isEmpty());
 
         BookInfo book_info{
-            .uuid      = uuid,
-            .title     = name,
-            .author    = book["author"].toString(""),
-            .cover_url = book["cover_url"].toString(""),
+            .uuid          = uuid,
+            .title         = name,
+            .author        = book["author"].toString(""),
+            .cover_url     = book["cover_url"].toString(""),
+            .creation_time = QDateTime::fromString(book["creation_time"].toString(""), Qt::ISODate),
+            .last_update_time =
+                QDateTime::fromString(book["last_update_time"].toString(""), Qt::ISODate),
         };
 
-        updateBookInfo(ui_gallery_->totalItems(), book_info);
+        if (!book_info.creation_time.isValid()) {
+            book_info.creation_time = QDateTime::currentDateTimeUtc();
+        }
+        if (!book_info.last_update_time.isValid()) {
+            book_info.last_update_time = QDateTime::currentDateTimeUtc();
+        }
+
+        handle_gallery_on_load_book(book_info);
 
         if (!dir.exists(uuid)) { continue; }
 
@@ -494,19 +567,17 @@ void JustWrite::syncToLocalStorage() {
         const auto &book_info = bm->info_ref();
         Q_ASSERT(uuid == book_info.uuid);
         QJsonObject book;
-        book["book_id"]   = book_info.uuid;
-        book["name"]      = book_info.title;
-        book["author"]    = book_info.author;
-        book["cover_url"] = book_info.cover_url;
-        //! FIXME: record real update time
-        book["last_update_time"] = QDateTime::currentDateTime().toString("yyyy-MM-dd.HH:mm:ss");
-        //! TODO: export toc and contents
+        book["book_id"]          = book_info.uuid;
+        book["name"]             = book_info.title;
+        book["author"]           = book_info.author;
+        book["cover_url"]        = book_info.cover_url;
+        book["creation_time"]    = book_info.creation_time.toString(Qt::ISODate);
+        book["last_update_time"] = book_info.last_update_time.toString(Qt::ISODate);
         book_data.append(book);
     }
 
-    local_storage["major_author"]     = likely_author_;
-    local_storage["last_update_time"] = QDateTime::currentDateTimeUtc().toString();
-    local_storage["data"]             = book_data;
+    local_storage["major_author"] = likely_author_;
+    local_storage["data"]         = book_data;
 
     QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
     Q_ASSERT(dir.exists());

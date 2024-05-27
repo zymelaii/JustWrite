@@ -62,6 +62,16 @@ public:
 
     void setTimerEnabled(bool enabled);
 
+    void setTextEngineLocked(bool locked) {
+        busy_loading_ = locked;
+    }
+
+    void prepareRenderData() {
+        setTextEngineLocked(true);
+        context_->prepare_render_data();
+        setTextEngineLocked(false);
+    }
+
 protected slots:
     void renderBlinkCursor();
     void render();

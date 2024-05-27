@@ -29,7 +29,7 @@ set(CMAKE_AUTORCC ON)
 
 option(JWRITE_BUILD_TESTS "Build the unittests" ON)
 
-set(QT_DEPENDENCY Core Gui Widgets StateMachine)
+set(QT_DEPENDENCY Core Gui Widgets StateMachine Concurrent)
 find_package(QT NAMES Qt6 COMPONENTS ${QT_DEPENDENCY} REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_DEPENDENCY} REQUIRED)
 

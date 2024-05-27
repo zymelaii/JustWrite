@@ -216,7 +216,6 @@ bool EditPage::resetBookSource(AbstractBookManager *book_manager) {
     ui_book_dir_->setModel(std::make_unique<BookModel>(book_manager_, ui_book_dir_));
 
     current_cid_ = -1;
-    flushWordsCount();
 
     return true;
 }
