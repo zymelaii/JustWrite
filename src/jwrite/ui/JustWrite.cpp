@@ -8,7 +8,7 @@
 #include <jwrite/ProfileUtils.h>
 #include <widget-kit/TextInputDialog.h>
 #include <widget-kit/OverlaySurface.h>
-#include <qt-material/qtmaterialcircularprogress.h>
+#include <widget-kit/Progress.h>
 #include <QScrollBar>
 #include <QVBoxLayout>
 #include <QKeyEvent>
@@ -19,6 +19,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QApplication>
 
 namespace jwrite::ui {
 
@@ -99,6 +100,10 @@ JustWrite::~JustWrite() {
                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
 }
 
+void JustWrite::wait(std::function<void()> job) {
+    widgetkit::Progress::wait(ui_surface_, job);
+}
+
 void JustWrite::updateColorScheme(const ColorScheme &scheme) {
     auto pal = palette();
     pal.setColor(QPalette::Window, scheme.window());
@@ -166,6 +171,8 @@ void JustWrite::toggleMaximize() {
 }
 
 void JustWrite::setupUi() {
+    setObjectName("JustWrite");
+
     auto top_layout = new QVBoxLayout(this);
 
     ui_title_bar_  = new TitleBar;
@@ -294,15 +301,22 @@ void JustWrite::requestStartEditBook(int index) {
     auto bm = books_.value(uuid);
     Q_ASSERT(bm);
 
-    ui_edit_page_->resetBookSource(bm);
+    const bool book_changed = ui_edit_page_->resetBookSource(bm);
 
     switchToPage(PageType::Edit);
+    QApplication::processEvents();
+
+    ui_edit_page_->resetWordsCount();
+
+    wait([this, bm] {
+        if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
+            ui_edit_page_->openChapter(chapters.back());
+        }
+        ui_edit_page_->flushWordsCount();
+    });
 
     ui_edit_page_->focusOnEditor();
-
-    if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
-        ui_edit_page_->openChapter(chapters.back());
-    }
+    ui_edit_page_->syncWordsStatus();
 }
 
 void JustWrite::requestRenameTocItem(const BookInfo &book_info, int vid, int cid) {
@@ -550,10 +564,6 @@ void JustWrite::syncToLocalStorage() {
 
         dir.cdUp();
     }
-}
-
-void JustWrite::showProgress() {
-    //! TODO: show progress overlay
 }
 
 void JustWrite::switchToPage(PageType page) {

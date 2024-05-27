@@ -49,6 +49,8 @@ Editor::Editor(QWidget *parent)
 
     restrict_rule_ = new TextRestrictRule;
 
+    timer_enabled_ = true;
+
     update_requested_ = false;
     stable_timer_.setInterval(16);
     stable_timer_.setSingleShot(false);
@@ -58,6 +60,8 @@ Editor::Editor(QWidget *parent)
 
     input_manager_ = new GeneralTextInputCommandManager(context_->engine);
     input_manager_->load_default();
+
+    busy_loading_ = false;
 
     scrollToStart();
 
@@ -101,6 +105,8 @@ QRect Editor::textArea() const {
 }
 
 void Editor::reset(QString &text, bool swap) {
+    busy_loading_ = true;
+
     context_->quit_preedit();
 
     auto text_out = this->text();
@@ -128,7 +134,7 @@ void Editor::reset(QString &text, bool swap) {
 
     if (swap) { text.swap(text_out); }
 
-    requestUpdate(true);
+    busy_loading_ = false;
 }
 
 QString Editor::take() {
@@ -265,7 +271,7 @@ void Editor::insertRawText(const QString &text) {
         auto text = text_list[i].trimmed();
         if (text.isEmpty()) { continue; }
         context_->insert(text);
-        if (i + 1 < text_list.size()) { breakIntoNewLine(); }
+        if (i + 1 < text_list.size()) { breakIntoNewLine(false); }
     }
     inserted_filter_enabled_ = true;
 }
@@ -396,17 +402,28 @@ void Editor::paste() {
     requestUpdate(true);
 }
 
-void Editor::breakIntoNewLine() {
+void Editor::breakIntoNewLine(bool should_update) {
     if (context_->engine.current_block()->text_len() == 0) { return; }
     context_->remove_sel_region();
     context_->engine.break_block_at_cursor_pos();
     context_->cursor_moved = true;
-    requestUpdate(true);
+    if (should_update) { requestUpdate(true); }
 }
 
 void Editor::verticalMove(bool up) {
     context_->vertical_move(up);
     requestUpdate(true);
+}
+
+void Editor::setTimerEnabled(bool enabled) {
+    if (enabled) {
+        stable_timer_.start();
+        blink_timer_.start();
+    } else {
+        stable_timer_.stop();
+        blink_timer_.stop();
+    }
+    timer_enabled_ = enabled;
 }
 
 void Editor::renderBlinkCursor() {
@@ -447,8 +464,10 @@ void Editor::requestUpdate(bool sync) {
     if (sync) {
         update_requested_          = true;
         blink_cursor_should_paint_ = true;
-        blink_timer_.stop();
-        blink_timer_.start();
+        if (timer_enabled_) {
+            blink_timer_.stop();
+            blink_timer_.start();
+        }
     } else {
         update_requested_ = false;
         update();
@@ -670,6 +689,8 @@ void Editor::resizeEvent(QResizeEvent *e) {
 }
 
 void Editor::paintEvent(QPaintEvent *e) {
+    if (busy_loading_) { return; }
+
     jwrite_profiler_start(FrameRenderCost);
 
     QPainter p(this);
@@ -762,7 +783,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::InsertTab: {
         } break;
         case TextInputCommand::InsertNewLine: {
-            breakIntoNewLine();
+            breakIntoNewLine(true);
         } break;
         case TextInputCommand::Cancel: {
             context_->unset_sel();

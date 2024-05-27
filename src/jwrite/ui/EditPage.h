@@ -35,7 +35,7 @@ signals:
 public:
     void updateColorScheme(const ColorScheme &scheme);
 
-    AbstractBookManager *resetBookSource(AbstractBookManager *book_manager);
+    bool                 resetBookSource(AbstractBookManager *book_manager);
     AbstractBookManager *takeBookSource();
 
     const AbstractBookManager &bookSource() const {
@@ -52,6 +52,15 @@ public:
     void renameBookDirItem(int id, const QString &title);
     void exportToLocal(const QString &path, ExportType type);
 
+    void resetWordsCount();
+    void updateWordsCount(const QString &text, bool text_changed);
+    void flushWordsCount();
+    void syncWordsStatus();
+
+    Editor *editor() {
+        return ui_editor_;
+    }
+
 protected slots:
     void updateCurrentDateTime();
 
@@ -61,9 +70,6 @@ protected:
 
     void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
     void requestExportToLocal();
-    void updateWordsCount(const QString &text, bool text_changed);
-    void flushWordsCount();
-    void syncWordsStatus();
     void createAndOpenNewChapter(int vid);
     void createAndOpenNewChapterUnderActiveVolume();
     void requestRenameCurrentTocItem();

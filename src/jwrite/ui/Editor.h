@@ -5,6 +5,7 @@
 #include <jwrite/TextRestrictRule.h>
 #include <QTimer>
 #include <QWidget>
+#include <atomic>
 
 namespace jwrite::ui {
 
@@ -56,8 +57,10 @@ public:
     void cut();
     void paste();
 
-    void breakIntoNewLine();
+    void breakIntoNewLine(bool should_update);
     void verticalMove(bool up);
+
+    void setTimerEnabled(bool enabled);
 
 protected slots:
     void renderBlinkCursor();
@@ -108,15 +111,17 @@ private:
     int    oob_drag_sel_flag_;
     QPoint oob_drag_sel_vpos_;
 
+    bool   timer_enabled_;
     bool   update_requested_;
     QTimer stable_timer_;
-
     QTimer blink_timer_;
     bool   blink_cursor_should_paint_;
 
     bool   auto_scroll_mode_;
     double scroll_base_y_pos_;
     double scroll_ref_y_pos_;
+
+    std::atomic_bool busy_loading_;
 
     QMargins        ui_margins_;
     Qt::CursorShape ui_cursor_shape_[2];

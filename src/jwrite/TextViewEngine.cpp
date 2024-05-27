@@ -101,7 +101,7 @@ QStringView TextBlock::text() const {
 
 void TextBlock::squeeze_and_extend_last_line(int length) {
     Q_ASSERT(!lines.isEmpty());
-    Q_ASSERT(length >= 0 && length < len_of_line(lines.size() - 1));
+    Q_ASSERT(length >= 0 && length <= len_of_line(lines.size() - 1));
     TextLine line;
     line.parent               = this;
     line.line_nr              = lines.size();

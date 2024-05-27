@@ -10,6 +10,7 @@
 #include <QStackedWidget>
 #include <QStackedLayout>
 #include <QSystemTrayIcon>
+#include <functional>
 #include <QWKWidgets/widgetwindowagent.h>
 
 namespace jwrite::ui {
@@ -31,8 +32,9 @@ signals:
     void pageChanged(PageType page);
 
 public:
-    void updateColorScheme(const ColorScheme &scheme);
+    void wait(std::function<void()> job);
 
+    void updateColorScheme(const ColorScheme &scheme);
     void updateBookInfo(int index, const BookInfo &info);
 
 protected:
@@ -56,8 +58,6 @@ protected:
     void initLocalStorage();
     void loadDataFromLocalStorage();
     void syncToLocalStorage();
-
-    void showProgress();
 
     void switchToPage(PageType page);
     void closePage();

@@ -24,10 +24,13 @@ void OverlayDialog::reject() {
     emit rejected();
 }
 
+void OverlayDialog::quit() {
+    exit(0);
+}
+
 void OverlayDialog::exit(int result) {
-    Q_ASSERT(event_loop_);
     setResult(result);
-    event_loop_->exit();
+    if (event_loop_) { event_loop_->exit(); }
 }
 
 int OverlayDialog::exec(OverlaySurface *surface) {

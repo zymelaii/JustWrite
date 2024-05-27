@@ -21,10 +21,11 @@ signals:
 public slots:
     void accept();
     void reject();
-    void exit(int result = 0);
+    void quit();
+    void exit(int result);
 
 public:
-    int exec(OverlaySurface *surface);
+    virtual int exec(OverlaySurface *surface);
 
     bool isAccepted() const {
         return accepted_or_rejected_ ? accepted_or_rejected_.value() : false;
@@ -41,6 +42,10 @@ protected:
 
     int result() const {
         return result_;
+    }
+
+    QEventLoop *&eventLoop() const {
+        return const_cast<OverlayDialog *>(this)->event_loop_;
     }
 
 private:

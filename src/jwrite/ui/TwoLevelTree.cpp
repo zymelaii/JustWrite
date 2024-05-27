@@ -50,6 +50,8 @@ void TwoLevelTree::setModel(std::unique_ptr<TwoLevelDataModel> model) {
     connect(model_.get(), &TwoLevelDataModel::valueChanged, this, &QWidget::updateGeometry);
 
     resetState();
+
+    adjustSize();
 }
 
 void TwoLevelTree::setItemRenderProxy(std::unique_ptr<ItemRenderProxy> proxy) {
