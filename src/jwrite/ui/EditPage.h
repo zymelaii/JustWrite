@@ -3,6 +3,7 @@
 #include <jwrite/ui/Editor.h>
 #include <jwrite/ui/StatusBar.h>
 #include <jwrite/ui/TwoLevelTree.h>
+#include <jwrite/ui/FloatingMenu.h>
 #include <jwrite/MessyInput.h>
 #include <jwrite/ColorScheme.h>
 #include <jwrite/VisualTextEditContext.h>
@@ -31,6 +32,8 @@ public:
 
 signals:
     void renameTocItemRequested(const BookInfo &book_info, int vid, int cid);
+    void quitEditRequested();
+    void openSettingsRequested();
 
 public:
     void updateColorScheme(const ColorScheme &scheme);
@@ -101,6 +104,7 @@ private:
     QLabel                  *ui_datetime_;
     QWidget                 *ui_sidebar_;
     QMap<QString, QWidget *> ui_named_widgets_;
+    FloatingMenu            *ui_menu_;
 };
 
 } // namespace jwrite::ui

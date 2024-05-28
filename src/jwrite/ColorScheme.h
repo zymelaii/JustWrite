@@ -32,6 +32,10 @@ public:
         Hover,
         //! background color for the selected item
         SelectedItem,
+        //! background color for the floating item
+        FloatingItem,
+        //! border color for the floating item
+        FloatingItemBorder,
     };
 
 public:
@@ -79,6 +83,14 @@ public:
 
     const QColor& selected_item() const {
         return colors_[ColorRole::SelectedItem];
+    }
+
+    const QColor& floating_item() const {
+        return colors_[ColorRole::FloatingItem];
+    }
+
+    const QColor& floating_item_border() const {
+        return colors_[ColorRole::FloatingItemBorder];
     }
 
     static ColorScheme get_default_scheme_of_theme(ColorTheme theme);

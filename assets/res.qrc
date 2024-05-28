@@ -8,7 +8,11 @@
         <file>res/themes/dark/icons/sys-close.svg</file>
         <file>res/themes/dark/icons/sys-maximize.svg</file>
         <file>res/themes/dark/icons/sys-minimize.svg</file>
-        <file>res/themes/dark/icons/warning-sign.svg</file>
+        <file>res/themes/dark/icons/sign-warning.svg</file>
+        <file>res/themes/dark/icons/menu-more.svg</file>
+        <file>res/themes/dark/icons/menu-close-hint.svg</file>
+        <file>res/themes/dark/icons/menu-settings.svg</file>
+        <file>res/themes/dark/icons/menu-return.svg</file>
         <file>res/themes/light/icons/button-close.svg</file>
         <file>res/themes/light/icons/indicator-edit.svg</file>
         <file>res/themes/light/icons/indicator-ellapse.svg</file>
@@ -16,7 +20,11 @@
         <file>res/themes/light/icons/sys-close.svg</file>
         <file>res/themes/light/icons/sys-maximize.svg</file>
         <file>res/themes/light/icons/sys-minimize.svg</file>
-        <file>res/themes/light/icons/warning-sign.svg</file>
+        <file>res/themes/light/icons/sign-warning.svg</file>
+        <file>res/themes/light/icons/menu-more.svg</file>
+        <file>res/themes/light/icons/menu-close-hint.svg</file>
+        <file>res/themes/light/icons/menu-settings.svg</file>
+        <file>res/themes/light/icons/menu-return.svg</file>
         <file>res/default-cover.png</file>
         <file>res/template/epub/style.css</file>
     </qresource>

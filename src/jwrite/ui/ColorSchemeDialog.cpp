@@ -37,15 +37,17 @@ void ColorSchemeDialog::setupUi() {
     auto layout_color_picker    = new QGridLayout(color_picker_conatiner);
 
     QList<QPair<QString, ColorScheme::ColorRole>> color_entries{
-        {"背景",       ColorScheme::Window      },
-        {"前景",       ColorScheme::WindowText  },
-        {"边框",       ColorScheme::Border      },
-        {"面板",       ColorScheme::Panel       },
-        {"文本",       ColorScheme::Text        },
-        {"文本背景", ColorScheme::TextBase    },
-        {"选中文本", ColorScheme::SelectedText},
-        {"悬停",       ColorScheme::Hover       },
-        {"选中项",    ColorScheme::SelectedItem},
+        {"背景",          ColorScheme::Window            },
+        {"前景",          ColorScheme::WindowText        },
+        {"边框",          ColorScheme::Border            },
+        {"面板",          ColorScheme::Panel             },
+        {"文本",          ColorScheme::Text              },
+        {"文本背景",    ColorScheme::TextBase          },
+        {"选中文本",    ColorScheme::SelectedText      },
+        {"悬停",          ColorScheme::Hover             },
+        {"选中项",       ColorScheme::SelectedItem      },
+        {"悬浮项",       ColorScheme::FloatingItem      },
+        {"悬浮项边框", ColorScheme::FloatingItemBorder},
     };
 
     int index = 0;

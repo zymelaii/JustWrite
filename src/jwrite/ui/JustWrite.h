@@ -56,6 +56,7 @@ public slots:
     void handle_book_dir_on_rename_toc_item(const QString &book_id, int toc_id, TocType type);
     void handle_book_dir_on_rename_toc_item__adapter(const BookInfo &book_info, int vid, int cid);
     void handle_on_page_change(PageType page);
+    void handle_on_open_settings();
 
 public:
     QString get_default_author() const;

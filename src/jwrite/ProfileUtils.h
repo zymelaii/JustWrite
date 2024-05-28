@@ -31,6 +31,7 @@ enum class ProfileTarget {
     GetLocationAtPos,
     GeneralTextEdit,
     SwitchChapter,
+    WordCounterCost,
 };
 
 class Profiler : public QObject {

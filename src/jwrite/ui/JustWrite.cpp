@@ -225,6 +225,38 @@ void JustWrite::handle_on_page_change(PageType page) {
     }
 }
 
+void JustWrite::handle_on_open_settings() {
+    //! TODO: currently only support editing the color scheme, impl it later
+
+    auto &config = AppConfig::get_instance();
+
+    const auto old_theme  = config.theme();
+    const auto old_scheme = config.scheme();
+
+    auto dialog = std::make_unique<ColorSchemeDialog>(old_theme, old_scheme, this);
+
+    connect(
+        dialog.get(),
+        &ColorSchemeDialog::applyRequested,
+        this,
+        [this, &config](ColorTheme theme, const ColorScheme &scheme) {
+            config.set_theme(theme);
+            config.set_scheme(scheme);
+        });
+
+    const int result = dialog->exec();
+
+    if (result != QDialog::Accepted) {
+        config.set_theme(old_theme);
+        config.set_scheme(old_scheme);
+        updateColorScheme(old_scheme);
+    } else {
+        config.set_theme(dialog->getTheme());
+        config.set_scheme(dialog->getScheme());
+        updateColorScheme(config.scheme());
+    }
+}
+
 JustWrite::JustWrite() {
     setupUi();
     setupConnections();
@@ -354,6 +386,9 @@ void JustWrite::setupConnections() {
         updateColorScheme(config.scheme());
     });
     connect(&config, &AppConfig::on_scheme_change, this, &JustWrite::updateColorScheme);
+    connect(ui_title_bar_, &TitleBar::minimizeRequested, this, &QWidget::showMinimized);
+    connect(ui_title_bar_, &TitleBar::maximizeRequested, this, &JustWrite::toggleMaximize);
+    connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::closePage);
     connect(ui_gallery_, &Gallery::clicked, this, &JustWrite::handle_gallery_on_click);
     connect(ui_gallery_, &Gallery::menuClicked, this, &JustWrite::handle_gallery_on_menu_action);
     connect(
@@ -367,9 +402,12 @@ void JustWrite::setupConnections() {
         this,
         &JustWrite::handle_on_page_change,
         Qt::QueuedConnection);
-    connect(ui_title_bar_, &TitleBar::minimizeRequested, this, &QWidget::showMinimized);
-    connect(ui_title_bar_, &TitleBar::maximizeRequested, this, &JustWrite::toggleMaximize);
-    connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::closePage);
+    connect(ui_edit_page_, &EditPage::quitEditRequested, this, [this] {
+        wait(std::bind(&EditPage::syncAndClearEditor, ui_edit_page_));
+        switchToPage(PageType::Gallery);
+    });
+    connect(
+        ui_edit_page_, &EditPage::openSettingsRequested, this, &JustWrite::handle_on_open_settings);
 }
 
 void JustWrite::requestStartEditBook(int index) {
@@ -648,17 +686,10 @@ void JustWrite::switchToPage(PageType page) {
 }
 
 void JustWrite::closePage() {
-    switch (current_page_) {
-        case PageType::Edit: {
-            ui_edit_page_->syncAndClearEditor();
-            switchToPage(PageType::Gallery);
-        } break;
-        case PageType::Gallery: {
-            //! TODO: throw a dialog to confirm quiting the jwrite
-            //! TODO: sync book content to local storage
-            requestQuitApp();
-        } break;
-    }
+    if (current_page_ == PageType::Edit) { ui_edit_page_->syncAndClearEditor(); }
+    //! TODO: throw a dialog to confirm quiting the jwrite
+    //! TODO: sync book content to local storage
+    requestQuitApp();
 }
 
 void JustWrite::showEvent(QShowEvent *event) {
@@ -674,33 +705,8 @@ bool JustWrite::eventFilter(QObject *watched, QEvent *event) {
         auto e = static_cast<QKeyEvent *>(event);
         if (auto opt = command_manager_.match(e)) {
             if (*opt == GlobalCommand::ShowColorSchemeDialog) {
-                auto      &config     = AppConfig::get_instance();
-                const auto old_theme  = config.theme();
-                const auto old_scheme = config.scheme();
-
-                auto dialog = std::make_unique<ColorSchemeDialog>(old_theme, old_scheme, this);
-
-                connect(
-                    dialog.get(),
-                    &ColorSchemeDialog::applyRequested,
-                    this,
-                    [this, &config](ColorTheme theme, const ColorScheme &scheme) {
-                        config.set_theme(theme);
-                        config.set_scheme(scheme);
-                    });
-
-                const int result = dialog->exec();
-
-                if (result != QDialog::Accepted) {
-                    config.set_theme(old_theme);
-                    config.set_scheme(old_scheme);
-                    updateColorScheme(old_scheme);
-                } else {
-                    config.set_theme(dialog->getTheme());
-                    config.set_scheme(dialog->getScheme());
-                    updateColorScheme(config.scheme());
-                }
-
+                //! FIXME: remove this part later
+                handle_on_open_settings();
                 return true;
             }
         }

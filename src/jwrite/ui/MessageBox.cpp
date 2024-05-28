@@ -52,7 +52,7 @@ MessageBox::Choice MessageBox::show(
 QString MessageBox::standardIconPath(StandardIcon icon) {
     switch (icon) {
         case StandardIcon::Warning: {
-            return AppConfig::get_instance().icon("warning-sign.svg");
+            return AppConfig::get_instance().icon("sign-warning.svg");
         } break;
     }
 }

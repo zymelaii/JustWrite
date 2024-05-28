@@ -3,6 +3,7 @@
 #include <jwrite/TextInputCommand.h>
 #include <jwrite/ProfileUtils.h>
 #include <jwrite/epub/EpubBuilder.h>
+#include <jwrite/AppConfig.h>
 #include <QVBoxLayout>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -202,6 +203,13 @@ void EditPage::updateColorScheme(const ColorScheme &scheme) {
         w->setPalette(pal);
         ui_book_dir_->reloadIndicator();
     }
+
+    if (auto w = ui_menu_) {
+        w->set_background_color(scheme.floating_item());
+        w->set_border_color(scheme.floating_item_border());
+        w->set_hover_color(scheme.hover());
+        w->reload_icon();
+    }
 }
 
 bool EditPage::resetBookSource(AbstractBookManager *book_manager) {
@@ -304,9 +312,6 @@ void EditPage::syncAndClearEditor() {
     book_manager_->sync_chapter_content(current_cid_, ui_editor_->take());
 
     current_cid_ = -1;
-
-    flushWordsCount();
-    syncWordsStatus();
 }
 
 void EditPage::focusOnEditor() {
@@ -398,21 +403,25 @@ void EditPage::resetWordsCount() {
 }
 
 void EditPage::updateWordsCount(const QString &text, bool text_changed) {
+    jwrite_profiler_start(WordCounterCost);
     if (text_changed) { total_words_ -= chap_words_; }
     chap_words_ = word_counter_->count_all(text);
     if (text_changed) { total_words_ += chap_words_; }
+    jwrite_profiler_record(WordCounterCost);
 }
 
 void EditPage::flushWordsCount() {
     chap_words_  = 0;
     total_words_ = 0;
     if (book_manager_) {
+        jwrite_profiler_start(WordCounterCost);
         for (const auto cid : book_manager_->get_all_chapters()) {
             const int count =
                 word_counter_->count_all(book_manager_->fetch_chapter_content(cid).value());
             if (cid == current_cid_) { chap_words_ = count; }
             total_words_ += count;
         }
+        jwrite_profiler_record(WordCounterCost);
     }
 }
 
@@ -445,6 +454,7 @@ void EditPage::setupUi() {
 
     ui_editor_     = new Editor;
     ui_status_bar_ = new StatusBar;
+    ui_menu_       = new FloatingMenu(ui_editor_);
 
     ui_sidebar_         = new QWidget;
     ui_new_volume_      = new FlatButton;
@@ -513,6 +523,17 @@ void EditPage::setupUi() {
 
     //! install book dir item render proxy
     ui_book_dir_->setItemRenderProxy(std::make_unique<BookDirItemRenderProxy>());
+
+    auto quit_edit_action     = new QAction(ui_menu_);
+    auto open_settings_action = new QAction(ui_menu_);
+    connect(quit_edit_action, &QAction::triggered, this, [this] {
+        emit quitEditRequested();
+    });
+    connect(open_settings_action, &QAction::triggered, this, [this] {
+        emit openSettingsRequested();
+    });
+    ui_menu_->add_menu_item("menu-return.svg", quit_edit_action);
+    ui_menu_->add_menu_item("menu-settings.svg", open_settings_action);
 
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
     setAutoFillBackground(true);
