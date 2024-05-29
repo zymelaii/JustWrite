@@ -36,6 +36,16 @@ void Toolbar::add_item(
     }
 }
 
+void Toolbar::apply_mask(const QSet<int> &mask) {
+    int index = 0;
+    for (int i = 0; i < ui_layout_->count(); ++i) {
+        auto w = ui_layout_->itemAt(i)->widget();
+        if (!w) { continue; }
+        w->setVisible(!mask.contains(index));
+        ++index;
+    }
+}
+
 Toolbar::Toolbar(QWidget *parent)
     : QWidget(parent)
     , ui_total_bottom_side_{0}

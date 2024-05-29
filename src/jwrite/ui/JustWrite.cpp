@@ -5,7 +5,9 @@
 #include <jwrite/ui/MessageBox.h>
 #include <jwrite/ui/ToolbarIcon.h>
 #include <jwrite/ColorScheme.h>
+#include <jwrite/epub/EpubBuilder.h>
 #include <jwrite/AppConfig.h>
+#include <jwrite/AppAction.h>
 #include <jwrite/ProfileUtils.h>
 #include <widget-kit/TextInputDialog.h>
 #include <widget-kit/OverlaySurface.h>
@@ -115,9 +117,34 @@ void JustWrite::do_remove_book(const QString &book_id) {
     delete bm;
 }
 
-void JustWrite::request_open_book(const QString &book_id) {}
+void JustWrite::request_open_book(const QString &book_id) {
+    Q_ASSERT(books_.contains(book_id));
+    auto bm = books_.value(book_id);
+    Q_ASSERT(bm);
 
-void JustWrite::do_open_book(const QString &book_id) {}
+    waitTaskBuilder()
+        .withPolicy(Progress::UseMinimumDisplayTime, false)
+        .withBlockingJob([this, bm] {
+            ui_edit_page_->resetBookSource(bm);
+            switchToPage(PageType::Edit);
+        })
+        .withAsyncJob([this, bm] {
+            ui_edit_page_->resetWordsCount();
+            ui_edit_page_->flushWordsCount();
+            if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
+                ui_edit_page_->openChapter(chapters.back());
+            }
+            ui_edit_page_->editor()->prepareRenderData();
+        })
+        .exec(ui_surface_);
+
+    ui_edit_page_->focusOnEditor();
+    ui_edit_page_->syncWordsStatus();
+}
+
+void JustWrite::do_open_book(const QString &book_id) {
+    //! TODO: preload chapters
+}
 
 void JustWrite::request_close_opened_book() {}
 
@@ -173,6 +200,148 @@ void JustWrite::do_rename_toc_item(const QString &book_id, int toc_id, const QSt
     Q_ASSERT(succeed);
 }
 
+void JustWrite::request_export_book(const QString &book_id) {
+    Q_ASSERT(books_.contains(book_id));
+    auto bm = books_.value(book_id);
+
+    if (const int cid = ui_edit_page_->book_dir()->selectedSubItem(); bm->has_chapter(cid)) {
+        //! TODO: check if the chapter is dirty
+        MessageBox::Option option{};
+        option.type        = MessageBox::Type::Ternary;
+        option.icon        = MessageBox::StandardIcon::Info;
+        option.cancel_text = "取消";
+        option.yes_text    = "是";
+        option.no_text     = "否";
+        const auto choice  = MessageBox::show(
+            ui_surface_, "导出作品", "当前章节正在编辑中，是否立即同步以导出最新内容？", option);
+        if (choice == MessageBox::Cancel) { return; }
+        if (choice == MessageBox::Yes) {
+            wait([&] {
+                bm->sync_chapter_content(cid, ui_edit_page_->editor()->text());
+            });
+        }
+    }
+
+    const auto &book_info = bm->info_ref();
+    const auto &title     = book_info.title;
+    Q_ASSERT(!title.isEmpty());
+
+    struct ExportInfo {
+        ExportType type;
+        QString    extesion;
+    };
+
+    QMap<QString, ExportInfo> filters{
+        {"文本文件 (*.txt)",    {ExportType::PlainText, ".txt"}},
+        {"EPUB 电子书 (*.epub)", {ExportType::ePub, ".epub"}    },
+    };
+
+    QString selected{};
+    auto    path = QFileDialog::getSaveFileName(
+        this, "导出到本地", title, filters.keys().join("\n"), &selected);
+
+    if (path.isEmpty()) {
+        MessageBox::Option option{};
+        option.type = MessageBox::Type::Notify;
+        option.icon = MessageBox::StandardIcon::Warning;
+        MessageBox::show(ui_surface_, "导出失败", "无效路径名，已取消导出。", option);
+        return;
+    }
+
+    const auto &export_info = filters.value(selected);
+    if (QFileInfo(path).suffix().isEmpty()) { path.append(export_info.extesion); }
+
+    bool succeed = true;
+    wait([&] {
+        succeed = do_export_book(book_id, path, export_info.type);
+    });
+
+    if (succeed) {
+        MessageBox::Option option{};
+        option.type = MessageBox::Type::Notify;
+        option.icon = MessageBox::StandardIcon::Info;
+        MessageBox::show(ui_surface_, "导出成功", "作品已导出至本地。", option);
+    } else {
+        MessageBox::Option option{};
+        option.type = MessageBox::Type::Notify;
+        option.icon = MessageBox::StandardIcon::Error;
+        MessageBox::show(
+            ui_surface_, "导出失败", "出现未知错误，请检查用户权限或稍后再试。", option);
+    }
+}
+
+bool JustWrite::do_export_book(const QString &book_id, const QString &path, ExportType type) {
+    switch (type) {
+        case ExportType::PlainText: {
+            return do_export_book_as_plain_text(book_id, path);
+        } break;
+        case ExportType::ePub: {
+            return do_export_book_as_epub(book_id, path);
+        } break;
+    }
+}
+
+bool JustWrite::do_export_book_as_plain_text(const QString &book_id, const QString &path) {
+    Q_ASSERT(books_.contains(book_id));
+    auto bm = books_.value(book_id);
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) { return false; }
+
+    QTextStream out(&file);
+
+    //! TODO: use specified toc format
+    const int total_volumes = bm->get_volumes().size();
+    int       chap_index    = 0;
+    for (int i = 0; i < total_volumes; ++i) {
+        const auto vid = bm->get_volumes()[i];
+        out << QStringLiteral("【第 %1 卷 %2】\n\n").arg(i + 1).arg(bm->get_title(vid).value());
+        const auto &chaps = bm->get_chapters_of_volume(vid);
+        for (const auto cid : chaps) {
+            const auto content = bm->fetch_chapter_content(cid).value();
+            out << QStringLiteral("第 %1 章 %2\n").arg(++chap_index).arg(bm->get_title(cid).value())
+                << content << "\n\n";
+        }
+    }
+
+    return true;
+}
+
+bool JustWrite::do_export_book_as_epub(const QString &book_id, const QString &path) {
+    Q_ASSERT(books_.contains(book_id));
+    auto bm = books_.value(book_id);
+
+    const auto &title  = bm->info_ref().title;
+    const auto &author = bm->info_ref().author;
+    Q_ASSERT(!title.isEmpty());
+    Q_ASSERT(!author.isEmpty());
+
+    epub::EpubBuilder builder(path);
+
+    const int total_volumes = bm->get_volumes().size();
+    for (int i = 0; i < total_volumes; ++i) {
+        const int vid = bm->get_volumes()[i];
+        builder.with_volume(
+            QString("第 %1 卷 %2").arg(i + 1).arg(bm->get_title(vid).value()),
+            bm->get_chapters_of_volume(vid).size());
+    }
+
+    int global_chap_index = 0;
+    builder.with_name(title)
+        .with_author(author)
+        .feed([this, bm, &global_chap_index](
+                  int vol_index, int chap_index, QString &out_chap_title, QString &out_content) {
+            const int vid = bm->get_volumes()[vol_index];
+            const int cid = bm->get_chapters_of_volume(vid)[chap_index];
+            out_chap_title =
+                QString("第 %1 章 %2").arg(++global_chap_index).arg(bm->get_title(cid).value());
+            out_content = bm->fetch_chapter_content(cid).value();
+        })
+        .build();
+
+    return true;
+}
+
 void JustWrite::handle_gallery_on_click(int index) {
     if (index == ui_gallery_->totalItems()) { request_create_new_book(); }
 }
@@ -182,7 +351,7 @@ void JustWrite::handle_gallery_on_menu_action(int index, Gallery::MenuAction act
     const auto &book_id = ui_gallery_->bookInfoAt(index).uuid;
     switch (action) {
         case Gallery::Open: {
-            requestStartEditBook(index);
+            request_open_book(book_id);
         } break;
         case Gallery::Edit: {
             request_update_book_info(book_id);
@@ -212,6 +381,12 @@ void JustWrite::handle_book_dir_on_rename_toc_item__adapter(
     const auto type   = cid == -1 ? TocType::Volume : TocType::Chapter;
     const auto toc_id = type == TocType::Volume ? vid : cid;
     handle_book_dir_on_rename_toc_item(book_info.uuid, toc_id, type);
+}
+
+void JustWrite::handle_edit_page_on_export() {
+    Q_ASSERT(current_page_ == PageType::Edit);
+    const auto &book_id = ui_edit_page_->bookSource().info_ref().uuid;
+    request_export_book(book_id);
 }
 
 void JustWrite::handle_on_page_change(PageType page) {
@@ -259,8 +434,52 @@ void JustWrite::handle_on_open_settings() {
     }
 }
 
+void JustWrite::handle_on_theme_change() {
+    const auto &config = AppConfig::get_instance();
+    handle_on_scheme_change(config.scheme());
+}
+
+void JustWrite::handle_on_scheme_change(const ColorScheme &scheme) {
+    updateColorScheme(scheme);
+}
+
+void JustWrite::handle_on_minimize() {
+    showMinimized();
+}
+
+void JustWrite::handle_on_toggle_maximize() {
+    if (isMinimized()) { return; }
+    if (isMaximized()) {
+        showNormal();
+    } else {
+        showMaximized();
+    }
+}
+
+void JustWrite::handle_on_close() {
+    if (current_page_ == PageType::Edit) {
+        MessageBox::Option opt{};
+        opt.type     = MessageBox::Type::Confirm;
+        opt.yes_text = "开润";
+        opt.no_text  = "彳亍";
+        const auto choice =
+            MessageBox::show(ui_surface_, "关闭只写", "真的不能再多码会儿了吗 T^T", opt);
+        if (choice != MessageBox::Yes) { return; }
+        ui_edit_page_->syncAndClearEditor();
+    }
+    wait(std::bind(&JustWrite::syncToLocalStorage, this));
+    close();
+}
+
+void JustWrite::handle_on_open_gallery() {
+    if (current_page_ == PageType::Gallery) { return; }
+    if (current_page_ == PageType::Edit) {
+        wait(std::bind(&EditPage::syncAndClearEditor, ui_edit_page_));
+    }
+    switchToPage(PageType::Gallery);
+}
+
 JustWrite::JustWrite() {
-    init();
     setupUi();
     setupConnections();
 
@@ -332,28 +551,6 @@ void JustWrite::set_default_author(const QString &author, bool force) {
     if (likely_author_.isEmpty() || force) { likely_author_ = author; }
 }
 
-void JustWrite::toggleMaximize() {
-    if (isMinimized()) { return; }
-    if (isMaximized()) {
-        showNormal();
-    } else {
-        showMaximized();
-    }
-}
-
-void JustWrite::init() {
-    action_goto_gallery_    = new QAction(this);
-    action_goto_edit_page_  = new QAction(this);
-    action_goto_favorites_  = new QAction(this);
-    action_goto_trash_bin_  = new QAction(this);
-    action_export_          = new QAction(this);
-    action_share_           = new QAction(this);
-    action_fullscreen_      = new QAction(this);
-    action_exit_fullscreen_ = new QAction(this);
-    action_show_help_       = new QAction(this);
-    action_open_settings_   = new QAction(this);
-}
-
 void JustWrite::setupUi() {
     setObjectName("JustWrite");
 
@@ -380,15 +577,49 @@ void JustWrite::setupUi() {
     top_layout->addWidget(ui_title_bar_);
     top_layout->addWidget(container);
 
-    ui_toolbar_->add_item("书库", "toolbar/gallery", action_goto_gallery_, false);
-    ui_toolbar_->add_item("编辑", "toolbar/draft", action_goto_edit_page_, false);
-    ui_toolbar_->add_item("素材收藏", "toolbar/favorites", action_goto_favorites_, false);
-    ui_toolbar_->add_item("回收站", "toolbar/trash", action_goto_trash_bin_, false);
-    ui_toolbar_->add_item("导出", "toolbar/export", action_export_, false);
-    ui_toolbar_->add_item("分享", "toolbar/share", action_share_, false);
-    ui_toolbar_->add_item("全屏", "toolbar/fullscreen", action_fullscreen_, true);
-    ui_toolbar_->add_item("帮助", "toolbar/help", action_show_help_, true);
-    ui_toolbar_->add_item("设置", "toolbar/settings", action_open_settings_, true);
+    enum ToolbarItemType {
+        Gallery,
+        Draft,
+        Favorites,
+        Trash,
+        Export,
+        Share,
+        Fullscreen,
+        ExitFullscreen,
+        Help,
+        Settings,
+    };
+
+    struct ToolbarItem {
+        ToolbarItemType   type;
+        QString           tip;
+        QString           icon;
+        AppAction::Action action;
+        bool              bottom_side;
+    };
+
+    QList<ToolbarItem> toolbar_items{
+        {Gallery,        "书库",       "toolbar/gallery",         AppAction::OpenBookGallery, false},
+        {Draft,          "编辑",       "toolbar/draft",           AppAction::OpenEditor,      false},
+        {Favorites,      "素材收藏", "toolbar/favorites",       AppAction::OpenFavorites,   false},
+        {Trash,          "回收站",    "toolbar/trash",           AppAction::OpenTrashBin,    false},
+        {Export,         "导出",       "toolbar/export",          AppAction::Export,          false},
+        {Share,          "分享",       "toolbar/share",           AppAction::Share,           false},
+        {Fullscreen,     "全屏",       "toolbar/fullscreen",      AppAction::Fullscreen,      true },
+        {ExitFullscreen, "退出全屏", "toolbar/fullscreen-exit", AppAction::ExitFullscreen,  true },
+        {Help,           "帮助",       "toolbar/help",            AppAction::OpenHelp,        true },
+        {Settings,       "设置",       "toolbar/settings",        AppAction::OpenSettings,    true },
+    };
+
+    const auto &actions = AppAction::get_instance();
+    for (int index = 0; index < toolbar_items.size(); ++index) {
+        const auto &[type, tip, icon, action, bottom_side] = toolbar_items[index];
+        Q_ASSERT(type == index);
+        ui_toolbar_->add_item(tip, icon, actions.get(action), bottom_side);
+    }
+
+    page_toolbar_mask_.insert(PageType::Gallery, {Gallery, Export, Share, ExitFullscreen});
+    page_toolbar_mask_.insert(PageType::Edit, {Draft, ExitFullscreen});
 
     ui_surface_        = new OverlaySurface;
     const bool succeed = ui_surface_->setup(container);
@@ -420,22 +651,22 @@ void JustWrite::setupUi() {
 }
 
 void JustWrite::setupConnections() {
-    auto &config = AppConfig::get_instance();
+    auto &config  = AppConfig::get_instance();
+    auto &actions = AppAction::get_instance();
 
-    connect(action_goto_gallery_, &QAction::triggered, this, [this] {
-        if (current_page_ == PageType::Gallery) { return; }
-        wait(std::bind(&EditPage::syncAndClearEditor, ui_edit_page_));
-        switchToPage(PageType::Gallery);
-    });
-    connect(action_open_settings_, &QAction::triggered, this, &JustWrite::handle_on_open_settings);
+    actions.bind(AppAction::OpenBookGallery, this, &JustWrite::handle_on_open_gallery);
+    actions.bind(AppAction::OpenSettings, this, &JustWrite::handle_on_open_settings);
+    actions.bind(AppAction::Export, this, &JustWrite::handle_edit_page_on_export);
 
-    connect(&config, &AppConfig::on_theme_change, this, [this, &config] {
-        updateColorScheme(config.scheme());
-    });
-    connect(&config, &AppConfig::on_scheme_change, this, &JustWrite::updateColorScheme);
-    connect(ui_title_bar_, &TitleBar::minimizeRequested, this, &QWidget::showMinimized);
-    connect(ui_title_bar_, &TitleBar::maximizeRequested, this, &JustWrite::toggleMaximize);
-    connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::closePage);
+    actions.attach(AppAction::OpenBookGallery, ui_edit_page_, &EditPage::quitEditRequested);
+    actions.attach(AppAction::OpenSettings, ui_edit_page_, &EditPage::openSettingsRequested);
+
+    connect(&config, &AppConfig::on_theme_change, this, &JustWrite::handle_on_theme_change);
+    connect(&config, &AppConfig::on_scheme_change, this, &JustWrite::handle_on_scheme_change);
+    connect(ui_title_bar_, &TitleBar::minimizeRequested, this, &JustWrite::handle_on_minimize);
+    connect(
+        ui_title_bar_, &TitleBar::maximizeRequested, this, &JustWrite::handle_on_toggle_maximize);
+    connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::handle_on_close);
     connect(ui_gallery_, &Gallery::clicked, this, &JustWrite::handle_gallery_on_click);
     connect(ui_gallery_, &Gallery::menuClicked, this, &JustWrite::handle_gallery_on_menu_action);
     connect(
@@ -449,42 +680,6 @@ void JustWrite::setupConnections() {
         this,
         &JustWrite::handle_on_page_change,
         Qt::QueuedConnection);
-    connect(ui_edit_page_, &EditPage::quitEditRequested, action_goto_gallery_, &QAction::trigger);
-    connect(
-        ui_edit_page_, &EditPage::openSettingsRequested, action_open_settings_, &QAction::trigger);
-}
-
-void JustWrite::requestStartEditBook(int index) {
-    const auto  book_info = ui_gallery_->bookInfoAt(index);
-    const auto &uuid      = book_info.uuid;
-
-    if (!books_.contains(uuid)) {
-        auto bm        = new BookManager;
-        bm->info_ref() = book_info;
-        books_.insert(uuid, bm);
-    }
-
-    auto bm = books_.value(uuid);
-    Q_ASSERT(bm);
-
-    waitTaskBuilder()
-        .withPolicy(Progress::UseMinimumDisplayTime, false)
-        .withBlockingJob([this, bm] {
-            ui_edit_page_->resetBookSource(bm);
-            switchToPage(PageType::Edit);
-        })
-        .withAsyncJob([this, bm] {
-            ui_edit_page_->resetWordsCount();
-            ui_edit_page_->flushWordsCount();
-            if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
-                ui_edit_page_->openChapter(chapters.back());
-            }
-            ui_edit_page_->editor()->prepareRenderData();
-        })
-        .exec(ui_surface_);
-
-    ui_edit_page_->focusOnEditor();
-    ui_edit_page_->syncWordsStatus();
 }
 
 void JustWrite::requestInitFromLocalStorage() {
@@ -494,11 +689,6 @@ void JustWrite::requestInitFromLocalStorage() {
     } else {
         initLocalStorage();
     }
-}
-
-void JustWrite::requestQuitApp() {
-    wait(std::bind(&JustWrite::syncToLocalStorage, this));
-    QCoreApplication::exit();
 }
 
 void JustWrite::initLocalStorage() {
@@ -725,15 +915,9 @@ void JustWrite::switchToPage(PageType page) {
     if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
         ui_page_stack_->setCurrentWidget(w);
     }
+    ui_toolbar_->apply_mask(page_toolbar_mask_[page]);
     current_page_ = page;
     emit pageChanged(page);
-}
-
-void JustWrite::closePage() {
-    if (current_page_ == PageType::Edit) { ui_edit_page_->syncAndClearEditor(); }
-    //! TODO: throw a dialog to confirm quiting the jwrite
-    //! TODO: sync book content to local storage
-    requestQuitApp();
 }
 
 void JustWrite::showEvent(QShowEvent *event) {

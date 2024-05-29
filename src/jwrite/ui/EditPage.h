@@ -53,7 +53,6 @@ public:
     void focusOnEditor();
 
     void renameBookDirItem(int id, const QString &title);
-    void exportToLocal(const QString &path, ExportType type);
 
     void resetWordsCount();
     void updateWordsCount(const QString &text, bool text_changed);
@@ -64,6 +63,10 @@ public:
         return ui_editor_;
     }
 
+    TwoLevelTree *book_dir() {
+        return ui_book_dir_;
+    }
+
 protected slots:
     void updateCurrentDateTime();
 
@@ -72,7 +75,6 @@ protected:
     void setupConnections();
 
     void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
-    void requestExportToLocal();
     void createAndOpenNewChapter(int vid);
     void createAndOpenNewChapterUnderActiveVolume();
     void requestRenameCurrentTocItem();
@@ -98,7 +100,6 @@ private:
     StatusBar               *ui_status_bar_;
     widgetkit::FlatButton   *ui_new_volume_;
     widgetkit::FlatButton   *ui_new_chapter_;
-    widgetkit::FlatButton   *ui_export_to_local_;
     TwoLevelTree            *ui_book_dir_;
     QLabel                  *ui_total_words_;
     QLabel                  *ui_datetime_;

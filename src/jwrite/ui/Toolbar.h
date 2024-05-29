@@ -13,6 +13,7 @@ public:
     void update_color_scheme(const ColorScheme &scheme);
     void reload_toolbar_icons();
     void add_item(const QString &tip, const QString &icon_name, QAction *action, bool bottom_side);
+    void apply_mask(const QSet<int> &mask);
 
 public:
     explicit Toolbar(QWidget *parent = nullptr);

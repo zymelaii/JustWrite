@@ -276,8 +276,10 @@ void TextViewEngine::set_text_ref_unsafe(const QString *ref, int ref_origin) {
 }
 
 void TextViewEngine::clear_all() {
-    for (auto block : active_blocks) { release(block); }
-    active_blocks.clear();
+    //! ATTENTION: there is some potential concurrency risk
+    decltype(active_blocks) blocks{std::move(active_blocks)};
+    Q_ASSERT(active_blocks.empty());
+    for (auto block : blocks) { release(block); }
     active_block_index = -1;
     cursor.reset();
     preedit = false;

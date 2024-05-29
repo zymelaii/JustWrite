@@ -31,6 +31,11 @@ public:
         Edit,
     };
 
+    enum class ExportType {
+        PlainText,
+        ePub,
+    };
+
 protected:
     void request_create_new_book();
     void do_create_book(BookInfo &book_info);
@@ -50,14 +55,26 @@ protected:
     void request_rename_toc_item(const QString &book_id, int toc, TocType type);
     void do_rename_toc_item(const QString &book_id, int toc, const QString &title);
 
+    void request_export_book(const QString &book_id);
+    bool do_export_book(const QString &book_id, const QString &path, ExportType type);
+    bool do_export_book_as_plain_text(const QString &book_id, const QString &path);
+    bool do_export_book_as_epub(const QString &book_id, const QString &path);
+
 public slots:
     void handle_gallery_on_click(int index);
     void handle_gallery_on_menu_action(int index, Gallery::MenuAction action);
     void handle_gallery_on_load_book(const BookInfo &book_info);
     void handle_book_dir_on_rename_toc_item(const QString &book_id, int toc_id, TocType type);
     void handle_book_dir_on_rename_toc_item__adapter(const BookInfo &book_info, int vid, int cid);
+    void handle_edit_page_on_export();
     void handle_on_page_change(PageType page);
     void handle_on_open_settings();
+    void handle_on_theme_change();
+    void handle_on_scheme_change(const ColorScheme &scheme);
+    void handle_on_minimize();
+    void handle_on_toggle_maximize();
+    void handle_on_close();
+    void handle_on_open_gallery();
 
 public:
     QString get_default_author() const;
@@ -79,30 +96,25 @@ signals:
 public:
     void updateColorScheme(const ColorScheme &scheme);
 
-public:
-    void toggleMaximize();
-
 protected:
-    void init();
     void setupUi();
     void setupConnections();
     void requestStartEditBook(int index);
 
     void requestInitFromLocalStorage();
-    void requestQuitApp();
 
     void initLocalStorage();
     void loadDataFromLocalStorage();
     void syncToLocalStorage();
 
     void switchToPage(PageType page);
-    void closePage();
 
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
 
 private:
     QMap<PageType, QWidget *>            page_map_;
+    QMap<PageType, QSet<int>>            page_toolbar_mask_;
     PageType                             current_page_;
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;
@@ -116,17 +128,6 @@ private:
     widgetkit::OverlaySurface *ui_surface_;
     QStackedWidget            *ui_page_stack_;
     QWK::WidgetWindowAgent    *ui_agent_;
-
-    QAction *action_goto_gallery_;
-    QAction *action_goto_edit_page_;
-    QAction *action_goto_favorites_;
-    QAction *action_goto_trash_bin_;
-    QAction *action_export_;
-    QAction *action_share_;
-    QAction *action_fullscreen_;
-    QAction *action_exit_fullscreen_;
-    QAction *action_show_help_;
-    QAction *action_open_settings_;
 };
 
 } // namespace jwrite::ui

@@ -61,10 +61,20 @@ void Profiler::summary_collected_data() {
         const int   index = indexof(target);
         const auto &data  = profile_data_[index];
         if (data.empty()) { continue; }
-        const double average = averageof(target);
+        double average = averageof(target);
         timeline_[index].append(average);
-        qDebug().noquote()
-            << QStringLiteral("  %1 %2us").arg(magic_enum::enum_name(target).data()).arg(average);
+        QString unit = "us";
+        if (average > 1e6) {
+            average /= 1e6;
+            unit     = "s";
+        } else if (average > 1e3) {
+            average /= 1e3;
+            unit     = "ms";
+        }
+        qDebug().noquote() << QStringLiteral("  %1 %2%3")
+                                  .arg(magic_enum::enum_name(target).data())
+                                  .arg(average)
+                                  .arg(unit);
         clear(target);
     }
 }

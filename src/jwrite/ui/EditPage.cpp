@@ -332,72 +332,6 @@ void EditPage::renameBookDirItem(int id, const QString &title) {
     ui_book_dir_->setItemValue(id, title);
 }
 
-void EditPage::exportToLocal(const QString &path, ExportType type) {
-    Q_ASSERT(book_manager_);
-
-    switch (type) {
-        case ExportType::PlainText: {
-            QFile file(path);
-            if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                //! TODO: replace with jwrite style message box
-                return;
-            }
-
-            QTextStream out(&file);
-
-            const int total_volumes = book_manager_->get_volumes().size();
-            int       chap_index    = 0;
-            for (int i = 0; i < total_volumes; ++i) {
-                const auto vid = book_manager_->get_volumes()[i];
-                out << QStringLiteral("【第 %1 卷 %2】\n\n")
-                           .arg(i + 1)
-                           .arg(book_manager_->get_title(vid).value());
-                const auto &chaps = book_manager_->get_chapters_of_volume(vid);
-                for (const auto cid : chaps) {
-                    const auto content = current_cid_ == cid
-                                           ? ui_editor_->text()
-                                           : book_manager_->fetch_chapter_content(cid).value();
-                    out << QStringLiteral("第 %1 章 %2\n")
-                               .arg(++chap_index)
-                               .arg(book_manager_->get_title(cid).value())
-                        << content << "\n\n";
-                }
-            }
-        } break;
-        case ExportType::ePub: {
-            const auto &title  = book_manager_->info_ref().title;
-            const auto &author = book_manager_->info_ref().author;
-
-            EpubBuilder builder(path);
-            const int   total_volumes = book_manager_->get_volumes().size();
-            for (int i = 0; i < total_volumes; ++i) {
-                const int vid = book_manager_->get_volumes()[i];
-                builder.with_volume(
-                    QString("第 %1 卷 %2").arg(i + 1).arg(book_manager_->get_title(vid).value()),
-                    book_manager_->get_chapters_of_volume(vid).size());
-            }
-            int global_chap_index = 0;
-            builder.with_name(title.isEmpty() ? "未命名书籍" : title)
-                .with_author(author.isEmpty() ? "佚名" : author)
-                .feed([this, &global_chap_index](
-                          int      vol_index,
-                          int      chap_index,
-                          QString &out_chap_title,
-                          QString &out_content) {
-                    const int vid  = book_manager_->get_volumes()[vol_index];
-                    const int cid  = book_manager_->get_chapters_of_volume(vid)[chap_index];
-                    out_chap_title = QString("第 %1 章 %2")
-                                         .arg(++global_chap_index)
-                                         .arg(book_manager_->get_title(cid).value());
-                    out_content = current_cid_ == cid
-                                    ? ui_editor_->text()
-                                    : book_manager_->fetch_chapter_content(cid).value();
-                })
-                .build();
-        } break;
-    }
-}
-
 void EditPage::resetWordsCount() {
     ui_total_words_->setText("全速统计中...");
 }
@@ -456,11 +390,10 @@ void EditPage::setupUi() {
     ui_status_bar_ = new StatusBar;
     ui_menu_       = new FloatingMenu(ui_editor_);
 
-    ui_sidebar_         = new QWidget;
-    ui_new_volume_      = new FlatButton;
-    ui_new_chapter_     = new FlatButton;
-    ui_export_to_local_ = new FlatButton;
-    ui_book_dir_        = new TwoLevelTree;
+    ui_sidebar_     = new QWidget;
+    ui_new_volume_  = new FlatButton;
+    ui_new_chapter_ = new FlatButton;
+    ui_book_dir_    = new TwoLevelTree;
 
     auto btn_line        = new QWidget;
     auto btn_line_layout = new QHBoxLayout(btn_line);
@@ -469,8 +402,6 @@ void EditPage::setupUi() {
     btn_line_layout->addWidget(ui_new_volume_);
     btn_line_layout->addStretch();
     btn_line_layout->addWidget(ui_new_chapter_);
-    btn_line_layout->addStretch();
-    btn_line_layout->addWidget(ui_export_to_local_);
     btn_line_layout->addStretch();
     ui_named_widgets_.insert("sidebar.button-line", btn_line);
 
@@ -510,7 +441,6 @@ void EditPage::setupUi() {
 
     ui_new_volume_->setText("新建卷");
     ui_new_chapter_->setText("新建章");
-    ui_export_to_local_->setText("导出");
 
     ui_total_words_ = ui_status_bar_->addItem("", false);
     ui_datetime_    = ui_status_bar_->addItem("", true);
@@ -576,7 +506,6 @@ void EditPage::setupConnections() {
         &FlatButton::pressed,
         this,
         &EditPage::createAndOpenNewChapterUnderActiveVolume);
-    connect(ui_export_to_local_, &FlatButton::pressed, this, &EditPage::requestExportToLocal);
     connect(&sec_timer_, &QTimer::timeout, this, &EditPage::updateCurrentDateTime);
     connect(ui_editor_, &Editor::focusLost, this, [this](VisualTextEditContext::TextLoc last_loc) {
         if (current_cid_ != -1) { chapter_locs_[current_cid_] = last_loc; }
@@ -595,39 +524,6 @@ void EditPage::setupConnections() {
 
 void EditPage::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
     //! TODO: menu style & popup input to edit the new title
-}
-
-void EditPage::requestExportToLocal() {
-    Q_ASSERT(book_manager_);
-
-    const auto  caption      = "导出到本地";
-    const auto &title        = book_manager_->info_ref().title;
-    const auto  default_name = title.isEmpty() ? "未命名书籍" : title;
-
-    QMap<QString, ExportType> types;
-    types[QStringLiteral("文本文件 (*.txt)")]     = ExportType::PlainText;
-    types[QStringLiteral("EPUB 电子书 (*.epub)")] = ExportType::ePub;
-
-    QString selected_type;
-    auto    path = QFileDialog::getSaveFileName(
-        this, caption, default_name, types.keys().join("\n"), &selected_type);
-
-    if (path.isEmpty()) { return; }
-
-    const auto type = types[selected_type];
-
-    if (QFileInfo(path).suffix().isEmpty()) {
-        switch (type) {
-            case ExportType::PlainText: {
-                path.append(".txt");
-            } break;
-            case ExportType::ePub: {
-                path.append(".epub");
-            } break;
-        }
-    }
-
-    exportToLocal(path, type);
 }
 
 void EditPage::createAndOpenNewChapter(int vid) {
