@@ -3,6 +3,7 @@
 #include <jwrite/ui/BookInfoEdit.h>
 #include <jwrite/ui/ColorSchemeDialog.h>
 #include <jwrite/ui/MessageBox.h>
+#include <jwrite/ui/AboutDialog.h>
 #include <jwrite/ui/ToolbarIcon.h>
 #include <jwrite/ColorScheme.h>
 #include <jwrite/epub/EpubBuilder.h>
@@ -402,6 +403,10 @@ void JustWrite::handle_on_page_change(PageType page) {
     }
 }
 
+void JustWrite::handle_on_open_help() {
+    AboutDialog::show(ui_surface_);
+}
+
 void JustWrite::handle_on_open_settings() {
     //! TODO: currently only support editing the color scheme, impl it later
 
@@ -655,6 +660,7 @@ void JustWrite::setupConnections() {
     auto &actions = AppAction::get_instance();
 
     actions.bind(AppAction::OpenBookGallery, this, &JustWrite::handle_on_open_gallery);
+    actions.bind(AppAction::OpenHelp, this, &JustWrite::handle_on_open_help);
     actions.bind(AppAction::OpenSettings, this, &JustWrite::handle_on_open_settings);
     actions.bind(AppAction::Export, this, &JustWrite::handle_edit_page_on_export);
 

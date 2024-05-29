@@ -1,0 +1,10 @@
+#include <jwrite/Version.h>
+
+namespace jwrite {
+
+const QVersionNumber VERSION(
+    @JustWrite_VERSION_MAJOR@,
+    @JustWrite_VERSION_MINOR@,
+    @JustWrite_VERSION_PATCH@);
+
+} // namespace jwrite

@@ -1,3 +1,8 @@
+configure_file(
+	${CMAKE_CURRENT_SOURCE_DIR}/Version.cpp.in
+	${CMAKE_CURRENT_BINARY_DIR}/Version.cpp
+)
+
 file(GLOB CORE_SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
 list(REMOVE_ITEM CORE_SOURCE_FILES App.cpp)
 
@@ -9,6 +14,7 @@ list(APPEND SOURCE_FILES ${UI_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${EPUB_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/res.qrc)
 list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/JustWrite.rc)
+list(APPEND SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/Version.cpp)
 
 add_library(jwrite-core STATIC ${CORE_SOURCE_FILES})
 target_link_libraries(

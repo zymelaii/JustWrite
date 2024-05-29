@@ -1,5 +1,6 @@
 #include <jwrite/ui/JustWrite.h>
 #include <jwrite/ProfileUtils.h>
+#include <jwrite/Version.h>
 #include <QGuiApplication>
 #include <QApplication>
 #include <QScreen>
@@ -26,6 +27,12 @@ int main(int argc, char *argv[]) {
 
     QGuiApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
     QApplication app(argc, argv);
+
+    QApplication::setOrganizationDomain("jwrite");
+    QApplication::setOrganizationName("github.com/zymelaii/jwrite");
+    QApplication::setApplicationName("JustWrite");
+    QApplication::setApplicationDisplayName("只写");
+    QApplication::setApplicationVersion(jwrite::VERSION.toString());
 
     const auto font_name = u8"更纱黑体 SC Light";
     QFontDatabase::addApplicationFont(QString("fonts/%1.ttf").arg(font_name));

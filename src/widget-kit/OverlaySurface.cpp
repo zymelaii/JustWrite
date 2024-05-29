@@ -55,6 +55,7 @@ void OverlaySurface::reload(OverlayDialog *overlay) {
         Q_ASSERT(ui_layout_->count() == 3);
         const auto w = ui_layout_->takeAt(1)->widget();
         Q_ASSERT(w == overlay_);
+        overlay_->setVisible(false);
         disconnect(overlay_, &OverlayDialog::accepted, this, nullptr);
         disconnect(overlay_, &OverlayDialog::rejected, this, nullptr);
     }
@@ -68,7 +69,7 @@ void OverlaySurface::reload(OverlayDialog *overlay) {
 
     overlay_ = overlay;
 
-    ui_layout_->invalidate();
+    ui_layout_->activate();
 }
 
 bool OverlaySurface::showOverlay() {

@@ -68,6 +68,7 @@ public slots:
     void handle_book_dir_on_rename_toc_item__adapter(const BookInfo &book_info, int vid, int cid);
     void handle_edit_page_on_export();
     void handle_on_page_change(PageType page);
+    void handle_on_open_help();
     void handle_on_open_settings();
     void handle_on_theme_change();
     void handle_on_scheme_change(const ColorScheme &scheme);
