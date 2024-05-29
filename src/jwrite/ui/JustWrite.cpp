@@ -3,6 +3,7 @@
 #include <jwrite/ui/BookInfoEdit.h>
 #include <jwrite/ui/ColorSchemeDialog.h>
 #include <jwrite/ui/MessageBox.h>
+#include <jwrite/ui/ToolbarIcon.h>
 #include <jwrite/ColorScheme.h>
 #include <jwrite/AppConfig.h>
 #include <jwrite/ProfileUtils.h>
@@ -10,6 +11,7 @@
 #include <widget-kit/OverlaySurface.h>
 #include <QScrollBar>
 #include <QVBoxLayout>
+#include <QToolTip>
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QPainter>
@@ -258,11 +260,9 @@ void JustWrite::handle_on_open_settings() {
 }
 
 JustWrite::JustWrite() {
+    init();
     setupUi();
     setupConnections();
-
-    page_map_[PageType::Gallery]->installEventFilter(this);
-    page_map_[PageType::Edit]->installEventFilter(this);
 
     switchToPage(PageType::Gallery);
 
@@ -311,8 +311,17 @@ void JustWrite::updateColorScheme(const ColorScheme &scheme) {
     }
 
     ui_title_bar_->updateColorScheme(scheme);
+    ui_toolbar_->update_color_scheme(scheme);
     ui_gallery_->updateColorScheme(scheme);
     ui_edit_page_->updateColorScheme(scheme);
+
+    auto font = this->font();
+    font.setPointSize(10);
+    QToolTip::setFont(font);
+
+    pal.setColor(QPalette::ToolTipBase, scheme.window());
+    pal.setColor(QPalette::ToolTipText, scheme.window_text());
+    QToolTip::setPalette(pal);
 }
 
 QString JustWrite::get_default_author() const {
@@ -332,12 +341,29 @@ void JustWrite::toggleMaximize() {
     }
 }
 
+void JustWrite::init() {
+    action_goto_gallery_    = new QAction(this);
+    action_goto_edit_page_  = new QAction(this);
+    action_goto_favorites_  = new QAction(this);
+    action_goto_trash_bin_  = new QAction(this);
+    action_export_          = new QAction(this);
+    action_share_           = new QAction(this);
+    action_fullscreen_      = new QAction(this);
+    action_exit_fullscreen_ = new QAction(this);
+    action_show_help_       = new QAction(this);
+    action_open_settings_   = new QAction(this);
+}
+
 void JustWrite::setupUi() {
     setObjectName("JustWrite");
 
     auto top_layout = new QVBoxLayout(this);
 
+    auto container        = new QWidget;
+    auto layout_container = new QHBoxLayout(container);
+
     ui_title_bar_  = new TitleBar;
+    ui_toolbar_    = new Toolbar;
     ui_page_stack_ = new QStackedWidget;
     ui_gallery_    = new Gallery;
     ui_edit_page_  = new EditPage;
@@ -348,22 +374,36 @@ void JustWrite::setupUi() {
     ui_page_stack_->addWidget(gallery_page);
     ui_page_stack_->addWidget(ui_edit_page_);
 
+    layout_container->addWidget(ui_toolbar_);
+    layout_container->addWidget(ui_page_stack_);
+
     top_layout->addWidget(ui_title_bar_);
-    top_layout->addWidget(ui_page_stack_);
+    top_layout->addWidget(container);
+
+    ui_toolbar_->add_item("书库", "toolbar-gallery.svg", action_goto_gallery_, false);
+    ui_toolbar_->add_item("编辑", "toolbar-draft.svg", action_goto_edit_page_, false);
+    ui_toolbar_->add_item("素材收藏", "toolbar-favorites.svg", action_goto_favorites_, false);
+    ui_toolbar_->add_item("回收站", "toolbar-trash-bin.svg", action_goto_trash_bin_, false);
+    ui_toolbar_->add_item("导出", "toolbar-export.svg", action_export_, false);
+    ui_toolbar_->add_item("分享", "toolbar-share.svg", action_share_, false);
+    ui_toolbar_->add_item("全屏", "toolbar-fullscreen.svg", action_fullscreen_, true);
+    ui_toolbar_->add_item("帮助", "toolbar-help.svg", action_show_help_, true);
+    ui_toolbar_->add_item("设置", "toolbar-settings.svg", action_open_settings_, true);
 
     ui_surface_        = new OverlaySurface;
-    const bool succeed = ui_surface_->setup(ui_page_stack_);
+    const bool succeed = ui_surface_->setup(container);
     Q_ASSERT(succeed);
 
-    ui_agent_ = new QWK::WidgetWindowAgent(this);
+    using AgentButton = QWK::WidgetWindowAgent::SystemButton;
+    ui_agent_         = new QWK::WidgetWindowAgent(this);
     ui_agent_->setup(this);
     ui_agent_->setTitleBar(ui_title_bar_);
-    ui_agent_->setSystemButton(
-        QWK::WidgetWindowAgent::Minimize, ui_title_bar_->systemButton(SystemButton::Minimize));
-    ui_agent_->setSystemButton(
-        QWK::WidgetWindowAgent::Maximize, ui_title_bar_->systemButton(SystemButton::Maximize));
-    ui_agent_->setSystemButton(
-        QWK::WidgetWindowAgent::Close, ui_title_bar_->systemButton(SystemButton::Close));
+    ui_agent_->setSystemButton(AgentButton::Minimize, ui_title_bar_->minimize_button());
+    ui_agent_->setSystemButton(AgentButton::Maximize, ui_title_bar_->maximize_button());
+    ui_agent_->setSystemButton(AgentButton::Close, ui_title_bar_->close_button());
+
+    layout_container->setContentsMargins({});
+    layout_container->setSpacing(0);
 
     top_layout->setContentsMargins({});
     top_layout->setSpacing(0);
@@ -371,16 +411,23 @@ void JustWrite::setupUi() {
     page_map_[PageType::Gallery] = gallery_page;
     page_map_[PageType::Edit]    = ui_edit_page_;
 
-    tray_icon_ = new QSystemTrayIcon(this);
-    tray_icon_->setIcon(QIcon(":/app.ico"));
-    tray_icon_->setToolTip("只写");
-    tray_icon_->setVisible(false);
+    ui_tray_icon_ = new QSystemTrayIcon(this);
+    ui_tray_icon_->setIcon(QIcon(":/app.ico"));
+    ui_tray_icon_->setToolTip("只写");
+    ui_tray_icon_->setVisible(false);
 
     updateColorScheme(AppConfig::get_instance().scheme());
 }
 
 void JustWrite::setupConnections() {
     auto &config = AppConfig::get_instance();
+
+    connect(action_goto_gallery_, &QAction::triggered, this, [this] {
+        if (current_page_ == PageType::Gallery) { return; }
+        wait(std::bind(&EditPage::syncAndClearEditor, ui_edit_page_));
+        switchToPage(PageType::Gallery);
+    });
+    connect(action_open_settings_, &QAction::triggered, this, &JustWrite::handle_on_open_settings);
 
     connect(&config, &AppConfig::on_theme_change, this, [this, &config] {
         updateColorScheme(config.scheme());
@@ -402,12 +449,9 @@ void JustWrite::setupConnections() {
         this,
         &JustWrite::handle_on_page_change,
         Qt::QueuedConnection);
-    connect(ui_edit_page_, &EditPage::quitEditRequested, this, [this] {
-        wait(std::bind(&EditPage::syncAndClearEditor, ui_edit_page_));
-        switchToPage(PageType::Gallery);
-    });
+    connect(ui_edit_page_, &EditPage::quitEditRequested, action_goto_gallery_, &QAction::trigger);
     connect(
-        ui_edit_page_, &EditPage::openSettingsRequested, this, &JustWrite::handle_on_open_settings);
+        ui_edit_page_, &EditPage::openSettingsRequested, action_open_settings_, &QAction::trigger);
 }
 
 void JustWrite::requestStartEditBook(int index) {
@@ -693,25 +737,11 @@ void JustWrite::closePage() {
 }
 
 void JustWrite::showEvent(QShowEvent *event) {
-    tray_icon_->hide();
+    ui_tray_icon_->hide();
 }
 
 void JustWrite::hideEvent(QHideEvent *event) {
-    tray_icon_->show();
-}
-
-bool JustWrite::eventFilter(QObject *watched, QEvent *event) {
-    if (event->type() == QEvent::KeyPress) {
-        auto e = static_cast<QKeyEvent *>(event);
-        if (auto opt = command_manager_.match(e)) {
-            if (*opt == GlobalCommand::ShowColorSchemeDialog) {
-                //! FIXME: remove this part later
-                handle_on_open_settings();
-                return true;
-            }
-        }
-    }
-    return false;
+    ui_tray_icon_->show();
 }
 
 } // namespace jwrite::ui

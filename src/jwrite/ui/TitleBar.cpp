@@ -21,7 +21,7 @@ void TitleBar::setTitle(const QString &title) {
     update();
 }
 
-SystemButton *TitleBar::systemButton(SystemButton::SystemCommand command_type) const {
+SystemButton *TitleBar::button(SystemButton::SystemCommand command_type) const {
     return sys_buttons_[magic_enum::enum_index(command_type).value()];
 }
 

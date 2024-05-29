@@ -24,7 +24,19 @@ public:
     QString title() const;
     void    setTitle(const QString &title);
 
-    SystemButton *systemButton(SystemButton::SystemCommand command_type) const;
+    SystemButton *button(SystemButton::SystemCommand command_type) const;
+
+    SystemButton *close_button() const {
+        return button(SystemButton::Close);
+    }
+
+    SystemButton *minimize_button() const {
+        return button(SystemButton::Minimize);
+    }
+
+    SystemButton *maximize_button() const {
+        return button(SystemButton::Maximize);
+    }
 
     void updateColorScheme(const ColorScheme &scheme);
 

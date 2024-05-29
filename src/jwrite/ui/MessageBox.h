@@ -18,7 +18,9 @@ public:
     };
 
     enum class StandardIcon {
+        Info,
         Warning,
+        Error,
     };
 
 public:

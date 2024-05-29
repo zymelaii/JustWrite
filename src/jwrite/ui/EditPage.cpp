@@ -719,8 +719,6 @@ bool EditPage::handleShortcuts(QKeyEvent *event) {
                 ui_editor_->setFocus();
                 messy_input_->start();
             } break;
-            case GlobalCommand::ShowColorSchemeDialog: {
-            } break;
         }
         return true;
     }

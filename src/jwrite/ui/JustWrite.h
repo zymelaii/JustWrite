@@ -1,6 +1,7 @@
 #pragma once
 
 #include <jwrite/ui/TitleBar.h>
+#include <jwrite/ui/Toolbar.h>
 #include <jwrite/ui/EditPage.h>
 #include <jwrite/ui/Gallery.h>
 #include <jwrite/BookManager.h>
@@ -82,6 +83,7 @@ public:
     void toggleMaximize();
 
 protected:
+    void init();
     void setupUi();
     void setupConnections();
     void requestStartEditBook(int index);
@@ -98,7 +100,6 @@ protected:
 
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
-    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     QMap<PageType, QWidget *>            page_map_;
@@ -106,13 +107,26 @@ private:
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;
     GlobalCommandManager                 command_manager_;
-    QSystemTrayIcon                     *tray_icon_;
-    TitleBar                            *ui_title_bar_;
-    Gallery                             *ui_gallery_;
-    EditPage                            *ui_edit_page_;
-    widgetkit::OverlaySurface           *ui_surface_;
-    QStackedWidget                      *ui_page_stack_;
-    QWK::WidgetWindowAgent              *ui_agent_;
+
+    QSystemTrayIcon           *ui_tray_icon_;
+    TitleBar                  *ui_title_bar_;
+    Toolbar                   *ui_toolbar_;
+    Gallery                   *ui_gallery_;
+    EditPage                  *ui_edit_page_;
+    widgetkit::OverlaySurface *ui_surface_;
+    QStackedWidget            *ui_page_stack_;
+    QWK::WidgetWindowAgent    *ui_agent_;
+
+    QAction *action_goto_gallery_;
+    QAction *action_goto_edit_page_;
+    QAction *action_goto_favorites_;
+    QAction *action_goto_trash_bin_;
+    QAction *action_export_;
+    QAction *action_share_;
+    QAction *action_fullscreen_;
+    QAction *action_exit_fullscreen_;
+    QAction *action_show_help_;
+    QAction *action_open_settings_;
 };
 
 } // namespace jwrite::ui

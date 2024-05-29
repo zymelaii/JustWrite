@@ -8,11 +8,23 @@
         <file>res/themes/dark/icons/sys-close.svg</file>
         <file>res/themes/dark/icons/sys-maximize.svg</file>
         <file>res/themes/dark/icons/sys-minimize.svg</file>
+        <file>res/themes/dark/icons/sign-info.svg</file>
         <file>res/themes/dark/icons/sign-warning.svg</file>
+        <file>res/themes/dark/icons/sign-error.svg</file>
         <file>res/themes/dark/icons/menu-more.svg</file>
         <file>res/themes/dark/icons/menu-close-hint.svg</file>
         <file>res/themes/dark/icons/menu-settings.svg</file>
         <file>res/themes/dark/icons/menu-return.svg</file>
+        <file>res/themes/dark/icons/toolbar-draft.svg</file>
+        <file>res/themes/dark/icons/toolbar-export.svg</file>
+        <file>res/themes/dark/icons/toolbar-favorites.svg</file>
+        <file>res/themes/dark/icons/toolbar-fullscreen-exit.svg</file>
+        <file>res/themes/dark/icons/toolbar-fullscreen.svg</file>
+        <file>res/themes/dark/icons/toolbar-gallery.svg</file>
+        <file>res/themes/dark/icons/toolbar-help.svg</file>
+        <file>res/themes/dark/icons/toolbar-settings.svg</file>
+        <file>res/themes/dark/icons/toolbar-share.svg</file>
+        <file>res/themes/dark/icons/toolbar-trash-bin.svg</file>
         <file>res/themes/light/icons/button-close.svg</file>
         <file>res/themes/light/icons/indicator-edit.svg</file>
         <file>res/themes/light/icons/indicator-ellapse.svg</file>
@@ -20,11 +32,23 @@
         <file>res/themes/light/icons/sys-close.svg</file>
         <file>res/themes/light/icons/sys-maximize.svg</file>
         <file>res/themes/light/icons/sys-minimize.svg</file>
+        <file>res/themes/light/icons/sign-info.svg</file>
         <file>res/themes/light/icons/sign-warning.svg</file>
+        <file>res/themes/light/icons/sign-error.svg</file>
         <file>res/themes/light/icons/menu-more.svg</file>
         <file>res/themes/light/icons/menu-close-hint.svg</file>
         <file>res/themes/light/icons/menu-settings.svg</file>
         <file>res/themes/light/icons/menu-return.svg</file>
+        <file>res/themes/light/icons/toolbar-draft.svg</file>
+        <file>res/themes/light/icons/toolbar-export.svg</file>
+        <file>res/themes/light/icons/toolbar-favorites.svg</file>
+        <file>res/themes/light/icons/toolbar-fullscreen-exit.svg</file>
+        <file>res/themes/light/icons/toolbar-fullscreen.svg</file>
+        <file>res/themes/light/icons/toolbar-gallery.svg</file>
+        <file>res/themes/light/icons/toolbar-help.svg</file>
+        <file>res/themes/light/icons/toolbar-settings.svg</file>
+        <file>res/themes/light/icons/toolbar-share.svg</file>
+        <file>res/themes/light/icons/toolbar-trash-bin.svg</file>
         <file>res/default-cover.png</file>
         <file>res/template/epub/style.css</file>
     </qresource>
