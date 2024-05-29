@@ -28,7 +28,7 @@ void SystemButton::reloadIcon() {
     }
 
     const auto name      = magic_enum::enum_name<SystemCommand>(cmd_);
-    const auto icon_path = config.icon(QString("sys-%1.svg").arg(name.data()).toLower());
+    const auto icon_path = config.icon(QString("sys/%1").arg(name.data()).toLower());
     QIcon      icon(icon_path);
     Q_ASSERT(!icon.isNull());
 

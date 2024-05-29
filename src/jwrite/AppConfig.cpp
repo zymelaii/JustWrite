@@ -35,8 +35,8 @@ void AppConfig::set_scheme(const ColorScheme& scheme) {
     emit on_scheme_change(scheme_);
 }
 
-QString AppConfig::icon(QString name) const {
-    return QString(":/res/themes/%1/icons/%2").arg(theme_name()).arg(name);
+QString AppConfig::icon(const QString& name) const {
+    return QString(":/res/themes/%1/icons/%2.svg").arg(theme_name()).arg(name);
 }
 
 QString AppConfig::path(StandardPath path_type) const {

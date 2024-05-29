@@ -46,7 +46,7 @@ void FloatingMenu::update_geometry() {
 void FloatingMenu::reload_icon() {
     auto     &config    = AppConfig::get_instance();
     const int icon_size = get_icon_size();
-    ui_menu_icon_       = QIcon(config.icon("menu-more.svg")).pixmap(icon_size);
+    ui_menu_icon_       = QIcon(config.icon("menu/more")).pixmap(icon_size);
     for (int i = 0; i < menu_items_.size(); ++i) {
         ui_menu_items_[i] = QIcon(config.icon(menu_items_[i].icon_name)).pixmap(icon_size);
     }

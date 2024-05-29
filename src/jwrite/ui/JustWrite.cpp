@@ -380,15 +380,15 @@ void JustWrite::setupUi() {
     top_layout->addWidget(ui_title_bar_);
     top_layout->addWidget(container);
 
-    ui_toolbar_->add_item("书库", "toolbar-gallery.svg", action_goto_gallery_, false);
-    ui_toolbar_->add_item("编辑", "toolbar-draft.svg", action_goto_edit_page_, false);
-    ui_toolbar_->add_item("素材收藏", "toolbar-favorites.svg", action_goto_favorites_, false);
-    ui_toolbar_->add_item("回收站", "toolbar-trash-bin.svg", action_goto_trash_bin_, false);
-    ui_toolbar_->add_item("导出", "toolbar-export.svg", action_export_, false);
-    ui_toolbar_->add_item("分享", "toolbar-share.svg", action_share_, false);
-    ui_toolbar_->add_item("全屏", "toolbar-fullscreen.svg", action_fullscreen_, true);
-    ui_toolbar_->add_item("帮助", "toolbar-help.svg", action_show_help_, true);
-    ui_toolbar_->add_item("设置", "toolbar-settings.svg", action_open_settings_, true);
+    ui_toolbar_->add_item("书库", "toolbar/gallery", action_goto_gallery_, false);
+    ui_toolbar_->add_item("编辑", "toolbar/draft", action_goto_edit_page_, false);
+    ui_toolbar_->add_item("素材收藏", "toolbar/favorites", action_goto_favorites_, false);
+    ui_toolbar_->add_item("回收站", "toolbar/trash", action_goto_trash_bin_, false);
+    ui_toolbar_->add_item("导出", "toolbar/export", action_export_, false);
+    ui_toolbar_->add_item("分享", "toolbar/share", action_share_, false);
+    ui_toolbar_->add_item("全屏", "toolbar/fullscreen", action_fullscreen_, true);
+    ui_toolbar_->add_item("帮助", "toolbar/help", action_show_help_, true);
+    ui_toolbar_->add_item("设置", "toolbar/settings", action_open_settings_, true);
 
     ui_surface_        = new OverlaySurface;
     const bool succeed = ui_surface_->setup(container);

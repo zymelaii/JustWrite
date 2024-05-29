@@ -124,7 +124,7 @@ void TwoLevelTree::reloadIndicator() {
     const auto size   = indicatorSize();
     for (const auto type : magic_enum::enum_values<Indicator>()) {
         const auto name      = magic_enum::enum_name(type);
-        const auto icon_path = config.icon(QString("indicator-%1.svg").arg(name.data()).toLower());
+        const auto icon_path = config.icon(QString("indicator/%1").arg(name.data()).toLower());
         QIcon      icon(icon_path);
         Q_ASSERT(!icon.isNull());
         ui_indicators_[type] = icon.pixmap(size);

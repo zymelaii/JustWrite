@@ -50,15 +50,16 @@ MessageBox::Choice MessageBox::show(
 }
 
 QString MessageBox::standardIconPath(StandardIcon icon) {
+    const auto &config = AppConfig::get_instance();
     switch (icon) {
         case StandardIcon::Info: {
-            return AppConfig::get_instance().icon("sign-info.svg");
+            return config.icon("sign/info");
         } break;
         case StandardIcon::Warning: {
-            return AppConfig::get_instance().icon("sign-warning.svg");
+            return config.icon("sign/warning");
         } break;
         case StandardIcon::Error: {
-            return AppConfig::get_instance().icon("sign-error.svg");
+            return config.icon("sign/error");
         } break;
     }
 }
@@ -106,7 +107,7 @@ void MessageBox::setupUi() {
 
     ui_caption_->setText("提示");
     ui_close_->setPixmap(
-        QIcon(AppConfig::get_instance().icon("button-close.svg")).pixmap(QSize(16, 16)));
+        QIcon(AppConfig::get_instance().icon("button/close")).pixmap(QSize(16, 16)));
     ui_message_->setText("");
     ui_btn_no_->setText("取消");
     ui_btn_yes_->setText("确定");

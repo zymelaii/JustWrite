@@ -532,8 +532,8 @@ void EditPage::setupUi() {
     connect(open_settings_action, &QAction::triggered, this, [this] {
         emit openSettingsRequested();
     });
-    ui_menu_->add_menu_item("menu-return.svg", quit_edit_action);
-    ui_menu_->add_menu_item("menu-settings.svg", open_settings_action);
+    ui_menu_->add_menu_item("menu/return", quit_edit_action);
+    ui_menu_->add_menu_item("menu/settings", open_settings_action);
 
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
     setAutoFillBackground(true);

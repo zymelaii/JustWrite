@@ -37,7 +37,7 @@ public:
 
     void set_scheme(const ColorScheme& scheme);
 
-    QString icon(QString name) const;
+    QString icon(const QString& name) const;
 
     QString path(StandardPath path_type) const;
 
