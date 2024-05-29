@@ -180,14 +180,15 @@ void FloatingMenu::paintEvent(QPaintEvent *event) {
     }
     p.drawPath(clip_path);
 
-    auto pos = item_bb.center() - QPoint(icon_size / 2, icon_size / 2);
+    auto pos = QPointF(item_bb.x() + item_bb.width() * 0.5, item_bb.y() + item_bb.height() * 0.5)
+             - QPointF(icon_size * 0.5, icon_size * 0.5);
     if (ui_expanded_) {
         if (ui_hover_on_ != -1) { p.setClipPath(clip_path); }
         int index = 0;
         for (const auto &icon : ui_menu_items_) {
             if (index == ui_hover_on_) { p.fillRect(item_bb, ui_hover_color_); }
             p.drawPixmap(pos, icon);
-            pos -= QPoint(0, item_extent);
+            pos -= QPointF(0, item_extent);
             item_bb.translate(0, -item_extent);
             ++index;
         }
