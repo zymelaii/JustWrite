@@ -309,7 +309,10 @@ void EditPage::syncAndClearEditor() {
 
     Q_ASSERT(book_manager_);
 
+    //! FIXME: unsafe multi-thread sync
+    ui_editor_->setTextEngineLocked(true);
     book_manager_->sync_chapter_content(current_cid_, ui_editor_->take());
+    ui_editor_->setTextEngineLocked(false);
 
     current_cid_ = -1;
 }
