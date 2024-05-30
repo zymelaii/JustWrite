@@ -73,7 +73,7 @@ void Profiler::summary_collected_data() {
         }
         qDebug().noquote() << QStringLiteral("  %1 %2%3")
                                   .arg(magic_enum::enum_name(target).data())
-                                  .arg(average)
+                                  .arg(average, 2)
                                   .arg(unit);
         clear(target);
     }
