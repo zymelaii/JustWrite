@@ -1,5 +1,6 @@
 #include <jwrite/ui/AboutDialog.h>
 #include <widget-kit/ImageLabel.h>
+#include <widget-kit/OverlaySurface.h>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QApplication>
@@ -17,6 +18,14 @@ AboutDialog::AboutDialog()
 }
 
 AboutDialog::~AboutDialog() {}
+
+int AboutDialog::exec(widgetkit::OverlaySurface* surface) {
+    Q_ASSERT(surface);
+    surface->installEventFilter(this);
+    const int result = OverlayDialog::exec(surface);
+    surface->removeEventFilter(this);
+    return result;
+}
 
 void AboutDialog::show(OverlaySurface* surface) {
     auto dialog = std::make_shared<AboutDialog>();
@@ -45,6 +54,15 @@ void AboutDialog::init() {
     ui_app_version->setFont(font);
 
     setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+}
+
+bool AboutDialog::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::MouseButtonPress) {
+        const auto e   = static_cast<QMouseEvent*>(event);
+        const auto pos = mapFromGlobal(e->globalPosition()).toPoint();
+        if (!contentsRect().contains(pos)) { quit(); }
+    }
+    return false;
 }
 
 void AboutDialog::paintEvent(QPaintEvent* event) {

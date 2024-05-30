@@ -93,10 +93,7 @@ void FlatButton::leaveEvent(QEvent *event) {
 }
 
 void FlatButton::mousePressEvent(QMouseEvent *e) {
-    if (e->button() == Qt::LeftButton) {
-        emit pressed();
-        e->accept();
-    }
+    if (e->button() == Qt::LeftButton) { emit pressed(); }
 }
 
 } // namespace widgetkit

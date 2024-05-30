@@ -146,14 +146,12 @@ bool FloatingMenu::event(QEvent *event) {
         case QEvent::ParentChange: {
             parent()->installEventFilter(this);
             update_geometry();
-            break;
-        }
+        } break;
         case QEvent::ParentAboutToChange: {
             parent()->removeEventFilter(this);
-            break;
-        }
-        default:
-            break;
+        } break;
+        default: {
+        } break;
     }
     return QWidget::event(event);
 }

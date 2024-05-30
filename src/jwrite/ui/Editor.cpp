@@ -1047,8 +1047,6 @@ void Editor::keyPressEvent(QKeyEvent *e) {
     }
 
     jwrite_profiler_record(GeneralTextEdit);
-
-    e->accept();
 }
 
 void Editor::mousePressEvent(QMouseEvent *e) {
