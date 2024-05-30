@@ -9,11 +9,11 @@ Tokenizer *Tokenizer::build() {
     const auto dir      = QCoreApplication::applicationDirPath() + "/dicts";
     auto       instance = new Tokenizer;
     instance->cutter_   = std::make_unique<cppjieba::Jieba>(
-        (dir + "/jieba.dict.utf8").toStdString(),
-        (dir + "/hmm_model.utf8").toStdString(),
-        (dir + "/user.dict.utf8").toStdString(),
-        (dir + "/idf.utf8").toStdString(),
-        (dir + "/stop_words.utf8").toStdString());
+        (dir + "/jieba.dict.utf8").toLocal8Bit().toStdString(),
+        (dir + "/hmm_model.utf8").toLocal8Bit().toStdString(),
+        (dir + "/user.dict.utf8").toLocal8Bit().toStdString(),
+        (dir + "/idf.utf8").toLocal8Bit().toStdString(),
+        (dir + "/stop_words.utf8").toLocal8Bit().toStdString());
     return instance;
 }
 
