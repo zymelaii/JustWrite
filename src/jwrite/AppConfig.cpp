@@ -4,8 +4,27 @@
 #include <QSettings>
 #include <QDebug>
 #include <memory>
+#include <magic_enum.hpp>
 
 namespace jwrite {
+
+static auto get_color_roles_for_settings() {
+    const QList<QPair<QString, ColorScheme::ColorRole>> color_roles = {
+        {"window",               ColorScheme::Window            },
+        {"window_text",          ColorScheme::WindowText        },
+        {"border",               ColorScheme::Border            },
+        {"panel",                ColorScheme::Panel             },
+        {"text",                 ColorScheme::Text              },
+        {"text_base",            ColorScheme::TextBase          },
+        {"selected_text",        ColorScheme::SelectedText      },
+        {"hover",                ColorScheme::Hover             },
+        {"selected_item",        ColorScheme::SelectedItem      },
+        {"floating_item",        ColorScheme::FloatingItem      },
+        {"floating_item_border", ColorScheme::FloatingItemBorder},
+    };
+    Q_ASSERT(color_roles.size() == magic_enum::enum_count<ColorScheme::ColorRole>());
+    return color_roles;
+}
 
 AppConfig::AppConfig()
     : QObject() {
@@ -69,18 +88,6 @@ void AppConfig::load() {
         return;
     }
 
-    const QList<QPair<QString, ColorScheme::ColorRole>> color_roles = {
-        {"window",        ColorScheme::Window      },
-        {"window_text",   ColorScheme::WindowText  },
-        {"border",        ColorScheme::Border      },
-        {"panel",         ColorScheme::Panel       },
-        {"text",          ColorScheme::Text        },
-        {"text_base",     ColorScheme::TextBase    },
-        {"selected_text", ColorScheme::SelectedText},
-        {"hover",         ColorScheme::Hover       },
-        {"selected_item", ColorScheme::SelectedItem},
-    };
-
     QSettings settings(settings_file, QSettings::IniFormat);
 
     settings.beginGroup("style");
@@ -91,7 +98,7 @@ void AppConfig::load() {
 
     auto scheme = ColorScheme::get_default_scheme_of_theme(theme_);
     settings.beginGroup("scheme");
-    for (const auto& [name, role] : color_roles) {
+    for (const auto& [name, role] : get_color_roles_for_settings()) {
         if (const auto color_name = settings.value(name).toString(); !color_name.isEmpty()) {
             if (auto color = QColor::fromString(color_name); color.isValid()) {
                 scheme[role] = color;
@@ -104,25 +111,15 @@ void AppConfig::load() {
 }
 
 void AppConfig::save() {
-    const QList<QPair<QString, ColorScheme::ColorRole>> color_roles = {
-        {"window",        ColorScheme::Window      },
-        {"window_text",   ColorScheme::WindowText  },
-        {"border",        ColorScheme::Border      },
-        {"panel",         ColorScheme::Panel       },
-        {"text",          ColorScheme::Text        },
-        {"text_base",     ColorScheme::TextBase    },
-        {"selected_text", ColorScheme::SelectedText},
-        {"hover",         ColorScheme::Hover       },
-        {"selected_item", ColorScheme::SelectedItem},
-    };
-
     QSettings settings(settings_file(), QSettings::IniFormat);
     settings.beginGroup("style");
     const auto theme_name = settings.value("theme", "dark").toString();
     settings.setValue("theme", QString{magic_enum::enum_name(theme_).data()}.toLower());
     settings.endGroup();
     settings.beginGroup("scheme");
-    for (const auto& [name, role] : color_roles) { settings.setValue(name, scheme_[role].rgba()); }
+    for (const auto& [name, role] : get_color_roles_for_settings()) {
+        settings.setValue(name, scheme_[role].name(QColor::HexArgb));
+    }
     settings.endGroup();
 }
 
