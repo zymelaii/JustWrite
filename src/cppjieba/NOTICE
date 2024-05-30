@@ -1,0 +1,8 @@
+cppjieba is a 3rd-party library that is contributed by yanyiwu
+on GitHub. I introduce it here and add some patches to the source
+code disable the warnings from my compiler, e.g. unused-variable,
+unused-include, etc.
+
+No changes to the functionality of the library are made.
+
+Authored by: zymelaii <melaiiryer@gmail.com>

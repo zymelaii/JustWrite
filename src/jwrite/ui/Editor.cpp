@@ -48,6 +48,7 @@ Editor::Editor(QWidget *parent)
     context_->resize_viewport(context_->viewport_width, text_area.height());
 
     restrict_rule_ = new TextRestrictRule;
+    tokenizer_     = Tokenizer::build();
 
     timer_enabled_ = true;
 
@@ -78,6 +79,7 @@ Editor::Editor(QWidget *parent)
 Editor::~Editor() {
     delete context_;
     delete restrict_rule_;
+    delete tokenizer_;
     delete input_manager_;
 }
 
@@ -815,8 +817,28 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             move(1, false);
         } break;
         case TextInputCommand::MoveToPrevWord: {
+            const auto block = engine.current_block();
+            const int  len   = cursor.pos;
+            if (len == 0) {
+                move(-1, false);
+            } else {
+                const auto word   = tokenizer_->get_last_word(block->text().left(len).toString());
+                const int  offset = word.length();
+                Q_ASSERT(offset <= cursor.pos);
+                moveTo(block->text_pos + cursor.pos - offset, false);
+            }
         } break;
         case TextInputCommand::MoveToNextWord: {
+            const auto block = engine.current_block();
+            const int  len   = block->text_len() - cursor.pos;
+            if (len == 0) {
+                move(1, false);
+            } else {
+                const auto word   = tokenizer_->get_first_word(block->text().right(len).toString());
+                const int  offset = word.length();
+                Q_ASSERT(offset <= len);
+                moveTo(block->text_pos + cursor.pos + offset, false);
+            }
         } break;
         case TextInputCommand::MoveToPrevLine: {
             verticalMove(true);
@@ -877,8 +899,28 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             del(1);
         } break;
         case TextInputCommand::DeletePrevWord: {
+            const auto block = engine.current_block();
+            const int  len   = cursor.pos;
+            if (context_->has_sel() || len == 0) {
+                del(-1);
+            } else {
+                const auto word   = tokenizer_->get_last_word(block->text().left(len).toString());
+                const int  offset = word.length();
+                Q_ASSERT(offset <= cursor.pos);
+                del(-offset);
+            }
         } break;
         case TextInputCommand::DeleteNextWord: {
+            const auto block = engine.current_block();
+            const int  len   = block->text_len() - cursor.pos;
+            if (context_->has_sel() || len == 0) {
+                del(1);
+            } else {
+                const auto word   = tokenizer_->get_first_word(block->text().right(len).toString());
+                const int  offset = word.length();
+                Q_ASSERT(offset <= len);
+                del(offset);
+            }
         } break;
         case TextInputCommand::DeleteToStartOfLine: {
             const auto &block = engine.current_block();
@@ -919,8 +961,28 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             move(1, true);
         } break;
         case TextInputCommand::SelectPrevWord: {
+            const auto block = engine.current_block();
+            const int  len   = cursor.pos;
+            if (len == 0) {
+                move(-1, true);
+            } else {
+                const auto word   = tokenizer_->get_last_word(block->text().left(len).toString());
+                const int  offset = word.length();
+                Q_ASSERT(offset <= cursor.pos);
+                moveTo(block->text_pos + cursor.pos - offset, true);
+            }
         } break;
         case TextInputCommand::SelectNextWord: {
+            const auto block = engine.current_block();
+            const int  len   = block->text_len() - cursor.pos;
+            if (len == 0) {
+                move(1, true);
+            } else {
+                const auto word   = tokenizer_->get_first_word(block->text().right(len).toString());
+                const int  offset = word.length();
+                Q_ASSERT(offset <= len);
+                moveTo(block->text_pos + cursor.pos + offset, true);
+            }
         } break;
         case TextInputCommand::SelectToPrevLine: {
             auto     &c        = *context_;

@@ -102,8 +102,8 @@ void TextInputCommandManager::load_default() {
     KEYBINDING(MoveToNextBlock);
     KEYBINDING(Backspace, DeletePrevChar);
     KEYBINDING(Delete, DeleteNextChar);
-    KEYBINDING(DeleteEndOfWord, DeletePrevWord);
-    KEYBINDING(DeleteStartOfWord, DeleteNextWord);
+    KEYBINDING(DeleteStartOfWord, DeletePrevWord);
+    KEYBINDING(DeleteEndOfWord, DeleteNextWord);
     KEYBINDING(DeleteToStartOfLine);
     KEYBINDING(DeleteToEndOfLine);
     // KEYBINDING(DeleteToStartOfBlock);

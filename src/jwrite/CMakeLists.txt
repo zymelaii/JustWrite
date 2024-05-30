@@ -21,6 +21,7 @@ target_link_libraries(
 	jwrite-core
 	PUBLIC Qt${QT_VERSION_MAJOR}::Gui
 	PUBLIC magic_enum::magic_enum
+	PUBLIC cppjieba
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCE_FILES})

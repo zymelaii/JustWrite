@@ -128,9 +128,9 @@ void JustWrite::request_open_book(const QString &book_id) {
         .withBlockingJob([this, bm] {
             ui_edit_page_->resetBookSource(bm);
             switchToPage(PageType::Edit);
+            ui_edit_page_->resetWordsCount();
         })
         .withAsyncJob([this, bm] {
-            ui_edit_page_->resetWordsCount();
             ui_edit_page_->flushWordsCount();
             if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
                 ui_edit_page_->openChapter(chapters.back());

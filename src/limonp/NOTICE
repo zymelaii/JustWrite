@@ -1,0 +1,7 @@
+cppjieba is a 3rd-party library that is contributed by yanyiwu on
+GitHub. Only the part depended on by cppjieba is included in this
+repository reference.
+
+No changes to the functionality of the library are made.
+
+Authored by: zymelaii <melaiiryer@gmail.com>

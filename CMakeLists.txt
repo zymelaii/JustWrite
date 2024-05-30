@@ -83,6 +83,11 @@ install(
 )
 
 install(
+    DIRECTORY ${CMAKE_SOURCE_DIR}/assets/dicts
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
+)
+
+install(
     FILES ${CMAKE_SOURCE_DIR}/VERSION
     DESTINATION ${CMAKE_INSTALL_PREFIX}
 )

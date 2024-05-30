@@ -3,6 +3,7 @@
 #include <jwrite/VisualTextEditContext.h>
 #include <jwrite/TextInputCommand.h>
 #include <jwrite/TextRestrictRule.h>
+#include <jwrite/Tokenizer.h>
 #include <QTimer>
 #include <QWidget>
 #include <atomic>
@@ -111,6 +112,7 @@ private:
     VisualTextEditContext    *context_;
     AbstractTextRestrictRule *restrict_rule_;
     TextInputCommandManager  *input_manager_;
+    Tokenizer                *tokenizer_;
 
     int    min_text_line_chars_;
     bool   soft_center_mode_;
