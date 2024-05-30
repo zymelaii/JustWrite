@@ -85,7 +85,6 @@ FloatingMenu::FloatingMenu(QWidget *parent)
 
     setupUi();
     setMouseTracking(true);
-    setAttribute(Qt::WA_Hover);
 
     parent->installEventFilter(this);
     update_geometry();
@@ -119,7 +118,7 @@ void FloatingMenu::setupUi() {
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }
 
-bool FloatingMenu::eventFilter(QObject *obj, QEvent *event) {
+bool FloatingMenu::eventFilter(QObject *watched, QEvent *event) {
     switch (event->type()) {
         case QEvent::Move:
             [[fallthrough]];
@@ -138,7 +137,7 @@ bool FloatingMenu::eventFilter(QObject *obj, QEvent *event) {
         default: {
         } break;
     }
-    return QWidget::eventFilter(obj, event);
+    return QWidget::eventFilter(watched, event);
 }
 
 bool FloatingMenu::event(QEvent *event) {

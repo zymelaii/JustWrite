@@ -1,6 +1,7 @@
 #pragma once
 
 #include <jwrite/ui/Editor.h>
+#include <jwrite/ui/FloatingLabel.h>
 #include <jwrite/ui/StatusBar.h>
 #include <jwrite/ui/TwoLevelTree.h>
 #include <jwrite/ui/FloatingMenu.h>
@@ -101,6 +102,7 @@ private:
     widgetkit::FlatButton   *ui_new_volume_;
     widgetkit::FlatButton   *ui_new_chapter_;
     TwoLevelTree            *ui_book_dir_;
+    FloatingLabel           *ui_word_count_;
     QLabel                  *ui_total_words_;
     QLabel                  *ui_datetime_;
     QWidget                 *ui_sidebar_;

@@ -210,6 +210,14 @@ void EditPage::updateColorScheme(const ColorScheme &scheme) {
         w->set_hover_color(scheme.hover());
         w->reload_icon();
     }
+
+    if (auto w = ui_word_count_) {
+        auto pal = w->palette();
+        pal.setColor(QPalette::Window, scheme.floating_item());
+        pal.setColor(QPalette::Base, scheme.floating_item_border());
+        pal.setColor(QPalette::WindowText, scheme.text());
+        w->setPalette(pal);
+    }
 }
 
 bool EditPage::resetBookSource(AbstractBookManager *book_manager) {
@@ -337,6 +345,7 @@ void EditPage::renameBookDirItem(int id, const QString &title) {
 
 void EditPage::resetWordsCount() {
     ui_total_words_->setText("全速统计中...");
+    ui_word_count_->set_text("统计中");
 }
 
 void EditPage::updateWordsCount(const QString &text, bool text_changed) {
@@ -376,6 +385,7 @@ void EditPage::syncWordsStatus() {
     ui_total_words_->setText(QString("全书共%1字 本章%2字")
                                  .arg(getFriendlyWordCount(total_words_))
                                  .arg(getFriendlyWordCount(chap_words_)));
+    ui_word_count_->set_text(QString("字数 %1").arg(getFriendlyWordCount(chap_words_)));
 }
 
 void EditPage::updateCurrentDateTime() {
@@ -392,6 +402,7 @@ void EditPage::setupUi() {
     ui_editor_     = new Editor;
     ui_status_bar_ = new StatusBar;
     ui_menu_       = new FloatingMenu(ui_editor_);
+    ui_word_count_ = new FloatingLabel(ui_editor_);
 
     ui_sidebar_     = new QWidget;
     ui_new_volume_  = new FlatButton;
@@ -447,6 +458,9 @@ void EditPage::setupUi() {
 
     ui_total_words_ = ui_status_bar_->addItem("", false);
     ui_datetime_    = ui_status_bar_->addItem("", true);
+
+    //! TODO: remove status bar in the future
+    ui_status_bar_->setVisible(false);
 
     auto font = this->font();
     font.setPointSize(10);
