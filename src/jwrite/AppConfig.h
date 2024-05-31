@@ -14,6 +14,13 @@ public:
         UserData,
     };
 
+    enum class FontStyle {
+        Light,
+        Regular,
+        Bold,
+        Italic,
+    };
+
 public:
     AppConfig();
     ~AppConfig() override;
@@ -42,6 +49,12 @@ public:
     QString path(StandardPath path_type) const;
 
     QString settings_file() const;
+
+    QString default_font_family() const {
+        return "Sarasa Gothic SC";
+    }
+
+    QFont font(FontStyle style, int point_size) const;
 
     static AppConfig& get_instance();
 

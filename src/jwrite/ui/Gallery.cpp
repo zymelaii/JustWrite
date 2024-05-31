@@ -351,6 +351,9 @@ void Gallery::drawDisplayCaseMenu(QPainter *p, int index, const QRect &cover_bb)
 void Gallery::paintEvent(QPaintEvent *event) {
     QPainter p(this);
 
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::TextAntialiasing);
+
     const int width = contentsRect().width();
     const int cols  = (width + item_spacing_) / (item_size_.width() + item_spacing_);
 

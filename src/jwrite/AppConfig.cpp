@@ -4,6 +4,7 @@
 #include <QSettings>
 #include <QDebug>
 #include <memory>
+#include <QFontDatabase>
 #include <magic_enum.hpp>
 
 namespace jwrite {
@@ -71,6 +72,14 @@ QString AppConfig::path(StandardPath path_type) const {
 
 QString AppConfig::settings_file() const {
     return QDir::cleanPath(path(StandardPath::UserData) + "/settings.ini");
+}
+
+QFont AppConfig::font(FontStyle style, int point_size) const {
+    const auto family     = default_font_family();
+    const auto style_name = magic_enum::enum_name(style);
+    Q_ASSERT(QFontDatabase::hasFamily(family));
+    Q_ASSERT(QFontDatabase::styles(family).contains(style_name.data()));
+    return QFontDatabase::font(family, style_name.data(), point_size);
 }
 
 AppConfig& AppConfig::get_instance() {

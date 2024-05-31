@@ -1,12 +1,15 @@
 #include <jwrite/ui/JustWrite.h>
 #include <jwrite/ProfileUtils.h>
 #include <jwrite/Version.h>
+#include <jwrite/AppConfig.h>
 #include <QApplication>
 #include <QScreen>
 #include <QFontDatabase>
 #include <QMouseEvent>
 #include <memory>
+#include <magic_enum.hpp>
 
+using jwrite::AppConfig;
 using jwrite::ui::JustWrite;
 
 class JwriteApplication : public QApplication {
@@ -93,6 +96,21 @@ QRect compute_preferred_geometry(const QRect &parent_geo) {
     return QRect(left, top, w, h);
 }
 
+void load_default_fonts() {
+    const auto &config        = AppConfig::get_instance();
+    const auto  home          = config.path(AppConfig::StandardPath::AppHome);
+    const auto  font_path_fmt = QString("%1/fonts/SarasaGothicSC-%2.ttf").arg(home);
+
+    for (const auto font_name : magic_enum::enum_values<AppConfig::FontStyle>()) {
+        const auto &path = font_path_fmt.arg(magic_enum::enum_name(font_name).data());
+        if (!QFile::exists(path)) { continue; }
+        const int id = QFontDatabase::addApplicationFont(path);
+        Q_ASSERT(id != -1);
+    }
+
+    QApplication::setFont(config.font(AppConfig::FontStyle::Light, 16));
+}
+
 int main(int argc, char *argv[]) {
     //! TODO: ensure single jwrite instance in the system
     //! HINT: or ensure the book is always editable in only one instance
@@ -106,9 +124,7 @@ int main(int argc, char *argv[]) {
     QApplication::setApplicationDisplayName("只写");
     QApplication::setApplicationVersion(jwrite::VERSION.toString());
 
-    const auto font_name = u8"更纱黑体 SC Light";
-    QFontDatabase::addApplicationFont(QString("fonts/%1.ttf").arg(font_name));
-    QApplication::setFont(QFont(font_name, 16));
+    load_default_fonts();
 
     auto       screen     = get_current_screen();
     const auto screen_geo = screen->geometry();
