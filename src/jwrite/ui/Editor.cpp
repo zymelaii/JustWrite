@@ -38,6 +38,8 @@ Editor::Editor(QWidget *parent)
     inserted_filter_enabled_   = true;
     drag_sel_flag_             = false;
     oob_drag_sel_flag_         = false;
+    auto_scroll_mode_          = false;
+    busy_loading_              = false;
     ui_cursor_shape_[0]        = Qt::ArrowCursor;
     ui_cursor_shape_[1]        = Qt::ArrowCursor;
 
@@ -261,9 +263,9 @@ void Editor::scrollToStart() {
 
 void Editor::scrollToEnd() {
     const auto [_, max_y_pos] = scrollBound();
-    expected_scroll_          = max_y_pos;
-    context_->scroll_to(expected_scroll_);
-    requestUpdate(true);
+    const double line_spacing = context_->engine.line_spacing_ratio * context_->engine.line_height;
+    const double y_pos        = max_y_pos + line_spacing - context_->viewport_height / 2;
+    scrollTo(y_pos, false);
 }
 
 void Editor::insertRawText(const QString &text) {

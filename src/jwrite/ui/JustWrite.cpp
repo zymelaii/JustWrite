@@ -1006,11 +1006,11 @@ void JustWrite::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void JustWrite::showEvent(QShowEvent *event) {
-    handle_on_visiblity_change(true);
+    handle_on_visiblity_change(false);
 }
 
 void JustWrite::hideEvent(QHideEvent *event) {
-    handle_on_visiblity_change(false);
+    handle_on_visiblity_change(true);
 }
 
 } // namespace jwrite::ui

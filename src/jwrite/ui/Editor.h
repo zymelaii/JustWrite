@@ -16,8 +16,8 @@ class Editor : public QWidget {
     Q_OBJECT
 
 public:
-    virtual ~Editor();
     explicit Editor(QWidget *parent = nullptr);
+    ~Editor() override;
 
 signals:
     void textAreaChanged(QRect area);
