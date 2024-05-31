@@ -98,11 +98,13 @@ std::optional<QString>
 }
 
 TextRestrictRule::Category TextRestrictRule::get_category(QChar c) {
+    //! TODO: unicode categories is complex enough to divide into several limited types, keep it
+    //! simple for now and consider a better solution later
     if (c.isSpace()) { return Category::Space; }
     if (c.isNull()) { return Category::Null; }
     if (c.isDigit() && c.unicode() < 0x7f) { return Category::Digit; }
     if (c.isUpper() || c.isLower() || c.isTitleCase()) { return Category::Alpha; }
-    if (c.isLetter() || c.isSymbol()) { return Category::Normal; }
+    if (c.isLetter() || c.isSymbol() || c.isNumber() && !c.isDigit()) { return Category::Normal; }
     if (c.isPunct()) {
         if (c.unicode() > 0x7f) { return Category::FullwidthPunct; }
         if (c == ',' || c == '?' || c == '!' || c == '.') { return Category::LatinPunct; }
