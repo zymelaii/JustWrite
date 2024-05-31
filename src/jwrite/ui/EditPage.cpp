@@ -124,7 +124,6 @@ EditPage::EditPage(QWidget *parent)
     resetWordsCount();
 
     last_loc_.block_index = -1;
-    command_manager_.load_default();
 
     ui_editor_->installEventFilter(this);
 
@@ -343,6 +342,78 @@ void EditPage::renameBookDirItem(int id, const QString &title) {
     ui_book_dir_->setItemValue(id, title);
 }
 
+void EditPage::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
+    //! TODO: menu style & popup input to edit the new title
+}
+
+void EditPage::createAndOpenNewChapter(int vid) {
+    //! TODO: consider to create the new chapter under the volume which is corresponded to the
+    //! focused top item in book dir
+
+    int volume_index = ui_book_dir_->totalTopItems() - 1;
+    if (vid != -1) {
+        Q_ASSERT(book_manager_->has_volume(vid));
+        volume_index = book_manager_->get_volumes().indexOf(vid);
+    }
+
+    if (volume_index == -1) {
+        addVolume(0, "默认卷");
+        volume_index = 0;
+    } else if (volume_index >= ui_book_dir_->totalTopItems()) {
+        addVolume(volume_index, "");
+    }
+
+    const int cid = addChapter(volume_index, "");
+    openChapter(cid);
+    syncWordsStatus();
+    ui_editor_->update();
+    focusOnEditor();
+    ui_book_dir_->setSubItemSelected(ui_book_dir_->topItemAt(volume_index), cid);
+}
+
+void EditPage::createAndOpenNewChapterUnderActiveVolume() {
+    const int vid     = ui_book_dir_->focusedTopItem();
+    const int item_id = ui_book_dir_->selectedItem();
+    if (vid == -1) {
+        Q_ASSERT(item_id == -1);
+        createAndOpenNewChapter(-1);
+    } else if (vid != item_id) {
+        Q_ASSERT(item_id != -1);
+        Q_ASSERT(item_id == ui_book_dir_->selectedSubItem());
+        createAndOpenNewChapter(vid);
+    } else {
+        createAndOpenNewChapter(vid);
+    }
+}
+
+void EditPage::requestRenameCurrentTocItem() {
+    if (!book_manager_) { return; }
+
+    const int item_id = ui_book_dir_->selectedItem();
+    if (item_id == -1) { return; }
+
+    const int cid = ui_book_dir_->selectedSubItem();
+
+    if (cid != item_id) {
+        Q_ASSERT(item_id == ui_book_dir_->focusedTopItem());
+        requestRenameTocItem(item_id, -1);
+        return;
+    }
+
+    //! ATTENTION: do not use focusTopItem() here to get the vid, it is not always the
+    //! corresponding top item to of the selected sub item
+
+    for (const int vid : book_manager_->get_volumes()) {
+        if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }
+        requestRenameTocItem(vid, cid);
+    }
+}
+
+void EditPage::requestRenameTocItem(int vid, int cid) {
+    if (!book_manager_) { return; }
+    emit renameTocItemRequested(book_manager_->info_ref(), vid, cid);
+}
+
 void EditPage::resetWordsCount() {
     ui_total_words_->setText("全速统计中...");
     ui_word_count_->set_text("统计中");
@@ -539,109 +610,6 @@ void EditPage::setupConnections() {
         });
 }
 
-void EditPage::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
-    //! TODO: menu style & popup input to edit the new title
-}
-
-void EditPage::createAndOpenNewChapter(int vid) {
-    //! TODO: consider to create the new chapter under the volume which is corresponded to the
-    //! focused top item in book dir
-
-    int volume_index = ui_book_dir_->totalTopItems() - 1;
-    if (vid != -1) {
-        Q_ASSERT(book_manager_->has_volume(vid));
-        volume_index = book_manager_->get_volumes().indexOf(vid);
-    }
-
-    if (volume_index == -1) {
-        addVolume(0, "默认卷");
-        volume_index = 0;
-    } else if (volume_index >= ui_book_dir_->totalTopItems()) {
-        addVolume(volume_index, "");
-    }
-
-    const int cid = addChapter(volume_index, "");
-    openChapter(cid);
-    syncWordsStatus();
-    ui_editor_->update();
-    focusOnEditor();
-    ui_book_dir_->setSubItemSelected(ui_book_dir_->topItemAt(volume_index), cid);
-}
-
-void EditPage::createAndOpenNewChapterUnderActiveVolume() {
-    const int vid     = ui_book_dir_->focusedTopItem();
-    const int item_id = ui_book_dir_->selectedItem();
-    if (vid == -1) {
-        Q_ASSERT(item_id == -1);
-        createAndOpenNewChapter(-1);
-    } else if (vid != item_id) {
-        Q_ASSERT(item_id != -1);
-        Q_ASSERT(item_id == ui_book_dir_->selectedSubItem());
-        createAndOpenNewChapter(vid);
-    } else {
-        createAndOpenNewChapter(vid);
-    }
-}
-
-void EditPage::requestRenameCurrentTocItem() {
-    if (!book_manager_) { return; }
-
-    const int item_id = ui_book_dir_->selectedItem();
-    if (item_id == -1) { return; }
-
-    const int cid = ui_book_dir_->selectedSubItem();
-
-    if (cid != item_id) {
-        Q_ASSERT(item_id == ui_book_dir_->focusedTopItem());
-        requestRenameTocItem(item_id, -1);
-        return;
-    }
-
-    //! ATTENTION: do not use focusTopItem() here to get the vid, it is not always the
-    //! corresponding top item to of the selected sub item
-
-    for (const int vid : book_manager_->get_volumes()) {
-        if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }
-        requestRenameTocItem(vid, cid);
-    }
-}
-
-void EditPage::requestRenameTocItem(int vid, int cid) {
-    if (!book_manager_) { return; }
-    emit renameTocItemRequested(book_manager_->info_ref(), vid, cid);
-}
-
-bool EditPage::handleShortcuts(QKeyEvent *event) {
-    if (auto opt = command_manager_.match(event)) {
-        const auto action = *opt;
-        qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
-        switch (action) {
-            case GlobalCommand::ToggleSidebar: {
-                ui_sidebar_->setVisible(!ui_sidebar_->isVisible());
-            } break;
-            case GlobalCommand::ToggleSoftCenterMode: {
-                ui_editor_->setSoftCenterMode(!ui_editor_->softCenterMode());
-            } break;
-            case GlobalCommand::CreateNewChapter: {
-                createAndOpenNewChapterUnderActiveVolume();
-            } break;
-            case GlobalCommand::Rename: {
-                requestRenameCurrentTocItem();
-            } break;
-            case GlobalCommand::DEV_EnableMessyInput: {
-                ui_editor_->setFocus();
-                messy_input_->start();
-            } break;
-        }
-        return true;
-    }
-    return false;
-}
-
-void EditPage::keyPressEvent(QKeyEvent *event) {
-    handleShortcuts(event);
-}
-
 bool EditPage::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         auto e = static_cast<QKeyEvent *>(event);
@@ -652,8 +620,6 @@ bool EditPage::eventFilter(QObject *watched, QEvent *event) {
             !TextInputCommandManager::is_printable_char(key) && messy_input_->is_running()) {
             return true;
         }
-
-        if (const bool done = handleShortcuts(e)) { return true; }
     }
 
     if (event->type() == QEvent::MouseButtonDblClick) {

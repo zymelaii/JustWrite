@@ -12,6 +12,7 @@
 #include <jwrite/ProfileUtils.h>
 #include <widget-kit/TextInputDialog.h>
 #include <widget-kit/OverlaySurface.h>
+#include <QMouseEvent>
 #include <QScrollBar>
 #include <QVBoxLayout>
 #include <QToolTip>
@@ -123,7 +124,7 @@ void JustWrite::request_open_book(const QString &book_id) {
     auto bm = books_.value(book_id);
     Q_ASSERT(bm);
 
-    waitTaskBuilder()
+    get_wait_builder()
         .withPolicy(Progress::UseMinimumDisplayTime, false)
         .withBlockingJob([this, bm] {
             ui_edit_page_->resetBookSource(bm);
@@ -343,6 +344,38 @@ bool JustWrite::do_export_book_as_epub(const QString &book_id, const QString &pa
     return true;
 }
 
+void JustWrite::set_fullscreen_mode(bool enable) {
+    const auto ws     = windowState();
+    const auto new_ws = enable ? (ws | Qt::WindowFullScreen) : (ws & ~Qt::WindowFullScreen);
+
+    const auto ti_removed  = enable ? TI_ExitFullscreen : TI_Fullscreen;
+    const auto ti_inserted = enable ? TI_Fullscreen : TI_ExitFullscreen;
+
+    for (auto &mask : page_toolbar_mask_) {
+        mask.remove(ti_removed);
+        mask.insert(ti_inserted);
+    }
+
+    ui_toolbar_->apply_mask(page_toolbar_mask_[current_page_]);
+
+    if (enable) {
+        ui_title_bar_->setVisible(false);
+        ui_toolbar_->setVisible(false);
+        ui_toolbar_->installEventFilter(this);
+    } else {
+        ui_title_bar_->setVisible(true);
+        ui_toolbar_->setVisible(true);
+        ui_toolbar_->removeEventFilter(this);
+    }
+
+    setWindowState(new_ws);
+    fullscreen_ = enable;
+}
+
+void JustWrite::trigger_shortcut(GlobalCommand shortcut) {
+    emit on_trigger_shortcut(shortcut);
+}
+
 void JustWrite::handle_gallery_on_click(int index) {
     if (index == ui_gallery_->totalItems()) { request_create_new_book(); }
 }
@@ -484,9 +517,49 @@ void JustWrite::handle_on_open_gallery() {
     switchToPage(PageType::Gallery);
 }
 
+void JustWrite::handle_on_enter_fullscreen() {
+    set_fullscreen_mode(true);
+}
+
+void JustWrite::handle_on_exit_fullscreen() {
+    set_fullscreen_mode(false);
+}
+
+void JustWrite::handle_on_visiblity_change(bool visible) {
+    ui_tray_icon_->setVisible(visible);
+}
+
+void JustWrite::handle_on_trigger_shortcut(GlobalCommand shortcut) {
+    switch (shortcut) {
+        case GlobalCommand::ToggleFullscreen: {
+            set_fullscreen_mode(!fullscreen_);
+        } break;
+        case GlobalCommand::ToggleSidebar: {
+            if (current_page_ == PageType::Edit) { ui_edit_page_->toggle_sidebar(); }
+        } break;
+        case GlobalCommand::ToggleSoftCenterMode: {
+            if (current_page_ == PageType::Edit) { ui_edit_page_->toggle_soft_center_mode(); }
+        } break;
+        case GlobalCommand::CreateNewChapter: {
+            if (current_page_ == PageType::Edit) {
+                ui_edit_page_->createAndOpenNewChapterUnderActiveVolume();
+            }
+        } break;
+        case GlobalCommand::Rename: {
+            if (current_page_ == PageType::Edit) { ui_edit_page_->requestRenameCurrentTocItem(); }
+        } break;
+        case GlobalCommand::DEV_EnableMessyInput: {
+            if (current_page_ == PageType::Edit) { ui_edit_page_->start_messy_input(); }
+        } break;
+    }
+}
+
 JustWrite::JustWrite() {
     setupUi();
     setupConnections();
+    setMouseTracking(true);
+
+    set_fullscreen_mode(windowState().testFlag(Qt::WindowFullScreen));
 
     switchToPage(PageType::Gallery);
 
@@ -582,19 +655,6 @@ void JustWrite::setupUi() {
     top_layout->addWidget(ui_title_bar_);
     top_layout->addWidget(container);
 
-    enum ToolbarItemType {
-        Gallery,
-        Draft,
-        Favorites,
-        Trash,
-        Export,
-        Share,
-        Fullscreen,
-        ExitFullscreen,
-        Help,
-        Settings,
-    };
-
     struct ToolbarItem {
         ToolbarItemType   type;
         QString           tip;
@@ -604,16 +664,16 @@ void JustWrite::setupUi() {
     };
 
     QList<ToolbarItem> toolbar_items{
-        {Gallery,        "书库",       "toolbar/gallery",         AppAction::OpenBookGallery, false},
-        {Draft,          "编辑",       "toolbar/draft",           AppAction::OpenEditor,      false},
-        {Favorites,      "素材收藏", "toolbar/favorites",       AppAction::OpenFavorites,   false},
-        {Trash,          "回收站",    "toolbar/trash",           AppAction::OpenTrashBin,    false},
-        {Export,         "导出",       "toolbar/export",          AppAction::Export,          false},
-        {Share,          "分享",       "toolbar/share",           AppAction::Share,           false},
-        {Fullscreen,     "全屏",       "toolbar/fullscreen",      AppAction::Fullscreen,      true },
-        {ExitFullscreen, "退出全屏", "toolbar/fullscreen-exit", AppAction::ExitFullscreen,  true },
-        {Help,           "帮助",       "toolbar/help",            AppAction::OpenHelp,        true },
-        {Settings,       "设置",       "toolbar/settings",        AppAction::OpenSettings,    true },
+        {TI_Gallery,        "书库",       "toolbar/gallery",         AppAction::OpenBookGallery, false},
+        {TI_Draft,          "编辑",       "toolbar/draft",           AppAction::OpenEditor,      false},
+        {TI_Favorites,      "素材收藏", "toolbar/favorites",       AppAction::OpenFavorites,   false},
+        {TI_Trash,          "回收站",    "toolbar/trash",           AppAction::OpenTrashBin,    false},
+        {TI_Export,         "导出",       "toolbar/export",          AppAction::Export,          false},
+        {TI_Share,          "分享",       "toolbar/share",           AppAction::Share,           false},
+        {TI_Fullscreen,     "全屏",       "toolbar/fullscreen",      AppAction::Fullscreen,      true },
+        {TI_ExitFullscreen, "退出全屏", "toolbar/fullscreen-exit", AppAction::ExitFullscreen,  true },
+        {TI_Help,           "帮助",       "toolbar/help",            AppAction::OpenHelp,        true },
+        {TI_Settings,       "设置",       "toolbar/settings",        AppAction::OpenSettings,    true },
     };
 
     const auto &actions = AppAction::get_instance();
@@ -623,8 +683,9 @@ void JustWrite::setupUi() {
         ui_toolbar_->add_item(tip, icon, actions.get(action), bottom_side);
     }
 
-    page_toolbar_mask_.insert(PageType::Gallery, {Gallery, Export, Share, ExitFullscreen});
-    page_toolbar_mask_.insert(PageType::Edit, {Draft, ExitFullscreen});
+    page_toolbar_mask_.insert(
+        PageType::Gallery, {TI_Gallery, TI_Export, TI_Share, TI_ExitFullscreen});
+    page_toolbar_mask_.insert(PageType::Edit, {TI_Draft, TI_ExitFullscreen});
 
     ui_surface_        = new OverlaySurface;
     const bool succeed = ui_surface_->setup(container);
@@ -663,6 +724,8 @@ void JustWrite::setupConnections() {
     actions.bind(AppAction::OpenHelp, this, &JustWrite::handle_on_open_help);
     actions.bind(AppAction::OpenSettings, this, &JustWrite::handle_on_open_settings);
     actions.bind(AppAction::Export, this, &JustWrite::handle_edit_page_on_export);
+    actions.bind(AppAction::Fullscreen, this, &JustWrite::handle_on_enter_fullscreen);
+    actions.bind(AppAction::ExitFullscreen, this, &JustWrite::handle_on_exit_fullscreen);
 
     actions.attach(AppAction::OpenBookGallery, ui_edit_page_, &EditPage::quitEditRequested);
     actions.attach(AppAction::OpenSettings, ui_edit_page_, &EditPage::openSettingsRequested);
@@ -686,6 +749,7 @@ void JustWrite::setupConnections() {
         this,
         &JustWrite::handle_on_page_change,
         Qt::QueuedConnection);
+    connect(this, &JustWrite::on_trigger_shortcut, this, &JustWrite::handle_on_trigger_shortcut);
 }
 
 void JustWrite::requestInitFromLocalStorage() {
@@ -926,12 +990,28 @@ void JustWrite::switchToPage(PageType page) {
     emit pageChanged(page);
 }
 
+bool JustWrite::eventFilter(QObject *watched, QEvent *event) {
+    if (watched == ui_toolbar_ && event->type() == QEvent::Leave) {
+        Q_ASSERT(fullscreen_);
+        ui_toolbar_->hide();
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
+void JustWrite::mouseMoveEvent(QMouseEvent *event) {
+    //! NOTE: depends on JwriteApplication to capture mouse-move-events from child widgets
+    qDebug() << "accept!";
+    if (fullscreen_ && ui_toolbar_->isHidden()) {
+        if (const auto pos = event->pos(); pos.x() >= 0 && pos.x() <= 8) { ui_toolbar_->show(); }
+    }
+}
+
 void JustWrite::showEvent(QShowEvent *event) {
-    ui_tray_icon_->hide();
+    handle_on_visiblity_change(true);
 }
 
 void JustWrite::hideEvent(QHideEvent *event) {
-    ui_tray_icon_->show();
+    handle_on_visiblity_change(false);
 }
 
 } // namespace jwrite::ui

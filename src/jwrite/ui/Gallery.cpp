@@ -43,6 +43,7 @@ void Gallery::updateDisplayCaseItem(int index, const BookInfo &book_info) {
     QImage cover(cover_url);
     if (cover.isNull()) { return; }
 
+    //! TODO: scale accoding to dpi
     cover = cover.scaled(item_size_, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
 
     DisplayCaseItem item{

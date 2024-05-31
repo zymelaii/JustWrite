@@ -8,6 +8,7 @@ void GlobalCommandManager::load_default() {
 #define KEYBINDING(cmd, key_name) \
     insert_or_update(QKeySequence::fromString(key_name), GlobalCommand::cmd)
 
+    KEYBINDING(ToggleFullscreen, "F11");
     KEYBINDING(ToggleSidebar, "Ctrl+Alt+B");
     KEYBINDING(ToggleSoftCenterMode, "Ctrl+E");
     KEYBINDING(CreateNewChapter, "Ctrl+N");

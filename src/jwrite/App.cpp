@@ -1,16 +1,88 @@
 #include <jwrite/ui/JustWrite.h>
 #include <jwrite/ProfileUtils.h>
 #include <jwrite/Version.h>
-#include <QGuiApplication>
 #include <QApplication>
 #include <QScreen>
 #include <QFontDatabase>
+#include <QMouseEvent>
 #include <memory>
+
+using jwrite::ui::JustWrite;
+
+class JwriteApplication : public QApplication {
+public:
+    JwriteApplication(int &argc, char **argv)
+        : QApplication(argc, argv)
+        , client_{nullptr} {}
+
+public:
+    void bind(JustWrite *client) {
+        client_ = client;
+    }
+
+protected:
+    void notify_client_on_mouse_move(QWidget *receiver, QMouseEvent *event) {
+        Q_ASSERT(client_);
+        if (receiver == client_) { return; }
+
+        //! ATTENTION: this only ensures that jwrite can listen for mouse-move-events from the child
+        //! widgets, YOU must enables the mouse tracking for jwrite to ensure that it receives these
+        //! events properly
+
+        auto cloned = new QMouseEvent(
+            QEvent::MouseMove,
+            client_->mapFromGlobal(event->globalPosition()),
+            event->globalPosition(),
+            event->button(),
+            event->buttons(),
+            event->modifiers());
+        postEvent(const_cast<JustWrite *>(client_), cloned);
+    }
+
+    bool filter_key_press_event(QKeyEvent *event) {
+        Q_ASSERT(client_);
+        if (auto opt = client_->try_match_shortcut(event)) {
+            client_->trigger_shortcut(*opt);
+            return true;
+        }
+        return false;
+    }
+
+    bool notify(QObject *receiver, QEvent *event) override {
+        if (client_ && receiver->isWidgetType()) {
+            const auto w = qobject_cast<QWidget *>(receiver);
+            switch (event->type()) {
+                case QEvent::MouseMove: {
+                    notify_client_on_mouse_move(w, static_cast<QMouseEvent *>(event));
+                } break;
+                case QEvent::KeyPress: {
+                    if (const bool done = filter_key_press_event(static_cast<QKeyEvent *>(event))) {
+                        return true;
+                    }
+                } break;
+                case QEvent::ScreenChangeInternal: {
+                    if (client_ == w && client_->is_fullscreen_mode()) {
+                        //! NOTE: switch screen in fullscreen mode will destroy the original
+                        //! geometry, force to refresh it to keep the fullscreenn mode behaves well
+                        client_->set_fullscreen_mode(false);
+                        client_->set_fullscreen_mode(true);
+                    }
+                }
+                default: {
+                } break;
+            }
+        }
+        return QApplication::notify(receiver, event);
+    }
+
+private:
+    JustWrite *client_;
+};
 
 constexpr QSize PREFERRED_CLIENT_SIZE(1000, 600);
 
 QScreen *get_current_screen() {
-    return QGuiApplication::screenAt(QCursor::pos());
+    return QApplication::screenAt(QCursor::pos());
 }
 
 QRect compute_preferred_geometry(const QRect &parent_geo) {
@@ -25,8 +97,8 @@ int main(int argc, char *argv[]) {
     //! TODO: ensure single jwrite instance in the system
     //! HINT: or ensure the book is always editable in only one instance
 
-    QGuiApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
-    QApplication app(argc, argv);
+    QApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
+    JwriteApplication app(argc, argv);
 
     QApplication::setOrganizationDomain("jwrite");
     QApplication::setOrganizationName("github.com/zymelaii/jwrite");
@@ -43,7 +115,9 @@ int main(int argc, char *argv[]) {
 
     setup_jwrite_profiler(10);
 
-    auto client = std::make_unique<jwrite::ui::JustWrite>();
+    auto client = std::make_unique<JustWrite>();
+    app.bind(client.get());
+
     client->setGeometry(compute_preferred_geometry(screen_geo));
     client->show();
 

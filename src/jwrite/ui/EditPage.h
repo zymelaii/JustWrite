@@ -54,11 +54,29 @@ public:
     void focusOnEditor();
 
     void renameBookDirItem(int id, const QString &title);
+    void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
+    void createAndOpenNewChapter(int vid);
+    void createAndOpenNewChapterUnderActiveVolume();
+    void requestRenameCurrentTocItem();
+    void requestRenameTocItem(int vid, int cid);
 
     void resetWordsCount();
     void updateWordsCount(const QString &text, bool text_changed);
     void flushWordsCount();
     void syncWordsStatus();
+
+    void toggle_sidebar() {
+        ui_sidebar_->setVisible(!ui_sidebar_->isVisible());
+    }
+
+    void toggle_soft_center_mode() {
+        ui_editor_->setSoftCenterMode(!ui_editor_->softCenterMode());
+    }
+
+    void start_messy_input() {
+        ui_editor_->setFocus();
+        messy_input_->start();
+    }
 
     Editor *editor() {
         return ui_editor_;
@@ -75,18 +93,9 @@ protected:
     void setupUi();
     void setupConnections();
 
-    void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
-    void createAndOpenNewChapter(int vid);
-    void createAndOpenNewChapterUnderActiveVolume();
-    void requestRenameCurrentTocItem();
-    void requestRenameTocItem(int vid, int cid);
-    bool handleShortcuts(QKeyEvent *event);
-
-    void keyPressEvent(QKeyEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
-    GlobalCommandManager                      command_manager_;
     MessyInputWorker                         *messy_input_;
     AbstractWordCounter                      *word_counter_;
     AbstractBookManager                      *book_manager_;

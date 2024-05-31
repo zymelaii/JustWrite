@@ -7,6 +7,7 @@
 namespace jwrite {
 
 enum class GlobalCommand {
+    ToggleFullscreen,
     ToggleSidebar,
     ToggleSoftCenterMode,
     CreateNewChapter,

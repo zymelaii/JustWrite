@@ -8,12 +8,13 @@
 #include <jwrite/GlobalCommand.h>
 #include <widget-kit/OverlaySurface.h>
 #include <widget-kit/Progress.h>
+#include <QWKWidgets/widgetwindowagent.h>
 #include <QWidget>
 #include <QStackedWidget>
 #include <QStackedLayout>
 #include <QSystemTrayIcon>
 #include <functional>
-#include <QWKWidgets/widgetwindowagent.h>
+#include <optional>
 
 namespace jwrite::ui {
 
@@ -35,6 +36,23 @@ public:
         PlainText,
         ePub,
     };
+
+protected:
+    enum ToolbarItemType {
+        TI_Gallery,
+        TI_Draft,
+        TI_Favorites,
+        TI_Trash,
+        TI_Export,
+        TI_Share,
+        TI_Fullscreen,
+        TI_ExitFullscreen,
+        TI_Help,
+        TI_Settings,
+    };
+
+signals:
+    void on_trigger_shortcut(GlobalCommand shortcut);
 
 protected:
     void request_create_new_book();
@@ -60,6 +78,14 @@ protected:
     bool do_export_book_as_plain_text(const QString &book_id, const QString &path);
     bool do_export_book_as_epub(const QString &book_id, const QString &path);
 
+public:
+    bool is_fullscreen_mode() const {
+        return fullscreen_;
+    }
+
+    void set_fullscreen_mode(bool enable);
+    void trigger_shortcut(GlobalCommand shortcut);
+
 public slots:
     void handle_gallery_on_click(int index);
     void handle_gallery_on_menu_action(int index, Gallery::MenuAction action);
@@ -76,14 +102,22 @@ public slots:
     void handle_on_toggle_maximize();
     void handle_on_close();
     void handle_on_open_gallery();
+    void handle_on_enter_fullscreen();
+    void handle_on_exit_fullscreen();
+    void handle_on_visiblity_change(bool visible);
+    void handle_on_trigger_shortcut(GlobalCommand shortcut);
 
 public:
     QString get_default_author() const;
     void    set_default_author(const QString &author, bool force);
 
+    std::optional<GlobalCommand> try_match_shortcut(QKeyEvent *event) const {
+        return command_manager_.match(event);
+    }
+
     void wait(std::function<void()> job);
 
-    static widgetkit::Progress::Builder waitTaskBuilder() {
+    static widgetkit::Progress::Builder get_wait_builder() {
         return widgetkit::Progress::Builder{};
     }
 
@@ -110,6 +144,8 @@ protected:
 
     void switchToPage(PageType page);
 
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
 
@@ -120,6 +156,7 @@ private:
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;
     GlobalCommandManager                 command_manager_;
+    bool                                 fullscreen_;
 
     QSystemTrayIcon           *ui_tray_icon_;
     TitleBar                  *ui_title_bar_;
