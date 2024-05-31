@@ -1018,6 +1018,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             select(block->text_pos, block->text_pos + block->text_len());
         } break;
         case TextInputCommand::SelectPrevPage: {
+            jwrite_profiler_start(SelectPage);
             const auto   origin = context_->get_vpos_at_cursor();
             const QPoint dest(
                 origin.x(), origin.y() - context_->viewport_y_pos - context_->viewport_height);
@@ -1025,8 +1026,10 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             Q_ASSERT(dest_loc.block_index != -1);
             const int pos = engine.active_blocks[dest_loc.block_index]->text_pos + dest_loc.pos;
             moveTo(pos, true);
+            jwrite_profiler_record(SelectPage);
         } break;
         case TextInputCommand::SelectNextPage: {
+            jwrite_profiler_start(SelectPage);
             const auto   origin = context_->get_vpos_at_cursor();
             const QPoint dest(
                 origin.x(), origin.y() - context_->viewport_y_pos + context_->viewport_height);
@@ -1034,6 +1037,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             Q_ASSERT(dest_loc.block_index != -1);
             const int pos = engine.active_blocks[dest_loc.block_index]->text_pos + dest_loc.pos;
             moveTo(pos, true);
+            jwrite_profiler_record(SelectPage);
         } break;
         case TextInputCommand::SelectToStartOfDoc: {
             moveTo(0, true);

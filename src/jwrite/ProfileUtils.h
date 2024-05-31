@@ -32,6 +32,7 @@ enum class ProfileTarget {
     GeneralTextEdit,
     SwitchChapter,
     WordCounterCost,
+    SelectPage,
 };
 
 class Profiler : public QObject {
