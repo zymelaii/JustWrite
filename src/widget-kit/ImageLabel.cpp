@@ -1,4 +1,5 @@
 #include <widget-kit/ImageLabel.h>
+#include <QScreen>
 #include <QPainter>
 
 namespace widgetkit {
@@ -42,8 +43,10 @@ void ImageLabel::setupUi() {
 void ImageLabel::reloadImage() {
     QPixmap pixmap(image_path_);
     if (pixmap.isNull()) { return; }
-    cached_pixmap_ =
-        pixmap.scaled(view_size_, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+    cached_pixmap_ = pixmap.scaled(
+        view_size_ * screen()->devicePixelRatio(),
+        Qt::KeepAspectRatioByExpanding,
+        Qt::SmoothTransformation);
     update();
 }
 

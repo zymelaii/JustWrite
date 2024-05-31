@@ -1000,7 +1000,6 @@ bool JustWrite::eventFilter(QObject *watched, QEvent *event) {
 
 void JustWrite::mouseMoveEvent(QMouseEvent *event) {
     //! NOTE: depends on JwriteApplication to capture mouse-move-events from child widgets
-    qDebug() << "accept!";
     if (fullscreen_ && ui_toolbar_->isHidden()) {
         if (const auto pos = event->pos(); pos.x() >= 0 && pos.x() <= 8) { ui_toolbar_->show(); }
     }
