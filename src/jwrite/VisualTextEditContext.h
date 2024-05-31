@@ -83,8 +83,22 @@ struct VisualTextEditContext {
      */
     bool set_cursor_to_textloc(const TextLoc &loc, int hint);
 
-    int     get_column_at_vpos(const TextLine &line, double x_pos) const;
-    TextLoc get_textloc_at_vpos(const QPoint &pos) const;
+    /*!
+     * \param [in] line the line to get column from
+     * \param [in] x_pos x position relative to the left edge of the viewport
+     */
+    int get_column_at_vpos(const TextLine &line, double x_pos) const;
+
+    /*!
+     * \param [in] pos cursor position relative to viewport top-left corner
+     * \param [in] clip whether to clip the position to the viewport
+     */
+    TextLoc get_textloc_at_rel_vpos(const QPoint &pos, bool clip) const;
+
+    /*!
+     * \return the absolute position of the cursor in the global text context
+     */
+    QPointF get_vpos_at_cursor() const;
 
     void begin_preedit();
     void update_preedit(const QString &text);
@@ -118,5 +132,7 @@ struct VisualTextEditContext {
     bool vertical_move(bool up);
     void scroll_to(double pos);
 };
+
+QDebug operator<<(QDebug stream, const VisualTextEditContext::TextLoc &text_loc);
 
 }; // namespace jwrite

@@ -533,7 +533,7 @@ void Editor::drawTextArea(QPainter *p) {
 
 bool Editor::updateTextLocToVisualPos(const QPoint &vpos) {
     const auto &e   = context_->engine;
-    const auto  loc = context_->get_textloc_at_vpos(vpos);
+    const auto  loc = context_->get_textloc_at_rel_vpos(vpos, true);
     Q_ASSERT(loc.block_index != -1);
     const auto block = e.active_blocks[loc.block_index];
     moveTo(block->text_pos + loc.pos, true);
@@ -1018,8 +1018,22 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             select(block->text_pos, block->text_pos + block->text_len());
         } break;
         case TextInputCommand::SelectPrevPage: {
+            const auto   origin = context_->get_vpos_at_cursor();
+            const QPoint dest(
+                origin.x(), origin.y() - context_->viewport_y_pos - context_->viewport_height);
+            const auto dest_loc = context_->get_textloc_at_rel_vpos(dest, false);
+            Q_ASSERT(dest_loc.block_index != -1);
+            const int pos = engine.active_blocks[dest_loc.block_index]->text_pos + dest_loc.pos;
+            moveTo(pos, true);
         } break;
         case TextInputCommand::SelectNextPage: {
+            const auto   origin = context_->get_vpos_at_cursor();
+            const QPoint dest(
+                origin.x(), origin.y() - context_->viewport_y_pos + context_->viewport_height);
+            const auto dest_loc = context_->get_textloc_at_rel_vpos(dest, false);
+            Q_ASSERT(dest_loc.block_index != -1);
+            const int pos = engine.active_blocks[dest_loc.block_index]->text_pos + dest_loc.pos;
+            moveTo(pos, true);
         } break;
         case TextInputCommand::SelectToStartOfDoc: {
             moveTo(0, true);
@@ -1088,7 +1102,7 @@ void Editor::mousePressEvent(QMouseEvent *e) {
     if (engine.is_empty() || engine.is_dirty()) { return; }
     if (engine.preedit) { return; }
 
-    const auto loc = context_->get_textloc_at_vpos(e->pos() - textArea().topLeft());
+    const auto loc = context_->get_textloc_at_rel_vpos(e->pos() - textArea().topLeft(), true);
     Q_ASSERT(loc.block_index != -1);
 
     const bool success = context_->set_cursor_to_textloc(loc, 0);
@@ -1113,7 +1127,7 @@ void Editor::mouseDoubleClickEvent(QMouseEvent *e) {
     context_->unset_sel();
 
     if (e->button() == Qt::LeftButton) {
-        const auto loc = context_->get_textloc_at_vpos(e->pos() - textArea().topLeft());
+        const auto loc = context_->get_textloc_at_rel_vpos(e->pos() - textArea().topLeft(), true);
         if (loc.block_index != -1) {
             const auto block = context_->engine.active_blocks[loc.block_index];
             select(block->text_pos, block->text_pos + block->text_len());

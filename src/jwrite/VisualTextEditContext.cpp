@@ -180,13 +180,15 @@ int VisualTextEditContext::get_column_at_vpos(const TextLine &line, double x_pos
     return col;
 }
 
-VisualTextEditContext::TextLoc VisualTextEditContext::get_textloc_at_vpos(const QPoint &pos) const {
+VisualTextEditContext::TextLoc
+    VisualTextEditContext::get_textloc_at_rel_vpos(const QPoint &pos, bool clip) const {
     Q_ASSERT(!engine.preedit);
 
     TextLoc loc{};
 
     const double line_spacing = engine.line_height * engine.line_spacing_ratio;
-    const double target_y_pos = qBound(0, pos.y(), viewport_height) + viewport_y_pos;
+    const double y_pos        = clip ? qBound(0, pos.y(), viewport_height) : pos.y();
+    const double target_y_pos = y_pos + viewport_y_pos;
 
     int    index     = -1;
     double rel_y_pos = 0.0;
@@ -234,6 +236,69 @@ VisualTextEditContext::TextLoc VisualTextEditContext::get_textloc_at_vpos(const 
     loc.pos         = line.text_offset() + col;
 
     return loc;
+}
+
+QPointF VisualTextEditContext::get_vpos_at_cursor() const {
+    Q_ASSERT(!engine.preedit);
+    Q_ASSERT(!engine.is_dirty());
+    Q_ASSERT(engine.is_cursor_available());
+
+    const auto &fm     = engine.fm;
+    const auto &cursor = engine.cursor;
+    const auto &block  = engine.current_block();
+    const auto &line   = block->current_line();
+
+    const auto &d               = cached_render_state;
+    const bool  use_cached_data = cached_render_data_ready && d.found_visible_block
+                              && d.visible_block.first <= engine.active_block_index
+                              && d.visible_block.last >= engine.active_block_index;
+
+    const int    leading_space = line.is_first_line() ? engine.standard_char_width * 2 : 0;
+    const double line_spacing  = engine.line_height * engine.line_spacing_ratio;
+
+    double x_pos = leading_space + cursor.col * line.char_spacing();
+    for (const auto c : line.text().left(cursor.col)) { x_pos += fm.horizontalAdvance(c); }
+
+    double y_pos = 0.0;
+    if (use_cached_data) {
+        y_pos = d.cached_block_y_pos[engine.active_block_index];
+    } else {
+        int start = -1;
+        int end   = -1;
+        int inc   = 0;
+
+        if (!d.found_visible_block) {
+            y_pos = 0.0;
+            start = 0;
+            end   = engine.active_block_index;
+            inc   = 1;
+        } else if (d.visible_block.first > engine.active_block_index) {
+            y_pos = d.cached_block_y_pos[d.visible_block.first];
+            start = d.visible_block.first - 1;
+            end   = engine.active_block_index - 1;
+            inc   = -1;
+        } else if (d.visible_block.last < engine.active_block_index) {
+            y_pos = d.cached_block_y_pos[d.visible_block.last];
+            start = d.visible_block.last;
+            end   = engine.active_block_index;
+            inc   = 1;
+        } else {
+            Q_UNREACHABLE();
+        }
+
+        double offset = 0.0;
+        for (int i = start; i != end; i += inc) {
+            const auto   block   = engine.active_blocks[i];
+            const double stride  = block->lines.size() * line_spacing + engine.block_spacing;
+            offset              += stride;
+        }
+
+        y_pos += inc > 0 ? offset : -offset;
+    }
+
+    y_pos += cursor.row * line_spacing;
+
+    return QPointF(x_pos, y_pos);
 }
 
 void VisualTextEditContext::begin_preedit() {
@@ -447,6 +512,12 @@ bool VisualTextEditContext::vertical_move(bool up) {
 void VisualTextEditContext::scroll_to(double pos) {
     viewport_y_pos           = pos;
     cached_render_data_ready = false;
+}
+
+QDebug operator<<(QDebug stream, const VisualTextEditContext::TextLoc &text_loc) {
+    stream.nospace() << "TextLoc[index=" << text_loc.block_index << ",row=" << text_loc.row
+                     << ",col=" << text_loc.col << ",pos=" << text_loc.pos << "]";
+    return stream;
 }
 
 } // namespace jwrite
