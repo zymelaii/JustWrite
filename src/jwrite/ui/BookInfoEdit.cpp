@@ -5,25 +5,17 @@
 
 namespace jwrite::ui {
 
-BookInfoEdit::BookInfoEdit()
-    : widgetkit::OverlayDialog() {
-    setupUi();
-    setupConnections();
-}
-
-BookInfoEdit::~BookInfoEdit() {}
-
-void BookInfoEdit::setTitle(const QString &title) {
+void BookInfoEdit::set_title(const QString &title) {
     ui_title_edit_->setText(title);
     book_info_.author = title;
 }
 
-void BookInfoEdit::setAuthor(const QString &author) {
+void BookInfoEdit::set_author(const QString &author) {
     ui_author_edit_->setText(author);
     book_info_.author = author;
 }
 
-void BookInfoEdit::setCover(const QString &cover_url) {
+void BookInfoEdit::set_cover(const QString &cover_url) {
     if (cover_url.isEmpty()) { return; }
 
     QImage image(cover_url);
@@ -33,14 +25,14 @@ void BookInfoEdit::setCover(const QString &cover_url) {
     book_info_.cover_url = cover_url;
 }
 
-void BookInfoEdit::setBookInfo(const BookInfo &info) {
+void BookInfoEdit::set_book_info(const BookInfo &info) {
     book_info_ = info;
-    setTitle(info.title);
-    setAuthor(info.author);
-    setCover(info.cover_url);
+    set_title(info.title);
+    set_author(info.author);
+    set_cover(info.cover_url);
 }
 
-QString BookInfoEdit::getCoverPath(QWidget *parent, bool validate, QImage *out_image) {
+QString BookInfoEdit::select_cover(QWidget *parent, bool validate, QImage *out_image) {
     const auto filter = "图片 (*.bmp *.jpg *.jpeg *.png)";
     auto       path   = QFileDialog::getOpenFileName(parent, "选择封面", "", filter);
 
@@ -57,25 +49,36 @@ QString BookInfoEdit::getCoverPath(QWidget *parent, bool validate, QImage *out_i
 }
 
 std::optional<BookInfo>
-    BookInfoEdit::getBookInfo(widgetkit::OverlaySurface *surface, const BookInfo &initial) {
+    BookInfoEdit::get_book_info(widgetkit::OverlaySurface *surface, const BookInfo &initial) {
     auto edit = std::make_unique<BookInfoEdit>();
-    edit->setBookInfo(initial);
-    const int request = edit->exec(surface);
-    if (request == BookInfoEdit::Submit) {
+    edit->set_book_info(initial);
+    edit->exec(surface);
+    if (edit->isAccepted()) {
         return {edit->book_info_};
     } else {
         return std::nullopt;
     }
 }
 
-void BookInfoEdit::selectCoverImage() {
+void BookInfoEdit::handle_on_select_cover() {
     QImage     image{};
-    const auto path = getCoverPath(this, true, &image);
+    const auto path = select_cover(this, true, &image);
     if (path.isEmpty()) { return; }
-    setCover(path);
+    set_cover(path);
 }
 
-void BookInfoEdit::setupUi() {
+void BookInfoEdit::handle_on_submit() {
+    book_info_.title  = ui_title_edit_->text();
+    book_info_.author = ui_author_edit_->text();
+    accept();
+}
+
+BookInfoEdit::BookInfoEdit()
+    : widgetkit::OverlayDialog() {
+    init();
+}
+
+void BookInfoEdit::init() {
     ui_title_edit_   = new QtMaterialTextField;
     ui_author_edit_  = new QtMaterialTextField;
     ui_cover_        = new widgetkit::ImageLabel;
@@ -161,22 +164,17 @@ void BookInfoEdit::setupUi() {
     ui_title_edit_->setLabelFontSize(12);
     ui_author_edit_->setLabelFontSize(12);
 
-    setCover(":/res/default-cover.png");
+    set_cover(":/res/default-cover.png");
 
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-}
 
-void BookInfoEdit::setupConnections() {
-    connect(ui_submit_, &widgetkit::FlatButton::pressed, this, [this] {
-        book_info_.title  = ui_title_edit_->text();
-        book_info_.author = ui_author_edit_->text();
-        exit(Request::Submit);
-    });
-    connect(ui_cancel_, &widgetkit::FlatButton::pressed, this, [this] {
-        exit(Request::Cancel);
-    });
+    connect(ui_submit_, &widgetkit::FlatButton::pressed, this, &BookInfoEdit::handle_on_submit);
+    connect(ui_cancel_, &widgetkit::FlatButton::pressed, this, &BookInfoEdit::quit);
     connect(
-        ui_cover_select_, &widgetkit::FlatButton::pressed, this, &BookInfoEdit::selectCoverImage);
+        ui_cover_select_,
+        &widgetkit::FlatButton::pressed,
+        this,
+        &BookInfoEdit::handle_on_select_cover);
 }
 
 void BookInfoEdit::paintEvent(QPaintEvent *event) {

@@ -38,7 +38,7 @@ public:
         return button(SystemButton::Maximize);
     }
 
-    void updateColorScheme(const ColorScheme &scheme);
+    void update_color_scheme(const ColorScheme &scheme);
 
 protected slots:
     void requestMinimize();

@@ -53,8 +53,11 @@ protected:
 
 signals:
     void on_trigger_shortcut(GlobalCommand shortcut);
+    void on_page_change(PageType page);
 
 protected:
+    bool do_load_book(const BookInfo &book_info);
+
     void request_create_new_book();
     void do_create_book(BookInfo &book_info);
 
@@ -78,18 +81,42 @@ protected:
     bool do_export_book_as_plain_text(const QString &book_id, const QString &path);
     bool do_export_book_as_epub(const QString &book_id, const QString &path);
 
+    void request_init_from_local_storage();
+    void do_init_local_storage();
+    void do_sync_local_storage();
+    void do_load_local_storage();
+
+    void request_switch_page(PageType page);
+
 public:
     bool is_fullscreen_mode() const {
         return fullscreen_;
     }
 
     void set_fullscreen_mode(bool enable);
+
     void trigger_shortcut(GlobalCommand shortcut);
+
+    QString get_default_author() const;
+    void    set_default_author(const QString &author, bool force);
+
+    void update_color_scheme(const ColorScheme &scheme);
+
+    std::optional<GlobalCommand> try_match_shortcut(QKeyEvent *event) const {
+        return command_manager_.match(event);
+    }
+
+    void wait(std::function<void()> job) {
+        widgetkit::Progress::wait(ui_surface_, job);
+    }
+
+    static widgetkit::Progress::Builder get_wait_builder() {
+        return widgetkit::Progress::Builder{};
+    }
 
 public slots:
     void handle_gallery_on_click(int index);
     void handle_gallery_on_menu_action(int index, Gallery::MenuAction action);
-    void handle_gallery_on_load_book(const BookInfo &book_info);
     void handle_book_dir_on_rename_toc_item(const QString &book_id, int toc_id, TocType type);
     void handle_book_dir_on_rename_toc_item__adapter(const BookInfo &book_info, int vid, int cid);
     void handle_edit_page_on_export();
@@ -98,9 +125,10 @@ public slots:
     void handle_on_open_settings();
     void handle_on_theme_change();
     void handle_on_scheme_change(const ColorScheme &scheme);
-    void handle_on_minimize();
-    void handle_on_toggle_maximize();
-    void handle_on_close();
+    void handle_on_request_minimize();
+    void handle_on_request_toggle_maximize();
+    void handle_on_request_close();
+    void handle_on_about_to_quit();
     void handle_on_open_gallery();
     void handle_on_enter_fullscreen();
     void handle_on_exit_fullscreen();
@@ -108,41 +136,12 @@ public slots:
     void handle_on_trigger_shortcut(GlobalCommand shortcut);
 
 public:
-    QString get_default_author() const;
-    void    set_default_author(const QString &author, bool force);
-
-    std::optional<GlobalCommand> try_match_shortcut(QKeyEvent *event) const {
-        return command_manager_.match(event);
-    }
-
-    void wait(std::function<void()> job);
-
-    static widgetkit::Progress::Builder get_wait_builder() {
-        return widgetkit::Progress::Builder{};
-    }
-
-public:
     JustWrite();
     ~JustWrite();
-
-signals:
-    void pageChanged(PageType page);
-
-public:
-    void updateColorScheme(const ColorScheme &scheme);
 
 protected:
     void setupUi();
     void setupConnections();
-    void requestStartEditBook(int index);
-
-    void requestInitFromLocalStorage();
-
-    void initLocalStorage();
-    void loadDataFromLocalStorage();
-    void syncToLocalStorage();
-
-    void switchToPage(PageType page);
 
     bool eventFilter(QObject *watched, QEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;

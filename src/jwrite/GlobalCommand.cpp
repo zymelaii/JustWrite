@@ -13,7 +13,6 @@ void GlobalCommandManager::load_default() {
     KEYBINDING(ToggleSoftCenterMode, "Ctrl+E");
     KEYBINDING(CreateNewChapter, "Ctrl+N");
     KEYBINDING(Rename, "F2");
-    KEYBINDING(DEV_EnableMessyInput, "F12");
 
 #undef KEYBINDING
 }

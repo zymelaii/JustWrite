@@ -6,13 +6,11 @@ namespace jwrite::ui {
 
 class AboutDialog : public widgetkit::OverlayDialog {
 public:
-    AboutDialog();
-    ~AboutDialog() override;
+    int         exec(widgetkit::OverlaySurface* surface) override;
+    static void show(widgetkit::OverlaySurface* surface);
 
 public:
-    int exec(widgetkit::OverlaySurface* surface) override;
-
-    static void show(widgetkit::OverlaySurface* surface);
+    AboutDialog();
 
 protected:
     void init();

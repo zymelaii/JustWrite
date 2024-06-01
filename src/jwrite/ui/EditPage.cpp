@@ -110,41 +110,97 @@ public:
     }
 };
 
-EditPage::EditPage(QWidget *parent)
-    : QWidget(parent)
-    , current_cid_{-1}
-    , chap_words_{0}
-    , total_words_{0}
-    , messy_input_{new MessyInputWorker(this)}
-    , word_counter_{new StrictWordCounter}
-    , book_manager_{nullptr} {
-    setupUi();
-    setupConnections();
-
-    resetWordsCount();
-
-    last_loc_.block_index = -1;
-
-    ui_editor_->installEventFilter(this);
-
-    sec_timer_.setInterval(1000);
-    sec_timer_.setSingleShot(false);
-    sec_timer_.start();
+void EditPage::request_rename_toc_item(int vid, int cid) {
+    Q_ASSERT(book_manager_);
+    emit on_request_rename_toc_item(book_manager_->info_ref(), vid, cid);
 }
 
-EditPage::~EditPage() {
-    jwrite_profiler_dump(QStringLiteral("jwrite-profiler.%1.log")
-                             .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmmss")));
-
-    delete word_counter_;
-
-    //! NOTE: do not release book_manager_, it will be released by the parent widget
-
-    messy_input_->kill();
-    delete messy_input_;
+void EditPage::request_invalidate_wcstate() {
+    ui_word_count_->set_text("统计中");
 }
 
-void EditPage::updateColorScheme(const ColorScheme &scheme) {
+void EditPage::request_sync_wcstate() {
+    ui_word_count_->set_text(QString("字数 %1").arg(get_friendly_word_count(chap_words_)));
+}
+
+void EditPage::do_update_wcstate(const QString &text, bool text_changed) {
+    jwrite_profiler_start(WordCounterCost);
+    if (text_changed) { total_words_ -= chap_words_; }
+    chap_words_ = word_counter_->count_all(text);
+    if (text_changed) { total_words_ += chap_words_; }
+    jwrite_profiler_record(WordCounterCost);
+}
+
+void EditPage::do_flush_wcstate() {
+    chap_words_  = 0;
+    total_words_ = 0;
+    if (book_manager_) {
+        jwrite_profiler_start(WordCounterCost);
+        for (const auto cid : book_manager_->get_all_chapters()) {
+            const int count =
+                word_counter_->count_all(book_manager_->fetch_chapter_content(cid).value());
+            if (cid == current_cid_) { chap_words_ = count; }
+            total_words_ += count;
+        }
+        jwrite_profiler_record(WordCounterCost);
+    }
+}
+
+void EditPage::do_open_chapter(int cid) {
+    Q_ASSERT(book_manager_);
+
+    if (cid == current_cid_) { return; }
+
+    jwrite_profiler_start(SwitchChapter);
+
+    const int next_cid = cid;
+    const int last_cid = current_cid_;
+
+    auto text = book_manager_->has_chapter(next_cid)
+                  ? book_manager_->fetch_chapter_content(next_cid).value()
+                  : QString{};
+
+    if (last_cid != -1) {
+        const auto loc = ui_editor_->currentTextLoc();
+        if (loc.block_index != -1) { chapter_locs_[last_cid] = loc; }
+    }
+
+    do_update_wcstate(text, false);
+    ui_editor_->reset(text, true);
+
+    book_manager_->sync_chapter_content(last_cid, text);
+
+    if (chapter_locs_.contains(next_cid)) {
+        last_loc_ = chapter_locs_[next_cid];
+    } else {
+        last_loc_.block_index = -1;
+    }
+
+    current_cid_ = next_cid;
+
+    //! TODO: provide interface in AbstractBookManager to get volume id of a chapter
+    for (const int vid : book_manager_->get_volumes()) {
+        if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }
+        ui_book_dir_->setSubItemSelected(vid, cid);
+        ui_book_dir_->setTopItemEllapsed(vid, false);
+    }
+
+    jwrite_profiler_record(SwitchChapter);
+
+    //! TODO: scroll book dir to the selected chapter
+}
+
+QString EditPage::get_friendly_word_count(int count) {
+    if (count > 1000 * 100) {
+        return " " + QString::number(count * 1e-4, 'f', 2) + " 万";
+    } else if (count > 1000 * 10) {
+        return " " + QString::number(count * 1e-3, 'f', 1) + " 千";
+    } else {
+        return " " + QString::number(count) + " ";
+    }
+}
+
+void EditPage::update_color_scheme(const ColorScheme &scheme) {
     auto pal = palette();
     pal.setColor(QPalette::Window, scheme.window());
     pal.setColor(QPalette::WindowText, scheme.window_text());
@@ -219,13 +275,27 @@ void EditPage::updateColorScheme(const ColorScheme &scheme) {
     }
 }
 
-bool EditPage::resetBookSource(AbstractBookManager *book_manager) {
+QString EditPage::get_book_id_of_source() const {
+    return book_manager_ ? book_manager_->info_ref().uuid : "";
+}
+
+void EditPage::drop_source_ref() {
+    if (!book_manager_) { return; }
+
+    book_manager_ = nullptr;
+    chapter_locs_.clear();
+    current_cid_ = -1;
+
+    total_words_ = 0;
+    chap_words_  = 0;
+}
+
+bool EditPage::reset_source(AbstractBookManager *book_manager) {
     Q_ASSERT(book_manager);
 
     if (book_manager == book_manager_) { return false; }
 
-    auto old_book_manager = takeBookSource();
-
+    drop_source_ref();
     book_manager_ = book_manager;
 
     ui_book_dir_->setModel(std::make_unique<BookModel>(book_manager_, ui_book_dir_));
@@ -235,28 +305,13 @@ bool EditPage::resetBookSource(AbstractBookManager *book_manager) {
     return true;
 }
 
-AbstractBookManager *EditPage::takeBookSource() {
-    if (!book_manager_) { return nullptr; }
-
-    auto old_book_manager = book_manager_;
-
-    book_manager_ = nullptr;
-    chapter_locs_.clear();
-    current_cid_ = -1;
-
-    total_words_ = 0;
-    chap_words_  = 0;
-
-    return old_book_manager;
-}
-
-int EditPage::addVolume(int index, const QString &title) {
+int EditPage::add_volume(int index, const QString &title) {
     Q_ASSERT(book_manager_);
     Q_ASSERT(index >= 0 && index <= ui_book_dir_->totalTopItems());
     return ui_book_dir_->addTopItem(index, title);
 }
 
-int EditPage::addChapter(int volume_index, const QString &title) {
+int EditPage::add_chapter(int volume_index, const QString &title) {
     Q_ASSERT(book_manager_);
     Q_ASSERT(volume_index >= 0 && volume_index < ui_book_dir_->totalTopItems());
     const auto vid = ui_book_dir_->topItemAt(volume_index);
@@ -265,53 +320,7 @@ int EditPage::addChapter(int volume_index, const QString &title) {
     return ui_book_dir_->addSubItem(vid, chap_index, title);
 }
 
-void EditPage::openChapter(int cid) {
-    Q_ASSERT(book_manager_);
-
-    if (messy_input_->is_running()) { return; }
-
-    if (cid == current_cid_) { return; }
-
-    jwrite_profiler_start(SwitchChapter);
-
-    const int next_cid = cid;
-    const int last_cid = current_cid_;
-
-    auto text = book_manager_->has_chapter(next_cid)
-                  ? book_manager_->fetch_chapter_content(next_cid).value()
-                  : QString{};
-
-    if (last_cid != -1) {
-        const auto loc = ui_editor_->currentTextLoc();
-        if (loc.block_index != -1) { chapter_locs_[last_cid] = loc; }
-    }
-
-    updateWordsCount(text, false);
-    ui_editor_->reset(text, true);
-
-    book_manager_->sync_chapter_content(last_cid, text);
-
-    if (chapter_locs_.contains(next_cid)) {
-        last_loc_ = chapter_locs_[next_cid];
-    } else {
-        last_loc_.block_index = -1;
-    }
-
-    current_cid_ = next_cid;
-
-    //! TODO: provide interface in AbstractBookManager to get volume id of a chapter
-    for (const int vid : book_manager_->get_volumes()) {
-        if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }
-        ui_book_dir_->setSubItemSelected(vid, cid);
-        ui_book_dir_->setTopItemEllapsed(vid, false);
-    }
-
-    jwrite_profiler_record(SwitchChapter);
-
-    //! TODO: scroll book dir to the selected chapter
-}
-
-void EditPage::syncAndClearEditor() {
+void EditPage::sync_chapter_from_editor() {
     if (current_cid_ == -1) { return; }
 
     Q_ASSERT(book_manager_);
@@ -324,7 +333,7 @@ void EditPage::syncAndClearEditor() {
     current_cid_ = -1;
 }
 
-void EditPage::focusOnEditor() {
+void EditPage::focus_editor() {
     if (ui_editor_->hasFocus()) { return; }
     if (last_loc_.block_index != -1) {
         ui_editor_->setCursorToTextLoc(last_loc_);
@@ -337,16 +346,12 @@ void EditPage::focusOnEditor() {
     // Q_ASSERT(ui_editor_->hasFocus());
 }
 
-void EditPage::renameBookDirItem(int id, const QString &title) {
+void EditPage::rename_toc_item(int id, const QString &title) {
     Q_ASSERT(book_manager_);
     ui_book_dir_->setItemValue(id, title);
 }
 
-void EditPage::popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
-    //! TODO: menu style & popup input to edit the new title
-}
-
-void EditPage::createAndOpenNewChapter(int vid) {
+void EditPage::create_and_open_chapter(int vid) {
     //! TODO: consider to create the new chapter under the volume which is corresponded to the
     //! focused top item in book dir
 
@@ -357,36 +362,81 @@ void EditPage::createAndOpenNewChapter(int vid) {
     }
 
     if (volume_index == -1) {
-        addVolume(0, "默认卷");
+        add_volume(0, "默认卷");
         volume_index = 0;
     } else if (volume_index >= ui_book_dir_->totalTopItems()) {
-        addVolume(volume_index, "");
+        add_volume(volume_index, "");
     }
 
-    const int cid = addChapter(volume_index, "");
-    openChapter(cid);
-    syncWordsStatus();
+    const int cid = add_chapter(volume_index, "");
+    do_open_chapter(cid);
+    request_sync_wcstate();
     ui_editor_->update();
-    focusOnEditor();
+    focus_editor();
     ui_book_dir_->setSubItemSelected(ui_book_dir_->topItemAt(volume_index), cid);
 }
 
-void EditPage::createAndOpenNewChapterUnderActiveVolume() {
+void EditPage::handle_editor_on_activate() {
+    if (current_cid_ != -1) { return; }
+    if (book_manager_->get_all_chapters().empty()) {
+        create_and_open_chapter(-1);
+    } else {
+        //! NOTE: this should be done in the caller side, not here
+        //! ATTENTION: here we assume that the returned chapters are in order
+        // const int cid = book_manager_->get_all_chapters().last();
+        // do_open_chapter(cid);
+        // focus_editor();
+    }
+}
+
+void EditPage::handle_editor_on_text_change(const QString &text) {
+    do_update_wcstate(text, true);
+    request_sync_wcstate();
+}
+
+void EditPage::handle_editor_on_focus_lost(VisualTextEditContext::TextLoc last_loc) {
+    if (current_cid_ != -1) { chapter_locs_[current_cid_] = last_loc; }
+    last_loc_ = last_loc;
+}
+
+void EditPage::handle_book_dir_on_select_item(bool is_top_item, int top_item_id, int sub_item_id) {
+    if (!is_top_item) {
+        do_open_chapter(sub_item_id);
+        request_sync_wcstate();
+        ui_editor_->update();
+        focus_editor();
+    }
+}
+
+void EditPage::handle_book_dir_on_double_click_item(
+    bool is_top_item, int top_item_id, int sub_item_id) {
+    request_rename_toc_item(top_item_id, sub_item_id);
+}
+
+void EditPage::handle_book_dir_on_open_menu(QPoint pos, TwoLevelTree::ItemInfo item_info) {
+    //! TODO: implement the menu for book dir
+}
+
+void EditPage::handle_on_create_volume() {
+    add_volume(ui_book_dir_->totalTopItems(), "");
+}
+
+void EditPage::handle_on_create_chapter() {
     const int vid     = ui_book_dir_->focusedTopItem();
     const int item_id = ui_book_dir_->selectedItem();
     if (vid == -1) {
         Q_ASSERT(item_id == -1);
-        createAndOpenNewChapter(-1);
+        create_and_open_chapter(-1);
     } else if (vid != item_id) {
         Q_ASSERT(item_id != -1);
         Q_ASSERT(item_id == ui_book_dir_->selectedSubItem());
-        createAndOpenNewChapter(vid);
+        create_and_open_chapter(vid);
     } else {
-        createAndOpenNewChapter(vid);
+        create_and_open_chapter(vid);
     }
 }
 
-void EditPage::requestRenameCurrentTocItem() {
+void EditPage::handle_on_rename_selected_toc_item() {
     if (!book_manager_) { return; }
 
     const int item_id = ui_book_dir_->selectedItem();
@@ -396,7 +446,7 @@ void EditPage::requestRenameCurrentTocItem() {
 
     if (cid != item_id) {
         Q_ASSERT(item_id == ui_book_dir_->focusedTopItem());
-        requestRenameTocItem(item_id, -1);
+        request_rename_toc_item(item_id, -1);
         return;
     }
 
@@ -405,65 +455,23 @@ void EditPage::requestRenameCurrentTocItem() {
 
     for (const int vid : book_manager_->get_volumes()) {
         if (!book_manager_->get_chapters_of_volume(vid).contains(cid)) { continue; }
-        requestRenameTocItem(vid, cid);
+        request_rename_toc_item(vid, cid);
     }
 }
 
-void EditPage::requestRenameTocItem(int vid, int cid) {
-    if (!book_manager_) { return; }
-    emit renameTocItemRequested(book_manager_->info_ref(), vid, cid);
+EditPage::EditPage(QWidget *parent)
+    : QWidget(parent)
+    , current_cid_{-1}
+    , chap_words_{0}
+    , total_words_{0}
+    , word_counter_{std::make_unique<StrictWordCounter>()}
+    , book_manager_{nullptr} {
+    init();
+    request_invalidate_wcstate();
+    last_loc_.block_index = -1;
 }
 
-void EditPage::resetWordsCount() {
-    ui_total_words_->setText("全速统计中...");
-    ui_word_count_->set_text("统计中");
-}
-
-void EditPage::updateWordsCount(const QString &text, bool text_changed) {
-    jwrite_profiler_start(WordCounterCost);
-    if (text_changed) { total_words_ -= chap_words_; }
-    chap_words_ = word_counter_->count_all(text);
-    if (text_changed) { total_words_ += chap_words_; }
-    jwrite_profiler_record(WordCounterCost);
-}
-
-void EditPage::flushWordsCount() {
-    chap_words_  = 0;
-    total_words_ = 0;
-    if (book_manager_) {
-        jwrite_profiler_start(WordCounterCost);
-        for (const auto cid : book_manager_->get_all_chapters()) {
-            const int count =
-                word_counter_->count_all(book_manager_->fetch_chapter_content(cid).value());
-            if (cid == current_cid_) { chap_words_ = count; }
-            total_words_ += count;
-        }
-        jwrite_profiler_record(WordCounterCost);
-    }
-}
-
-QString getFriendlyWordCount(int count) {
-    if (count > 1000 * 100) {
-        return " " + QString::number(count * 1e-4, 'f', 2) + " 万";
-    } else if (count > 1000 * 10) {
-        return " " + QString::number(count * 1e-3, 'f', 1) + " 千";
-    } else {
-        return " " + QString::number(count) + " ";
-    }
-}
-
-void EditPage::syncWordsStatus() {
-    ui_total_words_->setText(QString("全书共%1字 本章%2字")
-                                 .arg(getFriendlyWordCount(total_words_))
-                                 .arg(getFriendlyWordCount(chap_words_)));
-    ui_word_count_->set_text(QString("字数 %1").arg(getFriendlyWordCount(chap_words_)));
-}
-
-void EditPage::updateCurrentDateTime() {
-    ui_datetime_->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
-}
-
-void EditPage::setupUi() {
+void EditPage::init() {
     auto layout         = new QVBoxLayout(this);
     auto content        = new QWidget;
     auto layout_content = new QHBoxLayout(content);
@@ -471,12 +479,11 @@ void EditPage::setupUi() {
     ui_named_widgets_.insert("sidebar.splitter", splitter);
 
     ui_editor_     = new Editor;
-    ui_status_bar_ = new StatusBar;
     ui_menu_       = new FloatingMenu(ui_editor_);
     ui_word_count_ = new FloatingLabel(ui_editor_);
 
-    ui_sidebar_     = new QWidget;
     ui_new_volume_  = new FlatButton;
+    ui_sidebar_     = new QWidget;
     ui_new_chapter_ = new FlatButton;
     ui_book_dir_    = new TwoLevelTree;
 
@@ -511,7 +518,6 @@ void EditPage::setupUi() {
     splitter->addWidget(ui_editor_);
 
     layout->addWidget(content);
-    layout->addWidget(ui_status_bar_);
     layout->setContentsMargins({});
     layout->setSpacing(0);
 
@@ -527,12 +533,6 @@ void EditPage::setupUi() {
     ui_new_volume_->setText("新建卷");
     ui_new_chapter_->setText("新建章");
 
-    ui_total_words_ = ui_status_bar_->addItem("", false);
-    ui_datetime_    = ui_status_bar_->addItem("", true);
-
-    //! TODO: remove status bar in the future
-    ui_status_bar_->setVisible(false);
-
     auto font = this->font();
     font.setPointSize(10);
     ui_sidebar_->setFont(font);
@@ -544,93 +544,32 @@ void EditPage::setupUi() {
 
     auto quit_edit_action     = new QAction(ui_menu_);
     auto open_settings_action = new QAction(ui_menu_);
-    connect(quit_edit_action, &QAction::triggered, this, [this] {
-        emit quitEditRequested();
-    });
-    connect(open_settings_action, &QAction::triggered, this, [this] {
-        emit openSettingsRequested();
-    });
+
     ui_menu_->add_menu_item("menu/return", quit_edit_action);
     ui_menu_->add_menu_item("menu/settings", open_settings_action);
 
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
     setAutoFillBackground(true);
-}
 
-void EditPage::setupConnections() {
-    connect(ui_editor_, &Editor::activated, this, [this] {
-        if (current_cid_ != -1) { return; }
-        if (book_manager_->get_all_chapters().empty()) {
-            createAndOpenNewChapter(-1);
-        } else {
-            //! NOTE: this should be done in the caller side, not here
-            //! ATTENTION: here we assume that the returned chapters are in order
-            // const int cid = book_manager_->get_all_chapters().last();
-            // openChapter(cid);
-            // focusOnEditor();
-        }
-    });
-    connect(ui_editor_, &Editor::textChanged, this, [this](const QString &text) {
-        updateWordsCount(text, true);
-        syncWordsStatus();
-    });
+    connect(quit_edit_action, &QAction::triggered, this, &EditPage::on_request_quit_edit);
+    connect(open_settings_action, &QAction::triggered, this, &EditPage::on_request_open_settings);
+    connect(ui_editor_, &Editor::activated, this, &EditPage::handle_editor_on_activate);
+    connect(ui_editor_, &Editor::textChanged, this, &EditPage::handle_editor_on_text_change);
+    connect(
+        ui_book_dir_, &TwoLevelTree::itemSelected, this, &EditPage::handle_book_dir_on_select_item);
+    connect(ui_new_volume_, &FlatButton::pressed, this, &EditPage::handle_on_create_volume);
+    connect(ui_new_chapter_, &FlatButton::pressed, this, &EditPage::handle_on_create_chapter);
+    connect(ui_editor_, &Editor::focusLost, this, &EditPage::handle_editor_on_focus_lost);
     connect(
         ui_book_dir_,
-        &TwoLevelTree::itemSelected,
+        &TwoLevelTree::contextMenuRequested,
         this,
-        [this](bool is_top_item, int top_item_id, int sub_item_id) {
-            if (!is_top_item) {
-                openChapter(sub_item_id);
-                syncWordsStatus();
-                ui_editor_->update();
-                focusOnEditor();
-            }
-        });
-    connect(ui_new_volume_, &FlatButton::pressed, this, [this] {
-        addVolume(ui_book_dir_->totalTopItems(), "");
-    });
-    connect(
-        ui_new_chapter_,
-        &FlatButton::pressed,
-        this,
-        &EditPage::createAndOpenNewChapterUnderActiveVolume);
-    connect(&sec_timer_, &QTimer::timeout, this, &EditPage::updateCurrentDateTime);
-    connect(ui_editor_, &Editor::focusLost, this, [this](VisualTextEditContext::TextLoc last_loc) {
-        if (current_cid_ != -1) { chapter_locs_[current_cid_] = last_loc; }
-        last_loc_ = last_loc;
-        messy_input_->kill();
-    });
-    connect(ui_book_dir_, &TwoLevelTree::contextMenuRequested, this, &EditPage::popupBookDirMenu);
+        &EditPage::handle_book_dir_on_open_menu);
     connect(
         ui_book_dir_,
         &TwoLevelTree::itemDoubleClicked,
         this,
-        [this](bool is_top_item, int top_item_id, int sub_item_id) {
-            requestRenameTocItem(top_item_id, sub_item_id);
-        });
-}
-
-bool EditPage::eventFilter(QObject *watched, QEvent *event) {
-    if (event->type() == QEvent::KeyPress) {
-        auto e = static_cast<QKeyEvent *>(event);
-
-        //! NOTE: block special keys in messy input mode to avoid unexpceted behavior
-        //! ATTENTION: this can not block global shortcut keys
-        if (const auto key = QKeyCombination::fromCombined(e->key() | e->modifiers());
-            !TextInputCommandManager::is_printable_char(key) && messy_input_->is_running()) {
-            return true;
-        }
-    }
-
-    if (event->type() == QEvent::MouseButtonDblClick) {
-        auto e = static_cast<QMouseEvent *>(event);
-        if (e->buttons() == Qt::RightButton) {
-            messy_input_->kill();
-            return false;
-        }
-    }
-
-    return false;
+        &EditPage::handle_book_dir_on_double_click_item);
 }
 
 } // namespace jwrite::ui

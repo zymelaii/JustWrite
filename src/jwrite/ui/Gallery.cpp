@@ -64,7 +64,7 @@ void Gallery::updateDisplayCaseItem(int index, const BookInfo &book_info) {
     update();
 }
 
-void Gallery::updateColorScheme(const ColorScheme &scheme) {
+void Gallery::update_color_scheme(const ColorScheme &scheme) {
     auto pal = palette();
     pal.setColor(QPalette::Base, scheme.text_base());
     pal.setColor(QPalette::Window, scheme.window());

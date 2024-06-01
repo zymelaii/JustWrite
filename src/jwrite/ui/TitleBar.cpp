@@ -25,7 +25,7 @@ SystemButton *TitleBar::button(SystemButton::SystemCommand command_type) const {
     return sys_buttons_[magic_enum::enum_index(command_type).value()];
 }
 
-void TitleBar::updateColorScheme(const ColorScheme &scheme) {
+void TitleBar::update_color_scheme(const ColorScheme &scheme) {
     for (auto &button : sys_buttons_) { button->reloadIcon(); }
 }
 

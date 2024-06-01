@@ -76,6 +76,14 @@ private:
     QSet<int>          modified_;
 };
 
+bool JustWrite::do_load_book(const BookInfo &book_info) {
+    if (books_.contains(book_info.uuid)) { return false; }
+    auto bm        = new BookManager;
+    bm->info_ref() = book_info;
+    books_.insert(book_info.uuid, bm);
+    return true;
+}
+
 void JustWrite::request_create_new_book() {
     BookInfo book_info{.uuid = BookManager::alloc_uuid()};
     Q_ASSERT(!books_.contains(book_info.uuid));
@@ -93,9 +101,7 @@ void JustWrite::do_create_book(BookInfo &book_info) {
     book_info.creation_time    = QDateTime::currentDateTimeUtc();
     book_info.last_update_time = QDateTime::currentDateTimeUtc();
 
-    auto bm        = new BookManager;
-    bm->info_ref() = book_info;
-    books_.insert(book_info.uuid, bm);
+    do_load_book(book_info);
 }
 
 void JustWrite::request_remove_book(const QString &book_id) {
@@ -127,21 +133,21 @@ void JustWrite::request_open_book(const QString &book_id) {
     get_wait_builder()
         .withPolicy(Progress::UseMinimumDisplayTime, false)
         .withBlockingJob([this, bm] {
-            ui_edit_page_->resetBookSource(bm);
-            switchToPage(PageType::Edit);
-            ui_edit_page_->resetWordsCount();
+            ui_edit_page_->reset_source(bm);
+            request_switch_page(PageType::Edit);
+            ui_edit_page_->request_invalidate_wcstate();
         })
         .withAsyncJob([this, bm] {
-            ui_edit_page_->flushWordsCount();
+            ui_edit_page_->do_flush_wcstate();
             if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
-                ui_edit_page_->openChapter(chapters.back());
+                ui_edit_page_->do_open_chapter(chapters.back());
             }
             ui_edit_page_->editor()->prepareRenderData();
         })
         .exec(ui_surface_);
 
-    ui_edit_page_->focusOnEditor();
-    ui_edit_page_->syncWordsStatus();
+    ui_edit_page_->focus_editor();
+    ui_edit_page_->request_sync_wcstate();
 }
 
 void JustWrite::do_open_book(const QString &book_id) {
@@ -155,7 +161,7 @@ void JustWrite::do_close_book(const QString &book_id) {}
 void JustWrite::request_update_book_info(const QString &book_id) {
     Q_ASSERT(books_.contains(book_id));
     const auto &initial = books_.value(book_id)->info_ref();
-    if (auto opt = BookInfoEdit::getBookInfo(ui_surface_, initial)) {
+    if (auto opt = BookInfoEdit::get_book_info(ui_surface_, initial)) {
         auto &book_info = *opt;
         Q_ASSERT(book_info.uuid == book_id);
         do_update_book_info(book_info);
@@ -191,7 +197,7 @@ void JustWrite::request_rename_toc_item(const QString &book_id, int toc_id, TocT
         const auto &title = *opt;
         do_rename_toc_item(book_id, toc_id, title);
         //! FIXME: just notify the book dir to update
-        ui_edit_page_->renameBookDirItem(toc_id, title);
+        ui_edit_page_->rename_toc_item(toc_id, title);
     }
 }
 
@@ -344,6 +350,253 @@ bool JustWrite::do_export_book_as_epub(const QString &book_id, const QString &pa
     return true;
 }
 
+void JustWrite::request_init_from_local_storage() {
+    const auto &config = AppConfig::get_instance();
+    if (const QDir data_dir{config.path(AppConfig::StandardPath::UserData)}; !data_dir.exists()) {
+        do_init_local_storage();
+        Q_ASSERT(data_dir.exists());
+    } else {
+        do_load_local_storage();
+        for (auto &bm : books_) {
+            ui_gallery_->updateDisplayCaseItem(ui_gallery_->totalItems(), bm->info_ref());
+        }
+    }
+}
+
+void JustWrite::do_init_local_storage() {
+    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
+
+    if (!dir.exists()) {
+        const bool succeed = dir.mkdir(".");
+        Q_ASSERT(succeed);
+    }
+
+    QJsonObject local_storage;
+    local_storage["major_author"]     = QString{};
+    local_storage["last_update_time"] = QDateTime::currentDateTimeUtc().toString();
+    local_storage["data"]             = QJsonArray{};
+
+    /*! Json Structure
+     *  {
+     *      "data": [
+     *          {
+     *              "book_id": "<book-uuid>",
+     *              "name": "<name>",
+     *              "author": "<author>",
+     *              "cover_url": "<cover-url>",
+     *              "last_update_time": "<last-update-time>"
+     *          }
+     *      ],
+     *      "major_author" "<major-author>",
+     *      "last_update_time": "<last-update-time>"
+     *  }
+     **/
+
+    QFile data_file(dir.filePath("mainfest.json"));
+    data_file.open(QIODevice::WriteOnly | QIODevice::Text);
+
+    data_file.write(QJsonDocument(local_storage).toJson());
+
+    data_file.close();
+}
+
+void JustWrite::do_load_local_storage() {
+    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
+    Q_ASSERT(dir.exists());
+
+    Q_ASSERT(dir.exists("mainfest.json"));
+
+    QFile data_file(dir.filePath("mainfest.json"));
+    data_file.open(QIODevice::ReadOnly | QIODevice::Text);
+    const auto text = data_file.readAll();
+    auto       json = QJsonDocument::fromJson(text);
+    data_file.close();
+
+    Q_ASSERT(json.isObject());
+    const auto &local_storage = json.object();
+
+    likely_author_        = local_storage["major_author"].toString("");
+    const auto &book_data = local_storage["data"].toArray({});
+
+    for (const auto &ref : book_data) {
+        Q_ASSERT(ref.isObject());
+        const auto &book = ref.toObject();
+        const auto &uuid = book["book_id"].toString("");
+        const auto &name = book["name"].toString("");
+        Q_ASSERT(!uuid.isEmpty() && !name.isEmpty());
+
+        BookInfo book_info{
+            .uuid          = uuid,
+            .title         = name,
+            .author        = book["author"].toString(""),
+            .cover_url     = book["cover_url"].toString(""),
+            .creation_time = QDateTime::fromString(book["creation_time"].toString(""), Qt::ISODate),
+            .last_update_time =
+                QDateTime::fromString(book["last_update_time"].toString(""), Qt::ISODate),
+        };
+
+        if (!book_info.creation_time.isValid()) {
+            book_info.creation_time = QDateTime::currentDateTimeUtc();
+        }
+        if (!book_info.last_update_time.isValid()) {
+            book_info.last_update_time = QDateTime::currentDateTimeUtc();
+        }
+
+        {
+            const bool succeed = do_load_book(book_info);
+            Q_ASSERT(succeed);
+        }
+
+        if (!dir.exists(uuid)) { continue; }
+
+        {
+            const bool succeed = dir.cd(uuid);
+            Q_ASSERT(succeed);
+        }
+
+        auto bm = books_.value(uuid);
+        Q_ASSERT(bm);
+
+        if (dir.exists("TOC")) {
+            const auto toc_path = dir.filePath("TOC");
+            QFile      toc_file(toc_path);
+            toc_file.open(QIODevice::ReadOnly | QIODevice::Text);
+            const auto toc_text = toc_file.readAll();
+            toc_file.close();
+
+            const auto toc_json = QJsonDocument::fromJson(toc_text);
+            Q_ASSERT(toc_json.isArray());
+            const auto &volumes = toc_json.array();
+
+            /*! Json Structure
+             *  [
+             *      {
+             *          'vid': <volume-id>,
+             *          'title': '<volume-title>',
+             *          'chapters': [
+             *              {
+             *                  'cid': <chapter-id>,
+             *                  'title': '<chapter-title>',
+             *              }
+             *          ]
+             *      }
+             *  ]
+             */
+
+            int vol_index = 0;
+            for (const auto &vol_ref : volumes) {
+                Q_ASSERT(vol_ref.isObject());
+                const auto &volume    = vol_ref.toObject();
+                const auto  vid       = volume["vid"].toInt();
+                const auto  vol_title = volume["title"].toString("");
+                bm->add_volume_as(vol_index++, vid, vol_title);
+                const auto &chapters   = volume["chapters"].toArray({});
+                int         chap_index = 0;
+                for (const auto &chap_ref : chapters) {
+                    Q_ASSERT(chap_ref.isObject());
+                    const auto &chapter    = chap_ref.toObject();
+                    const auto  cid        = chapter["cid"].toInt();
+                    const auto  chap_title = chapter["title"].toString("");
+                    bm->add_chapter_as(vid, chap_index++, cid, chap_title);
+                }
+            }
+        }
+
+        dir.cdUp();
+    }
+}
+
+void JustWrite::do_sync_local_storage() {
+    QJsonObject local_storage;
+    QJsonArray  book_data;
+
+    //! FIXME: combine with local data
+
+    for (const auto &[uuid, bm] : books_.asKeyValueRange()) {
+        const auto &book_info = bm->info_ref();
+        Q_ASSERT(uuid == book_info.uuid);
+        QJsonObject book;
+        book["book_id"]          = book_info.uuid;
+        book["name"]             = book_info.title;
+        book["author"]           = book_info.author;
+        book["cover_url"]        = book_info.cover_url;
+        book["creation_time"]    = book_info.creation_time.toString(Qt::ISODate);
+        book["last_update_time"] = book_info.last_update_time.toString(Qt::ISODate);
+        book_data.append(book);
+    }
+
+    local_storage["major_author"] = likely_author_;
+    local_storage["data"]         = book_data;
+
+    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
+    Q_ASSERT(dir.exists());
+
+    //! TODO: check validity of local storage file
+
+    QFile data_file(dir.filePath("mainfest.json"));
+    data_file.open(QIODevice::WriteOnly | QIODevice::Text);
+    data_file.write(QJsonDocument(local_storage).toJson());
+    data_file.close();
+
+    //! NOTE: here we simply sync to local according to the book set in the memory, and remove
+    //! the book from the set also means remove the book from the local storage, however, in the
+    //! current edition, we simply delete the record without removing the content from your
+    //! machine, so you can mannually recover it by adding the record to the mainfest.json file
+    //! FIXME: you know what I'm gonna say - yeah, that's not a good idea
+
+    for (const auto &[uuid, bm] : books_.asKeyValueRange()) {
+        if (!dir.exists(uuid)) { dir.mkdir(uuid); }
+        dir.cd(uuid);
+
+        QJsonArray volumes;
+        for (const int vid : bm->get_volumes()) {
+            QJsonObject volume;
+            QJsonArray  chapters;
+            for (const int cid : bm->get_chapters_of_volume(vid)) {
+                QJsonObject chapter;
+                chapter["cid"]   = cid;
+                chapter["title"] = bm->get_title(cid).value().get();
+                chapters.append(chapter);
+            }
+            volume["vid"]      = vid;
+            volume["title"]    = bm->get_title(vid).value().get();
+            volume["chapters"] = chapters;
+            volumes.append(volume);
+        }
+
+        QFile toc_file(dir.filePath("TOC"));
+        toc_file.open(QIODevice::WriteOnly | QIODevice::Text);
+        toc_file.write(QJsonDocument(volumes).toJson());
+        toc_file.close();
+
+        //! FIXME: unsafe cast
+        const auto book_manager = static_cast<BookManager *>(bm);
+        for (const int cid : book_manager->get_all_chapters()) {
+            if (!book_manager->is_chapter_dirty(cid)) { continue; }
+            Q_ASSERT(book_manager->chapter_cached(cid));
+            const auto content = std::move(book_manager->fetch_chapter_content(cid).value());
+            QFile      file(book_manager->get_path_to_chapter(cid));
+            file.open(QIODevice::WriteOnly | QIODevice::Text);
+            Q_ASSERT(file.isOpen());
+            file.write(content.toUtf8());
+            file.close();
+        }
+
+        dir.cdUp();
+    }
+}
+
+void JustWrite::request_switch_page(PageType page) {
+    Q_ASSERT(page_map_.contains(page));
+    Q_ASSERT(page_map_.value(page, nullptr));
+    if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
+        ui_page_stack_->setCurrentWidget(w);
+    }
+    ui_toolbar_->apply_mask(page_toolbar_mask_[page]);
+    current_page_ = page;
+    emit on_page_change(page);
+}
+
 void JustWrite::set_fullscreen_mode(bool enable) {
     const auto ws     = windowState();
     const auto new_ws = enable ? (ws | Qt::WindowFullScreen) : (ws & ~Qt::WindowFullScreen);
@@ -376,6 +629,46 @@ void JustWrite::trigger_shortcut(GlobalCommand shortcut) {
     emit on_trigger_shortcut(shortcut);
 }
 
+QString JustWrite::get_default_author() const {
+    return likely_author_.isEmpty() ? "佚名" : likely_author_;
+}
+
+void JustWrite::set_default_author(const QString &author, bool force) {
+    if (likely_author_.isEmpty() || force) { likely_author_ = author; }
+}
+
+void JustWrite::update_color_scheme(const ColorScheme &scheme) {
+    auto pal = palette();
+    pal.setColor(QPalette::Window, scheme.window());
+    pal.setColor(QPalette::WindowText, scheme.window_text());
+    pal.setColor(QPalette::Base, scheme.text_base());
+    pal.setColor(QPalette::Text, scheme.text());
+    pal.setColor(QPalette::Highlight, scheme.selected_text());
+    pal.setColor(QPalette::Button, scheme.window());
+    pal.setColor(QPalette::ButtonText, scheme.window_text());
+    setPalette(pal);
+
+    if (auto w = static_cast<QScrollArea *>(page_map_[PageType::Gallery])->verticalScrollBar()) {
+        auto pal = w->palette();
+        pal.setColor(w->backgroundRole(), scheme.text_base());
+        pal.setColor(w->foregroundRole(), scheme.window());
+        w->setPalette(pal);
+    }
+
+    ui_title_bar_->update_color_scheme(scheme);
+    ui_toolbar_->update_color_scheme(scheme);
+    ui_gallery_->update_color_scheme(scheme);
+    ui_edit_page_->update_color_scheme(scheme);
+
+    auto font = this->font();
+    font.setPointSize(10);
+    QToolTip::setFont(font);
+
+    pal.setColor(QPalette::ToolTipBase, scheme.window());
+    pal.setColor(QPalette::ToolTipText, scheme.window_text());
+    QToolTip::setPalette(pal);
+}
+
 void JustWrite::handle_gallery_on_click(int index) {
     if (index == ui_gallery_->totalItems()) { request_create_new_book(); }
 }
@@ -396,15 +689,6 @@ void JustWrite::handle_gallery_on_menu_action(int index, Gallery::MenuAction act
     }
 }
 
-void JustWrite::handle_gallery_on_load_book(const BookInfo &book_info) {
-    if (!books_.contains(book_info.uuid)) {
-        auto bm        = new BookManager;
-        bm->info_ref() = book_info;
-        books_.insert(book_info.uuid, bm);
-    }
-    ui_gallery_->updateDisplayCaseItem(ui_gallery_->totalItems(), book_info);
-}
-
 void JustWrite::handle_book_dir_on_rename_toc_item(
     const QString &book_id, int toc_id, TocType type) {
     request_rename_toc_item(book_id, toc_id, type);
@@ -419,7 +703,7 @@ void JustWrite::handle_book_dir_on_rename_toc_item__adapter(
 
 void JustWrite::handle_edit_page_on_export() {
     Q_ASSERT(current_page_ == PageType::Edit);
-    const auto &book_id = ui_edit_page_->bookSource().info_ref().uuid;
+    const auto &book_id = ui_edit_page_->get_book_id_of_source();
     request_export_book(book_id);
 }
 
@@ -429,7 +713,9 @@ void JustWrite::handle_on_page_change(PageType page) {
             ui_title_bar_->setTitle("只写 丶 阐释你的梦");
         } break;
         case PageType::Edit: {
-            const auto &info  = ui_edit_page_->bookSource().info_ref();
+            const auto &book_id = ui_edit_page_->get_book_id_of_source();
+            Q_ASSERT(books_.contains(book_id));
+            const auto &info  = books_.value(book_id)->info_ref();
             const auto  title = QString("%1\u3000%2 [著]").arg(info.title).arg(info.author);
             ui_title_bar_->setTitle(title);
         } break;
@@ -452,7 +738,7 @@ void JustWrite::handle_on_open_settings() {
 
     connect(
         dialog.get(),
-        &ColorSchemeDialog::applyRequested,
+        &ColorSchemeDialog::on_request_apply,
         this,
         [this, &config](ColorTheme theme, const ColorScheme &scheme) {
             config.set_theme(theme);
@@ -464,11 +750,11 @@ void JustWrite::handle_on_open_settings() {
     if (result != QDialog::Accepted) {
         config.set_theme(old_theme);
         config.set_scheme(old_scheme);
-        updateColorScheme(old_scheme);
+        update_color_scheme(old_scheme);
     } else {
-        config.set_theme(dialog->getTheme());
-        config.set_scheme(dialog->getScheme());
-        updateColorScheme(config.scheme());
+        config.set_theme(dialog->theme());
+        config.set_scheme(dialog->scheme());
+        update_color_scheme(config.scheme());
     }
 }
 
@@ -478,14 +764,14 @@ void JustWrite::handle_on_theme_change() {
 }
 
 void JustWrite::handle_on_scheme_change(const ColorScheme &scheme) {
-    updateColorScheme(scheme);
+    update_color_scheme(scheme);
 }
 
-void JustWrite::handle_on_minimize() {
+void JustWrite::handle_on_request_minimize() {
     showMinimized();
 }
 
-void JustWrite::handle_on_toggle_maximize() {
+void JustWrite::handle_on_request_toggle_maximize() {
     if (isMinimized()) { return; }
     if (isMaximized()) {
         showNormal();
@@ -494,7 +780,7 @@ void JustWrite::handle_on_toggle_maximize() {
     }
 }
 
-void JustWrite::handle_on_close() {
+void JustWrite::handle_on_request_close() {
     if (current_page_ == PageType::Edit) {
         MessageBox::Option opt{};
         opt.type     = MessageBox::Type::Confirm;
@@ -503,18 +789,30 @@ void JustWrite::handle_on_close() {
         const auto choice =
             MessageBox::show(ui_surface_, "关闭只写", "真的不能再多码会儿了吗 T^T", opt);
         if (choice != MessageBox::Yes) { return; }
-        ui_edit_page_->syncAndClearEditor();
     }
-    wait(std::bind(&JustWrite::syncToLocalStorage, this));
+
     close();
+    qDebug() << "JustWrite is closed.";
+
+    if (!testAttribute(Qt::WA_QuitOnClose)) { qApp->quit(); }
+}
+
+void JustWrite::handle_on_about_to_quit() {
+    qDebug() << "JustWrite is about to quit.";
+    if (current_page_ == PageType::Edit) { ui_edit_page_->sync_chapter_from_editor(); }
+    wait([this] {
+        do_sync_local_storage();
+    });
 }
 
 void JustWrite::handle_on_open_gallery() {
     if (current_page_ == PageType::Gallery) { return; }
     if (current_page_ == PageType::Edit) {
-        wait(std::bind(&EditPage::syncAndClearEditor, ui_edit_page_));
+        wait([this] {
+            ui_edit_page_->sync_chapter_from_editor();
+        });
     }
-    switchToPage(PageType::Gallery);
+    request_switch_page(PageType::Gallery);
 }
 
 void JustWrite::handle_on_enter_fullscreen() {
@@ -541,15 +839,12 @@ void JustWrite::handle_on_trigger_shortcut(GlobalCommand shortcut) {
             if (current_page_ == PageType::Edit) { ui_edit_page_->toggle_soft_center_mode(); }
         } break;
         case GlobalCommand::CreateNewChapter: {
-            if (current_page_ == PageType::Edit) {
-                ui_edit_page_->createAndOpenNewChapterUnderActiveVolume();
-            }
+            if (current_page_ == PageType::Edit) { ui_edit_page_->handle_on_create_chapter(); }
         } break;
         case GlobalCommand::Rename: {
-            if (current_page_ == PageType::Edit) { ui_edit_page_->requestRenameCurrentTocItem(); }
-        } break;
-        case GlobalCommand::DEV_EnableMessyInput: {
-            if (current_page_ == PageType::Edit) { ui_edit_page_->start_messy_input(); }
+            if (current_page_ == PageType::Edit) {
+                ui_edit_page_->handle_on_rename_selected_toc_item();
+            }
         } break;
     }
 }
@@ -561,7 +856,7 @@ JustWrite::JustWrite() {
 
     set_fullscreen_mode(windowState().testFlag(Qt::WindowFullScreen));
 
-    switchToPage(PageType::Gallery);
+    request_switch_page(PageType::Gallery);
 
     //! NOTE: Qt gives out an unexpected minimum height to my widgets and QLayout::invalidate()
     //! could not solve the problem, maybe there is some dirty cached data at the bottom level.
@@ -570,7 +865,7 @@ JustWrite::JustWrite() {
     //! figure out a better way to solve the problem
     const auto DO_NOT_REMOVE_THIS_STATEMENT = sizeHint();
 
-    requestInitFromLocalStorage();
+    request_init_from_local_storage();
 
     command_manager_.load_default();
 }
@@ -583,50 +878,6 @@ JustWrite::~JustWrite() {
 
     jwrite_profiler_dump(QString("jwrite-profiler.%1.log")
                              .arg(QDateTime::currentDateTimeUtc().toString("yyyyMMddHHmmss")));
-}
-
-void JustWrite::wait(std::function<void()> job) {
-    Progress::wait(ui_surface_, job);
-}
-
-void JustWrite::updateColorScheme(const ColorScheme &scheme) {
-    auto pal = palette();
-    pal.setColor(QPalette::Window, scheme.window());
-    pal.setColor(QPalette::WindowText, scheme.window_text());
-    pal.setColor(QPalette::Base, scheme.text_base());
-    pal.setColor(QPalette::Text, scheme.text());
-    pal.setColor(QPalette::Highlight, scheme.selected_text());
-    pal.setColor(QPalette::Button, scheme.window());
-    pal.setColor(QPalette::ButtonText, scheme.window_text());
-    setPalette(pal);
-
-    if (auto w = static_cast<QScrollArea *>(page_map_[PageType::Gallery])->verticalScrollBar()) {
-        auto pal = w->palette();
-        pal.setColor(w->backgroundRole(), scheme.text_base());
-        pal.setColor(w->foregroundRole(), scheme.window());
-        w->setPalette(pal);
-    }
-
-    ui_title_bar_->updateColorScheme(scheme);
-    ui_toolbar_->update_color_scheme(scheme);
-    ui_gallery_->updateColorScheme(scheme);
-    ui_edit_page_->updateColorScheme(scheme);
-
-    auto font = this->font();
-    font.setPointSize(10);
-    QToolTip::setFont(font);
-
-    pal.setColor(QPalette::ToolTipBase, scheme.window());
-    pal.setColor(QPalette::ToolTipText, scheme.window_text());
-    QToolTip::setPalette(pal);
-}
-
-QString JustWrite::get_default_author() const {
-    return likely_author_.isEmpty() ? "佚名" : likely_author_;
-}
-
-void JustWrite::set_default_author(const QString &author, bool force) {
-    if (likely_author_.isEmpty() || force) { likely_author_ = author; }
 }
 
 void JustWrite::setupUi() {
@@ -713,7 +964,7 @@ void JustWrite::setupUi() {
     ui_tray_icon_->setToolTip("只写");
     ui_tray_icon_->setVisible(false);
 
-    updateColorScheme(AppConfig::get_instance().scheme());
+    update_color_scheme(AppConfig::get_instance().scheme());
 }
 
 void JustWrite::setupConnections() {
@@ -727,267 +978,34 @@ void JustWrite::setupConnections() {
     actions.bind(AppAction::Fullscreen, this, &JustWrite::handle_on_enter_fullscreen);
     actions.bind(AppAction::ExitFullscreen, this, &JustWrite::handle_on_exit_fullscreen);
 
-    actions.attach(AppAction::OpenBookGallery, ui_edit_page_, &EditPage::quitEditRequested);
-    actions.attach(AppAction::OpenSettings, ui_edit_page_, &EditPage::openSettingsRequested);
+    actions.attach(AppAction::OpenBookGallery, ui_edit_page_, &EditPage::on_request_quit_edit);
+    actions.attach(AppAction::OpenSettings, ui_edit_page_, &EditPage::on_request_open_settings);
 
     connect(&config, &AppConfig::on_theme_change, this, &JustWrite::handle_on_theme_change);
     connect(&config, &AppConfig::on_scheme_change, this, &JustWrite::handle_on_scheme_change);
-    connect(ui_title_bar_, &TitleBar::minimizeRequested, this, &JustWrite::handle_on_minimize);
     connect(
-        ui_title_bar_, &TitleBar::maximizeRequested, this, &JustWrite::handle_on_toggle_maximize);
-    connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::handle_on_close);
+        ui_title_bar_, &TitleBar::minimizeRequested, this, &JustWrite::handle_on_request_minimize);
+    connect(
+        ui_title_bar_,
+        &TitleBar::maximizeRequested,
+        this,
+        &JustWrite::handle_on_request_toggle_maximize);
+    connect(ui_title_bar_, &TitleBar::closeRequested, this, &JustWrite::handle_on_request_close);
+    connect(qApp, &QApplication::aboutToQuit, this, &JustWrite::handle_on_about_to_quit);
     connect(ui_gallery_, &Gallery::clicked, this, &JustWrite::handle_gallery_on_click);
     connect(ui_gallery_, &Gallery::menuClicked, this, &JustWrite::handle_gallery_on_menu_action);
     connect(
         ui_edit_page_,
-        &EditPage::renameTocItemRequested,
+        &EditPage::on_request_rename_toc_item,
         this,
         &JustWrite::handle_book_dir_on_rename_toc_item__adapter);
     connect(
         this,
-        &JustWrite::pageChanged,
+        &JustWrite::on_page_change,
         this,
         &JustWrite::handle_on_page_change,
         Qt::QueuedConnection);
     connect(this, &JustWrite::on_trigger_shortcut, this, &JustWrite::handle_on_trigger_shortcut);
-}
-
-void JustWrite::requestInitFromLocalStorage() {
-    const QDir data_dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
-    if (data_dir.exists()) {
-        loadDataFromLocalStorage();
-    } else {
-        initLocalStorage();
-    }
-}
-
-void JustWrite::initLocalStorage() {
-    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
-
-    if (!dir.exists()) {
-        const bool succeed = dir.mkdir(".");
-        Q_ASSERT(succeed);
-    }
-
-    QJsonObject local_storage;
-    local_storage["major_author"]     = QString{};
-    local_storage["last_update_time"] = QDateTime::currentDateTimeUtc().toString();
-    local_storage["data"]             = QJsonArray{};
-
-    /*! Json Structure
-     *  {
-     *      "data": [
-     *          {
-     *              "book_id": "<book-uuid>",
-     *              "name": "<name>",
-     *              "author": "<author>",
-     *              "cover_url": "<cover-url>",
-     *              "last_update_time": "<last-update-time>"
-     *          }
-     *      ],
-     *      "major_author" "<major-author>",
-     *      "last_update_time": "<last-update-time>"
-     *  }
-     **/
-
-    QFile data_file(dir.filePath("mainfest.json"));
-    data_file.open(QIODevice::WriteOnly | QIODevice::Text);
-
-    data_file.write(QJsonDocument(local_storage).toJson());
-
-    data_file.close();
-}
-
-void JustWrite::loadDataFromLocalStorage() {
-    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
-    Q_ASSERT(dir.exists());
-
-    Q_ASSERT(dir.exists("mainfest.json"));
-
-    QFile data_file(dir.filePath("mainfest.json"));
-    data_file.open(QIODevice::ReadOnly | QIODevice::Text);
-    const auto text = data_file.readAll();
-    auto       json = QJsonDocument::fromJson(text);
-    data_file.close();
-
-    Q_ASSERT(json.isObject());
-    const auto &local_storage = json.object();
-
-    likely_author_        = local_storage["major_author"].toString("");
-    const auto &book_data = local_storage["data"].toArray({});
-
-    for (const auto &ref : book_data) {
-        Q_ASSERT(ref.isObject());
-        const auto &book = ref.toObject();
-        const auto &uuid = book["book_id"].toString("");
-        const auto &name = book["name"].toString("");
-        Q_ASSERT(!uuid.isEmpty() && !name.isEmpty());
-
-        BookInfo book_info{
-            .uuid          = uuid,
-            .title         = name,
-            .author        = book["author"].toString(""),
-            .cover_url     = book["cover_url"].toString(""),
-            .creation_time = QDateTime::fromString(book["creation_time"].toString(""), Qt::ISODate),
-            .last_update_time =
-                QDateTime::fromString(book["last_update_time"].toString(""), Qt::ISODate),
-        };
-
-        if (!book_info.creation_time.isValid()) {
-            book_info.creation_time = QDateTime::currentDateTimeUtc();
-        }
-        if (!book_info.last_update_time.isValid()) {
-            book_info.last_update_time = QDateTime::currentDateTimeUtc();
-        }
-
-        handle_gallery_on_load_book(book_info);
-
-        if (!dir.exists(uuid)) { continue; }
-
-        const bool succeed = dir.cd(uuid);
-        Q_ASSERT(succeed);
-
-        auto bm = books_.value(uuid);
-        Q_ASSERT(bm);
-
-        if (dir.exists("TOC")) {
-            const auto toc_path = dir.filePath("TOC");
-            QFile      toc_file(toc_path);
-            toc_file.open(QIODevice::ReadOnly | QIODevice::Text);
-            const auto toc_text = toc_file.readAll();
-            toc_file.close();
-
-            const auto toc_json = QJsonDocument::fromJson(toc_text);
-            Q_ASSERT(toc_json.isArray());
-            const auto &volumes = toc_json.array();
-
-            /*! Json Structure
-             *  [
-             *      {
-             *          'vid': <volume-id>,
-             *          'title': '<volume-title>',
-             *          'chapters': [
-             *              {
-             *                  'cid': <chapter-id>,
-             *                  'title': '<chapter-title>',
-             *              }
-             *          ]
-             *      }
-             *  ]
-             */
-
-            int vol_index = 0;
-            for (const auto &vol_ref : volumes) {
-                Q_ASSERT(vol_ref.isObject());
-                const auto &volume    = vol_ref.toObject();
-                const auto  vid       = volume["vid"].toInt();
-                const auto  vol_title = volume["title"].toString("");
-                bm->add_volume_as(vol_index++, vid, vol_title);
-                const auto &chapters   = volume["chapters"].toArray({});
-                int         chap_index = 0;
-                for (const auto &chap_ref : chapters) {
-                    Q_ASSERT(chap_ref.isObject());
-                    const auto &chapter    = chap_ref.toObject();
-                    const auto  cid        = chapter["cid"].toInt();
-                    const auto  chap_title = chapter["title"].toString("");
-                    bm->add_chapter_as(vid, chap_index++, cid, chap_title);
-                }
-            }
-        }
-
-        dir.cdUp();
-    }
-}
-
-void JustWrite::syncToLocalStorage() {
-    QJsonObject local_storage;
-    QJsonArray  book_data;
-
-    //! FIXME: combine with local data
-
-    for (const auto &[uuid, bm] : books_.asKeyValueRange()) {
-        const auto &book_info = bm->info_ref();
-        Q_ASSERT(uuid == book_info.uuid);
-        QJsonObject book;
-        book["book_id"]          = book_info.uuid;
-        book["name"]             = book_info.title;
-        book["author"]           = book_info.author;
-        book["cover_url"]        = book_info.cover_url;
-        book["creation_time"]    = book_info.creation_time.toString(Qt::ISODate);
-        book["last_update_time"] = book_info.last_update_time.toString(Qt::ISODate);
-        book_data.append(book);
-    }
-
-    local_storage["major_author"] = likely_author_;
-    local_storage["data"]         = book_data;
-
-    QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
-    Q_ASSERT(dir.exists());
-
-    //! TODO: check validity of local storage file
-
-    QFile data_file(dir.filePath("mainfest.json"));
-    data_file.open(QIODevice::WriteOnly | QIODevice::Text);
-    data_file.write(QJsonDocument(local_storage).toJson());
-    data_file.close();
-
-    //! NOTE: here we simply sync to local according to the book set in the memory, and remove
-    //! the book from the set also means remove the book from the local storage, however, in the
-    //! current edition, we simply delete the record without removing the content from your
-    //! machine, so you can mannually recover it by adding the record to the mainfest.json file
-    //! FIXME: you know what I'm gonna say - yeah, that's not a good idea
-
-    for (const auto &[uuid, bm] : books_.asKeyValueRange()) {
-        if (!dir.exists(uuid)) { dir.mkdir(uuid); }
-        dir.cd(uuid);
-
-        QJsonArray volumes;
-        for (const int vid : bm->get_volumes()) {
-            QJsonObject volume;
-            QJsonArray  chapters;
-            for (const int cid : bm->get_chapters_of_volume(vid)) {
-                QJsonObject chapter;
-                chapter["cid"]   = cid;
-                chapter["title"] = bm->get_title(cid).value().get();
-                chapters.append(chapter);
-            }
-            volume["vid"]      = vid;
-            volume["title"]    = bm->get_title(vid).value().get();
-            volume["chapters"] = chapters;
-            volumes.append(volume);
-        }
-
-        QFile toc_file(dir.filePath("TOC"));
-        toc_file.open(QIODevice::WriteOnly | QIODevice::Text);
-        toc_file.write(QJsonDocument(volumes).toJson());
-        toc_file.close();
-
-        //! FIXME: unsafe cast
-        const auto book_manager = static_cast<BookManager *>(bm);
-        for (const int cid : book_manager->get_all_chapters()) {
-            if (!book_manager->is_chapter_dirty(cid)) { continue; }
-            Q_ASSERT(book_manager->chapter_cached(cid));
-            const auto content = std::move(book_manager->fetch_chapter_content(cid).value());
-            QFile      file(book_manager->get_path_to_chapter(cid));
-            file.open(QIODevice::WriteOnly | QIODevice::Text);
-            Q_ASSERT(file.isOpen());
-            file.write(content.toUtf8());
-            file.close();
-        }
-
-        dir.cdUp();
-    }
-}
-
-void JustWrite::switchToPage(PageType page) {
-    Q_ASSERT(page_map_.contains(page));
-    Q_ASSERT(page_map_.value(page, nullptr));
-    if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
-        ui_page_stack_->setCurrentWidget(w);
-    }
-    ui_toolbar_->apply_mask(page_toolbar_mask_[page]);
-    current_page_ = page;
-    emit pageChanged(page);
 }
 
 bool JustWrite::eventFilter(QObject *watched, QEvent *event) {

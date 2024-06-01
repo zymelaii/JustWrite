@@ -17,13 +17,10 @@ ColorSchemeDialog::ColorSchemeDialog(
     : QDialog(parent)
     , theme_{initial_theme}
     , schemes_{{theme_, initial_scheme}} {
-    setupUi();
-    updateGeometry();
+    init();
 }
 
-ColorSchemeDialog::~ColorSchemeDialog() {}
-
-void ColorSchemeDialog::setupUi() {
+void ColorSchemeDialog::init() {
     auto layout = new QVBoxLayout(this);
 
     auto theme_container        = new QWidget;
@@ -69,12 +66,12 @@ void ColorSchemeDialog::setupUi() {
             &widgetkit::ColorPreviewItem::colorChanged,
             [this, role = color_role](QColor color) {
                 schemes_[theme_][role] = color;
-                emit schemeChanged(getTheme(), getScheme());
+                emit on_scheme_change(theme(), scheme());
             });
 
         connect(
             this,
-            &ColorSchemeDialog::schemeChanged,
+            &ColorSchemeDialog::on_scheme_change,
             selector,
             [this, selector, role = color_role](ColorTheme theme, const ColorScheme &scheme) {
                 blockSignals(true);
@@ -123,7 +120,7 @@ void ColorSchemeDialog::setupUi() {
 
     connect(ok_button, &QPushButton::clicked, this, &ColorSchemeDialog::accept);
     connect(apply_button, &QPushButton::clicked, this, [this] {
-        emit applyRequested(getTheme(), getScheme());
+        emit on_request_apply(theme(), scheme());
     });
     connect(cancel_button, &QPushButton::clicked, this, &ColorSchemeDialog::reject);
     connect(
@@ -139,12 +136,14 @@ void ColorSchemeDialog::setupUi() {
                 schemes_[theme] = ColorScheme::get_default_scheme_of_theme(theme);
             }
             theme_ = theme;
-            emit schemeChanged(getTheme(), getScheme());
+            emit on_scheme_change(this->theme(), this->scheme());
         });
 
     auto font = this->font();
     font.setPointSize(12);
     this->setFont(font);
+
+    updateGeometry();
 }
 
 } // namespace jwrite::ui

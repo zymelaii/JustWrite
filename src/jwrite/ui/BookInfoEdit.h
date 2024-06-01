@@ -5,9 +5,7 @@
 #include <widget-kit/ImageLabel.h>
 #include <widget-kit/OverlayDialog.h>
 #include <qt-material/qtmaterialtextfield.h>
-#include <qt-material/qtmaterialraisedbutton.h>
 #include <QWidget>
-#include <QLabel>
 
 namespace jwrite::ui {
 
@@ -15,56 +13,25 @@ class BookInfoEdit : public widgetkit::OverlayDialog {
     Q_OBJECT
 
 public:
-    enum Request {
-        Submit,
-        Cancel,
-    };
+    void set_title(const QString &title);
+    void set_author(const QString &author);
+    void set_cover(const QString &cover_url);
+    void set_book_info(const BookInfo &info);
+
+    static QString select_cover(QWidget *parent, bool validate, QImage *out_image);
+
+    static std::optional<BookInfo>
+        get_book_info(widgetkit::OverlaySurface *surface, const BookInfo &initial);
+
+protected slots:
+    void handle_on_select_cover();
+    void handle_on_submit();
 
 public:
     BookInfoEdit();
-    ~BookInfoEdit() override;
-
-public:
-    void setTitle(const QString &title);
-    void setAuthor(const QString &author);
-    void setCover(const QString &cover_url);
-    void setBookInfo(const BookInfo &info);
-
-    BookInfoEdit &withTitle(const QString &title) {
-        setTitle(title);
-        return *this;
-    }
-
-    BookInfoEdit &withAuthor(const QString &author) {
-        setAuthor(author);
-        return *this;
-    }
-
-    BookInfoEdit &withCover(const QString &cover_url) {
-        setCover(cover_url);
-        return *this;
-    }
-
-    BookInfoEdit &withBookInfo(const BookInfo &info) {
-        setBookInfo(info);
-        return *this;
-    }
-
-    const BookInfo &bookInfo() const {
-        return book_info_;
-    }
-
-    static QString getCoverPath(QWidget *parent, bool validate, QImage *out_image);
-
-    static std::optional<BookInfo>
-        getBookInfo(widgetkit::OverlaySurface *surface, const BookInfo &initial);
-
-protected slots:
-    void selectCoverImage();
 
 protected:
-    void setupUi();
-    void setupConnections();
+    void init();
 
     void paintEvent(QPaintEvent *event) override;
 

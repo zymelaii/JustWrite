@@ -2,10 +2,8 @@
 
 #include <jwrite/ui/Editor.h>
 #include <jwrite/ui/FloatingLabel.h>
-#include <jwrite/ui/StatusBar.h>
 #include <jwrite/ui/TwoLevelTree.h>
 #include <jwrite/ui/FloatingMenu.h>
-#include <jwrite/MessyInput.h>
 #include <jwrite/ColorScheme.h>
 #include <jwrite/VisualTextEditContext.h>
 #include <jwrite/WordCounter.h>
@@ -13,57 +11,45 @@
 #include <jwrite/BookManager.h>
 #include <widget-kit/FlatButton.h>
 #include <QWidget>
-#include <QTimer>
 #include <QLabel>
+#include <memory>
 
 namespace jwrite::ui {
 
 class EditPage : public QWidget {
     Q_OBJECT
 
-protected:
-    enum class ExportType {
-        PlainText,
-        ePub,
-    };
-
-public:
-    explicit EditPage(QWidget *parent = nullptr);
-    ~EditPage() override;
-
 signals:
-    void renameTocItemRequested(const BookInfo &book_info, int vid, int cid);
-    void quitEditRequested();
-    void openSettingsRequested();
+    void on_request_rename_toc_item(const BookInfo &book_info, int vid, int cid);
+    void on_request_quit_edit();
+    void on_request_open_settings();
 
 public:
-    void updateColorScheme(const ColorScheme &scheme);
+    void request_rename_toc_item(int vid, int cid);
 
-    bool                 resetBookSource(AbstractBookManager *book_manager);
-    AbstractBookManager *takeBookSource();
+    void request_invalidate_wcstate();
+    void request_sync_wcstate();
+    void do_update_wcstate(const QString &text, bool text_changed);
+    void do_flush_wcstate();
 
-    const AbstractBookManager &bookSource() const {
-        Q_ASSERT(book_manager_);
-        return *book_manager_;
-    }
+    void do_open_chapter(int cid);
 
-    int  addVolume(int index, const QString &title);
-    int  addChapter(int volume_index, const QString &title);
-    void openChapter(int cid);
-    void syncAndClearEditor();
-    void focusOnEditor();
+public:
+    static QString get_friendly_word_count(int count);
 
-    void renameBookDirItem(int id, const QString &title);
-    void popupBookDirMenu(QPoint pos, TwoLevelTree::ItemInfo item_info);
-    void createAndOpenNewChapter(int vid);
-    void createAndOpenNewChapterUnderActiveVolume();
-    void requestRenameCurrentTocItem();
-    void requestRenameTocItem(int vid, int cid);
+    void update_color_scheme(const ColorScheme &scheme);
 
-    void resetWordsCount();
-    void updateWordsCount(const QString &text, bool text_changed);
-    void flushWordsCount();
-    void syncWordsStatus();
+    QString get_book_id_of_source() const;
+    void    drop_source_ref();
+    bool    reset_source(AbstractBookManager *book_manager);
+
+    int  add_volume(int index, const QString &title);
+    int  add_chapter(int volume_index, const QString &title);
+    void sync_chapter_from_editor();
+    void focus_editor();
+
+    void rename_toc_item(int id, const QString &title);
+    void create_and_open_chapter(int vid);
 
     void toggle_sidebar() {
         ui_sidebar_->setVisible(!ui_sidebar_->isVisible());
@@ -71,11 +57,6 @@ public:
 
     void toggle_soft_center_mode() {
         ui_editor_->setSoftCenterMode(!ui_editor_->softCenterMode());
-    }
-
-    void start_messy_input() {
-        ui_editor_->setFocus();
-        messy_input_->start();
     }
 
     Editor *editor() {
@@ -86,20 +67,26 @@ public:
         return ui_book_dir_;
     }
 
-protected slots:
-    void updateCurrentDateTime();
+public:
+    void handle_editor_on_activate();
+    void handle_editor_on_text_change(const QString &text);
+    void handle_editor_on_focus_lost(VisualTextEditContext::TextLoc last_loc);
+    void handle_book_dir_on_select_item(bool is_top_item, int top_item_id, int sub_item_id);
+    void handle_book_dir_on_double_click_item(bool is_top_item, int top_item_id, int sub_item_id);
+    void handle_book_dir_on_open_menu(QPoint pos, TwoLevelTree::ItemInfo item_info);
+    void handle_on_create_volume();
+    void handle_on_create_chapter();
+    void handle_on_rename_selected_toc_item();
+
+public:
+    explicit EditPage(QWidget *parent = nullptr);
 
 protected:
-    void setupUi();
-    void setupConnections();
-
-    bool eventFilter(QObject *watched, QEvent *event) override;
+    void init();
 
 private:
-    MessyInputWorker                         *messy_input_;
-    AbstractWordCounter                      *word_counter_;
+    std::unique_ptr<AbstractWordCounter>      word_counter_;
     AbstractBookManager                      *book_manager_;
-    QTimer                                    sec_timer_;
     int                                       current_cid_;
     QMap<int, VisualTextEditContext::TextLoc> chapter_locs_;
     int                                       chap_words_;
@@ -107,13 +94,10 @@ private:
     VisualTextEditContext::TextLoc            last_loc_;
 
     Editor                  *ui_editor_;
-    StatusBar               *ui_status_bar_;
     widgetkit::FlatButton   *ui_new_volume_;
     widgetkit::FlatButton   *ui_new_chapter_;
     TwoLevelTree            *ui_book_dir_;
     FloatingLabel           *ui_word_count_;
-    QLabel                  *ui_total_words_;
-    QLabel                  *ui_datetime_;
     QWidget                 *ui_sidebar_;
     QMap<QString, QWidget *> ui_named_widgets_;
     FloatingMenu            *ui_menu_;

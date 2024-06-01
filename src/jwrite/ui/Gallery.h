@@ -28,7 +28,7 @@ public:
     void removeDisplayCase(int index);
     void updateDisplayCaseItem(int index, const BookInfo &book_info);
 
-    void updateColorScheme(const ColorScheme &scheme);
+    void update_color_scheme(const ColorScheme &scheme);
 
     int totalItems() const {
         return items_.size();

@@ -15,10 +15,6 @@ struct EditorPrivate;
 class Editor : public QWidget {
     Q_OBJECT
 
-public:
-    explicit Editor(QWidget *parent = nullptr);
-    ~Editor() override;
-
 signals:
     void textAreaChanged(QRect area);
     void textChanged(const QString &text);
@@ -78,10 +74,16 @@ protected slots:
     void render();
 
 public:
+    explicit Editor(QWidget *parent = nullptr);
+    ~Editor() override;
+
+public:
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
 
 protected:
+    void init();
+
     void requestUpdate(bool sync);
     void setCursorShape(Qt::CursorShape shape);
     void restoreCursorShape();

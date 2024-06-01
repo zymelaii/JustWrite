@@ -17,8 +17,6 @@ AboutDialog::AboutDialog()
     init();
 }
 
-AboutDialog::~AboutDialog() {}
-
 int AboutDialog::exec(widgetkit::OverlaySurface* surface) {
     Q_ASSERT(surface);
     surface->installEventFilter(this);

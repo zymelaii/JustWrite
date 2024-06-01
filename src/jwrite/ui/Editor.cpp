@@ -21,70 +21,6 @@
 
 namespace jwrite::ui {
 
-Editor::Editor(QWidget *parent)
-    : QWidget(parent) {
-    setFocusPolicy(Qt::ClickFocus);
-    setAttribute(Qt::WA_InputMethodEnabled);
-    setAutoFillBackground(true);
-    setAcceptDrops(true);
-    setMouseTracking(true);
-    setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
-    setContentsMargins({});
-
-    min_text_line_chars_       = 12;
-    soft_center_mode_          = false;
-    expected_scroll_           = 0.0;
-    blink_cursor_should_paint_ = true;
-    inserted_filter_enabled_   = true;
-    drag_sel_flag_             = false;
-    oob_drag_sel_flag_         = false;
-    auto_scroll_mode_          = false;
-    busy_loading_              = false;
-    ui_cursor_shape_[0]        = Qt::ArrowCursor;
-    ui_cursor_shape_[1]        = Qt::ArrowCursor;
-
-    setSoftCenterMode(true);
-
-    const auto text_area = textArea();
-    context_             = new VisualTextEditContext(fontMetrics(), text_area.width());
-    context_->resize_viewport(context_->viewport_width, text_area.height());
-
-    restrict_rule_ = new TextRestrictRule;
-    tokenizer_     = Tokenizer::build();
-
-    timer_enabled_ = true;
-
-    update_requested_ = false;
-    stable_timer_.setInterval(16);
-    stable_timer_.setSingleShot(false);
-
-    blink_timer_.setInterval(500);
-    blink_timer_.setSingleShot(false);
-
-    input_manager_ = new GeneralTextInputCommandManager(context_->engine);
-    input_manager_->load_default();
-
-    busy_loading_ = false;
-
-    scrollToStart();
-
-    connect(this, &Editor::textAreaChanged, this, [this](QRect area) {
-        context_->resize_viewport(area.width(), area.height());
-        requestUpdate(false);
-    });
-    connect(&blink_timer_, &QTimer::timeout, this, &Editor::renderBlinkCursor);
-    connect(&stable_timer_, &QTimer::timeout, this, &Editor::render);
-
-    stable_timer_.start();
-}
-
-Editor::~Editor() {
-    delete context_;
-    delete restrict_rule_;
-    delete tokenizer_;
-    delete input_manager_;
-}
-
 bool Editor::softCenterMode() const {
     return soft_center_mode_;
 }
@@ -462,6 +398,74 @@ QSize Editor::minimumSizeHint() const {
         min_text_line_chars_ * context_->engine.standard_char_width + hori_margin;
     const auto min_height = line_spacing * 3 + context_->engine.block_spacing * 2 + vert_margin;
     return QSize(min_width, min_height);
+}
+
+Editor::Editor(QWidget *parent)
+    : QWidget(parent) {
+    init();
+}
+
+Editor::~Editor() {
+    delete context_;
+    delete restrict_rule_;
+    delete tokenizer_;
+    delete input_manager_;
+}
+
+void Editor::init() {
+    setFocusPolicy(Qt::ClickFocus);
+    setAttribute(Qt::WA_InputMethodEnabled);
+    setAutoFillBackground(true);
+    setAcceptDrops(true);
+    setMouseTracking(true);
+    setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+    setContentsMargins({});
+
+    min_text_line_chars_       = 12;
+    soft_center_mode_          = false;
+    expected_scroll_           = 0.0;
+    blink_cursor_should_paint_ = true;
+    inserted_filter_enabled_   = true;
+    drag_sel_flag_             = false;
+    oob_drag_sel_flag_         = false;
+    auto_scroll_mode_          = false;
+    busy_loading_              = false;
+    ui_cursor_shape_[0]        = Qt::ArrowCursor;
+    ui_cursor_shape_[1]        = Qt::ArrowCursor;
+
+    setSoftCenterMode(true);
+
+    const auto text_area = textArea();
+    context_             = new VisualTextEditContext(fontMetrics(), text_area.width());
+    context_->resize_viewport(context_->viewport_width, text_area.height());
+
+    restrict_rule_ = new TextRestrictRule;
+    tokenizer_     = Tokenizer::build();
+
+    timer_enabled_ = true;
+
+    update_requested_ = false;
+    stable_timer_.setInterval(16);
+    stable_timer_.setSingleShot(false);
+
+    blink_timer_.setInterval(500);
+    blink_timer_.setSingleShot(false);
+
+    input_manager_ = new GeneralTextInputCommandManager(context_->engine);
+    input_manager_->load_default();
+
+    busy_loading_ = false;
+
+    scrollToStart();
+
+    connect(this, &Editor::textAreaChanged, this, [this](QRect area) {
+        context_->resize_viewport(area.width(), area.height());
+        requestUpdate(false);
+    });
+    connect(&blink_timer_, &QTimer::timeout, this, &Editor::renderBlinkCursor);
+    connect(&stable_timer_, &QTimer::timeout, this, &Editor::render);
+
+    stable_timer_.start();
 }
 
 void Editor::requestUpdate(bool sync) {
