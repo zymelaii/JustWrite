@@ -274,6 +274,7 @@ dl {
 
 li {
     font-family: "Palatino", "Times New Roman", Caecilia, serif;
+    list-style-type: none;
     line-height: 1.5em;
     orphans: 2;
     widows: 2;
