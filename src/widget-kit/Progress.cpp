@@ -12,7 +12,8 @@ namespace widgetkit {
 Progress::Progress()
     : OverlayDialog()
     , policy_(Progress::IgnoreSmallJob | Progress::UseMinimumDisplayTime)
-    , minimum_display_time_{800} {
+    , minimum_display_time_{800}
+    , small_job_criteria_{200} {
     setupUi();
 }
 
