@@ -509,6 +509,7 @@ void TwoLevelTree::mouseDoubleClickEvent(QMouseEvent *event) {
 }
 
 QDebug operator<<(QDebug stream, const TwoLevelTreeItemInfo &item_info) {
+    QDebugStateSaver saver(stream);
     stream.nospace() << "ItemInfo::" << (item_info.is_top_item ? "Top" : "Sub")
                      << "(id=" << item_info.id << ", index=[" << item_info.global_index << ","
                      << item_info.local_index << "," << item_info.level_index

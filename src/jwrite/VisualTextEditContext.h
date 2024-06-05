@@ -113,7 +113,7 @@ struct VisualTextEditContext {
         sel.clear();
     }
 
-    void remove_sel_region();
+    void remove_sel_region(QString *deleted_text);
 
     /*!
      * \param [in] hint expected movements to the further move command
@@ -126,7 +126,7 @@ struct VisualTextEditContext {
 
     void move(int offset, bool extend_sel);
     void move_to(int pos, bool extend_sel);
-    void del(int times, bool hard_mode);
+    void del(int times, bool hard_mode, QString *deleted_text);
     void insert(const QString &text);
 
     bool vertical_move(bool up);

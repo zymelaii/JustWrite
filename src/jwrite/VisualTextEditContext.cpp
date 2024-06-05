@@ -101,7 +101,7 @@ VisualTextEditContext::TextLoc VisualTextEditContext::current_textloc() const {
         .block_index = engine.active_block_index,
         .row         = engine.cursor.row,
         .col         = engine.cursor.col,
-        .pos         = edit_cursor_pos,
+        .pos         = engine.cursor.pos,
     };
 }
 
@@ -137,7 +137,6 @@ bool VisualTextEditContext::set_cursor_to_textloc(const TextLoc &loc, int hint) 
     Q_ASSERT(!engine.preedit);
     if (!(loc.block_index >= 0 && loc.block_index < engine.active_blocks.size())) { return false; }
     const auto block = engine.active_blocks[loc.block_index];
-    const int  pos   = loc.pos - block->text_pos;
     if (hint == 0) {
         if (!(loc.row >= 0 && loc.row < block->lines.size())) { return false; }
         const auto line = block->lines[loc.row];
@@ -304,7 +303,7 @@ QPointF VisualTextEditContext::get_vpos_at_cursor() const {
 
 void VisualTextEditContext::begin_preedit() {
     Q_ASSERT(!engine.preedit);
-    remove_sel_region();
+    remove_sel_region(nullptr);
     engine.begin_preedit(preedit_text);
 }
 
@@ -336,12 +335,12 @@ void VisualTextEditContext::commit_preedit() {
     engine.commit_preedit();
 }
 
-void VisualTextEditContext::remove_sel_region() {
+void VisualTextEditContext::remove_sel_region(QString *deleted_text) {
     Q_ASSERT(!engine.preedit);
     if (!has_sel()) { return; }
     const int len = sel.len();
     move_within_sel_region(-1);
-    del(len, true);
+    del(len, true, deleted_text);
 }
 
 int VisualTextEditContext::move_within_sel_region(int hint) {
@@ -399,17 +398,51 @@ void VisualTextEditContext::move_to(int pos, bool extend_sel) {
     cursor_moved = true;
 }
 
-void VisualTextEditContext::del(int times, bool hard_mode) {
+void VisualTextEditContext::del(int times, bool hard_mode, QString *deleted_text) {
     Q_ASSERT(engine.is_cursor_available());
+    Q_ASSERT(!has_sel());
+    Q_ASSERT(!engine.preedit);
 
-    if (has_sel()) {
-        remove_sel_region();
-    } else {
-        int       deleted             = 0;
-        const int edit_cursor_offset  = engine.commit_deletion(times, deleted, hard_mode);
-        edit_cursor_pos              += edit_cursor_offset;
-        edit_text.remove(edit_cursor_pos, deleted);
+    //! TODO: better solution
+    if (deleted_text) {
+        const bool saved_cursor_moved    = cursor_moved;
+        const int  saved_edit_cursor_pos = edit_cursor_pos;
+        const auto saved_loc             = current_textloc();
+        engine.commit_movement(times, nullptr, hard_mode);
+        const auto dest_loc = current_textloc();
+
+        const auto &loc_start = times > 0 ? saved_loc : dest_loc;
+        const auto &loc_end   = times > 0 ? dest_loc : saved_loc;
+
+        const bool succeed = set_cursor_to_textloc(saved_loc, 0);
+        Q_ASSERT(succeed);
+        cursor_moved = saved_cursor_moved;
+
+        if (loc_start.block_index == loc_end.block_index) {
+            const int pos = engine.active_blocks[loc_start.block_index]->text_pos + loc_start.pos;
+            *deleted_text = edit_text.mid(edit_cursor_pos, loc_end.pos - loc_start.pos);
+        } else {
+            QStringList blocks{};
+            blocks << engine.active_blocks[loc_start.block_index]
+                          ->text()
+                          .mid(loc_start.pos)
+                          .toString();
+            for (int i = loc_start.block_index + 1; i < loc_end.block_index; ++i) {
+                blocks << engine.active_blocks[i]->text().toString();
+            }
+            blocks
+                << engine.active_blocks[loc_end.block_index]->text().left(loc_end.pos).toString();
+            *deleted_text = blocks.join('\n');
+        }
+
+        Q_ASSERT(saved_edit_cursor_pos == edit_cursor_pos);
     }
+
+    int       deleted             = 0;
+    const int edit_cursor_offset  = engine.commit_deletion(times, deleted, hard_mode);
+    edit_cursor_pos              += edit_cursor_offset;
+
+    edit_text.remove(edit_cursor_pos, deleted);
 
     cursor_moved = true;
 }
@@ -417,7 +450,7 @@ void VisualTextEditContext::del(int times, bool hard_mode) {
 void VisualTextEditContext::insert(const QString &text) {
     Q_ASSERT(engine.is_cursor_available());
 
-    if (has_sel()) { remove_sel_region(); }
+    if (has_sel()) { remove_sel_region(nullptr); }
 
     const int len = text.length();
 
@@ -516,6 +549,7 @@ void VisualTextEditContext::scroll_to(double pos) {
 }
 
 QDebug operator<<(QDebug stream, const VisualTextEditContext::TextLoc &text_loc) {
+    QDebugStateSaver saver(stream);
     stream.nospace() << "TextLoc[index=" << text_loc.block_index << ",row=" << text_loc.row
                      << ",col=" << text_loc.col << ",pos=" << text_loc.pos << "]";
     return stream;

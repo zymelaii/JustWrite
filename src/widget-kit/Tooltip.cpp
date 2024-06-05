@@ -52,8 +52,6 @@ void ToolTipLabel::mouseMoveEvent(QMouseEvent *event) {
 void ToolTipLabel::paintEvent(QPaintEvent *event) {
     if (text_.isEmpty()) { return; }
 
-    qDebug() << contentsRect();
-
     QPainter p(this);
     p.setRenderHint(QPainter::TextAntialiasing);
 

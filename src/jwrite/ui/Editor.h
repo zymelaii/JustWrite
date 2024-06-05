@@ -3,6 +3,7 @@
 #include <jwrite/VisualTextEditContext.h>
 #include <jwrite/TextInputCommand.h>
 #include <jwrite/TextRestrictRule.h>
+#include <jwrite/TextEditHistory.h>
 #include <jwrite/Tokenizer.h>
 #include <QTimer>
 #include <QWidget>
@@ -42,20 +43,27 @@ public:
     void                  scrollToStart();
     void                  scrollToEnd();
 
-    void insertRawText(const QString &text);
-    bool insertedPairFilter(const QString &text);
+    void direct_remove_sel(QString *deleted_text);
+    void direct_delete(int times, QString *deleted_text);
+    void execute_delete_action(int times);
+    void direct_insert(const QString &text);
+    void direct_batch_insert(const QString &multiline_text);
+    void execute_insert_action(const QString &text, bool batch_mode);
+    bool insert_action_filter(const QString &text);
 
+    void del(int times);
+    void insert(const QString &text, bool batch_mode);
     void select(int start_pos, int end_pos);
     void move(int offset, bool extend_sel);
-    void moveTo(int pos, bool extend_sel);
-    void insert(const QString &text);
-    void del(int times);
+    void move_to(int pos, bool extend_sel);
     void copy();
     void cut();
     void paste();
+    void undo();
+    void redo();
 
-    void breakIntoNewLine(bool should_update);
-    void verticalMove(bool up);
+    [[deprecated]] void breakIntoNewLine(bool should_update);
+    void                verticalMove(bool up);
 
     Tokenizer *tokenizer() const;
 
@@ -118,6 +126,7 @@ private:
     TextInputCommandManager  *input_manager_;
     Tokenizer                *tokenizer_;
     QFuture<Tokenizer *>      fut_tokenizer_;
+    TextEditHistory           history_;
 
     int    min_text_line_chars_;
     bool   soft_center_mode_;

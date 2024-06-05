@@ -423,7 +423,9 @@ int TextViewEngine::commit_deletion(int times, int &deleted, bool hard_del) {
     //! method by TextViewEngine, here we render the block in advance to keep the info of cursor
     //! FIXME: render per delete op could be costful, consider a better solution
     //! HINT: by checking the dirty cursor pos to guess the direction hint and render it in engine
-    block->render();
+    //! NOTE: the render call here happens before the del action applied to the text source, it
+    //! would lead to a wrong render result since the text source is still dirty
+    // block->render();
 
     return text_offset;
 }

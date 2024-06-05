@@ -18,6 +18,7 @@
 #include <QTimer>
 #include <QMap>
 #include <magic_enum.hpp>
+#include <spdlog/spdlog.h>
 
 namespace jwrite::ui {
 
@@ -54,7 +55,7 @@ void Editor::reset(QString &text, bool swap) {
 
     int active_block_index = context_->engine.active_block_index != -1 ? 0 : -1;
 
-    context_->viewport_y_pos    = 0;
+    context_->viewport_y_pos = 0;
     context_->engine.clear_all();
     context_->engine.insert_block(0);
     context_->engine.active_block_index = 0;
@@ -67,7 +68,7 @@ void Editor::reset(QString &text, bool swap) {
     context_->vertical_move_state      = false;
     context_->unset_sel();
 
-    insertRawText(text);
+    direct_batch_insert(text);
 
     context_->engine.active_block_index = active_block_index;
     context_->edit_cursor_pos           = 0;
@@ -89,6 +90,8 @@ QString Editor::take() {
     context_->cached_render_data_ready = false;
     context_->cursor_moved             = true;
     context_->vertical_move_state      = false;
+
+    history_.clear();
 
     return std::move(text);
 }
@@ -144,17 +147,7 @@ QString Editor::text() const {
 }
 
 VisualTextEditContext::TextLoc Editor::currentTextLoc() const {
-    VisualTextEditContext::TextLoc loc{.block_index = -1};
-
-    const auto &e = context_->engine;
-    if (!e.is_cursor_available()) { return loc; }
-
-    loc.block_index = e.active_block_index;
-    loc.row         = e.cursor.row;
-    loc.col         = e.cursor.col;
-    loc.pos         = e.current_line().text_offset() + e.cursor.col;
-
-    return loc;
+    return context_->current_textloc();
 }
 
 void Editor::setCursorToTextLoc(const VisualTextEditContext::TextLoc &loc) {
@@ -205,19 +198,60 @@ void Editor::scrollToEnd() {
     scrollTo(y_pos, false);
 }
 
-void Editor::insertRawText(const QString &text) {
-    auto text_list           = text.split('\n');
-    inserted_filter_enabled_ = false;
-    for (int i = 0; i < text_list.size(); ++i) {
-        auto text = text_list[i].trimmed();
-        if (text.isEmpty()) { continue; }
-        context_->insert(text);
-        if (i + 1 < text_list.size()) { breakIntoNewLine(false); }
-    }
-    inserted_filter_enabled_ = true;
+void Editor::direct_remove_sel(QString *deleted_text) {
+    Q_ASSERT(context_->has_sel());
+    context_->remove_sel_region(deleted_text);
 }
 
-bool Editor::insertedPairFilter(const QString &text) {
+void Editor::direct_delete(int times, QString *deleted_text) {
+    Q_ASSERT(!context_->has_sel());
+    context_->del(times, false, deleted_text);
+}
+
+void Editor::execute_delete_action(int times) {
+    Q_ASSERT(!context_->engine.preedit);
+    Q_ASSERT(context_->engine.is_cursor_available());
+    QString deleted_text{};
+    if (context_->has_sel()) {
+        direct_remove_sel(&deleted_text);
+    } else {
+        direct_delete(times, &deleted_text);
+    }
+    const auto loc = currentTextLoc();
+    history_.push(TextEditAction::from_action(TextEditAction::Type::Delete, loc, deleted_text));
+}
+
+void Editor::direct_insert(const QString &text) {
+    Q_ASSERT(!context_->engine.preedit);
+    Q_ASSERT(!context_->has_sel());
+    context_->insert(text);
+}
+
+void Editor::direct_batch_insert(const QString &multiline_text) {
+    Q_ASSERT(!context_->engine.preedit);
+    Q_ASSERT(!context_->has_sel());
+    auto lines = multiline_text.split('\n');
+    direct_insert(lines.first());
+    for (int i = 1; i < lines.size(); ++i) {
+        context_->engine.break_block_at_cursor_pos();
+        direct_insert(lines[i]);
+    }
+}
+
+void Editor::execute_insert_action(const QString &text, bool batch_mode) {
+    Q_ASSERT(context_->engine.is_cursor_available());
+    Q_ASSERT(!context_->engine.preedit);
+    Q_ASSERT(!context_->has_sel());
+    const auto loc = currentTextLoc();
+    if (batch_mode) {
+        direct_batch_insert(text);
+    } else {
+        direct_insert(text);
+    }
+    history_.push(TextEditAction::from_action(TextEditAction::Type::Insert, loc, text));
+}
+
+bool Editor::insert_action_filter(const QString &text) {
     static QMap<QString, QString> QUOTE_PAIRS{
         {"“", "”"},
         {"‘", "’"},
@@ -235,7 +269,7 @@ bool Editor::insertedPairFilter(const QString &text) {
 
     if (QUOTE_PAIRS.count(text)) {
         auto matched = QUOTE_PAIRS[text];
-        context_->insert(text + matched);
+        execute_insert_action(text + matched, false);
         context_->move(-1, false);
         return true;
     }
@@ -248,6 +282,39 @@ bool Editor::insertedPairFilter(const QString &text) {
     }
 
     return false;
+}
+
+void Editor::del(int times) {
+    execute_delete_action(times);
+    emit textChanged(context_->edit_text);
+    requestUpdate(true);
+}
+
+void Editor::insert(const QString &text, bool batch_mode) {
+    Q_ASSERT(context_->engine.is_cursor_available());
+    if (context_->has_sel()) {
+        Q_ASSERT(!context_->engine.preedit);
+        execute_delete_action(0);
+    } else if (context_->engine.preedit) {
+        context_->commit_preedit();
+    }
+    if (batch_mode) {
+        execute_insert_action(text, true);
+        if (!text.isEmpty()) { context_->cursor_moved = true; }
+    } else {
+        const auto block_text  = context_->engine.current_block()->text();
+        const auto insert_pos  = context_->engine.cursor.pos;
+        const auto text_before = block_text.left(insert_pos);
+        const auto text_after  = block_text.right(block_text.length() - insert_pos);
+        const auto text_in     = restrict_rule_->restrict(text, text_before, text_after);
+
+        bool filtered = false;
+        if (inserted_filter_enabled_) { filtered = insert_action_filter(text_in); }
+
+        if (!filtered) { execute_insert_action(text_in, false); }
+    }
+    emit textChanged(context_->edit_text);
+    requestUpdate(true);
 }
 
 void Editor::select(int start_pos, int end_pos) {
@@ -264,35 +331,8 @@ void Editor::move(int offset, bool extend_sel) {
     requestUpdate(true);
 }
 
-void Editor::moveTo(int pos, bool extend_sel) {
+void Editor::move_to(int pos, bool extend_sel) {
     context_->move_to(pos, extend_sel);
-    requestUpdate(true);
-}
-
-void Editor::insert(const QString &text) {
-    if (context_->engine.preedit) { context_->commit_preedit(); }
-
-    const auto block_text = context_->engine.current_block()->text();
-    const auto insert_pos = context_->engine.cursor.pos;
-    const auto text_in    = restrict_rule_->restrict(
-        text, block_text.left(insert_pos), block_text.right(block_text.length() - insert_pos));
-
-    bool done = false;
-
-    do {
-        if (!inserted_filter_enabled_) { break; }
-        done = insertedPairFilter(text_in);
-    } while (0);
-
-    if (!done) { context_->insert(text_in); }
-
-    emit textChanged(context_->edit_text);
-    requestUpdate(true);
-}
-
-void Editor::del(int times) {
-    context_->del(times, false);
-    emit textChanged(context_->edit_text);
     requestUpdate(true);
 }
 
@@ -322,30 +362,62 @@ void Editor::copy() {
 void Editor::cut() {
     copy();
     if (context_->has_sel()) {
-        context_->remove_sel_region();
+        del(0);
     } else {
         //! cut the current block if has no sel, also remove the block
         const auto &e = context_->engine;
         context_->move(-e.cursor.pos, false);
-        context_->del(e.current_block()->text_len() + 1, false);
+        del(e.current_block()->text_len() + 1);
     }
-    emit textChanged(context_->edit_text);
-    requestUpdate(true);
 }
 
 void Editor::paste() {
     auto clipboard = QGuiApplication::clipboard();
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
-    insertRawText(clipboard->text());
-    emit textChanged(context_->edit_text);
+    insert(clipboard->text(), true);
     scrollToCursor();
-    requestUpdate(true);
+}
+
+void Editor::undo() {
+    if (auto opt = history_.get_undo_action()) {
+        auto action = opt.value();
+        context_->unset_sel();
+        setCursorToTextLoc(action.loc);
+        switch (action.type) {
+            case TextEditAction::Insert: {
+                direct_batch_insert(action.text);
+            } break;
+            case TextEditAction::Delete: {
+                direct_delete(action.text.length(), nullptr);
+            } break;
+        }
+        emit textChanged(context_->edit_text);
+        requestUpdate(true);
+    }
+}
+
+void Editor::redo() {
+    if (auto opt = history_.get_redo_action()) {
+        auto action = opt.value();
+        context_->unset_sel();
+        setCursorToTextLoc(action.loc);
+        switch (action.type) {
+            case TextEditAction::Insert: {
+                direct_batch_insert(action.text);
+            } break;
+            case TextEditAction::Delete: {
+                direct_delete(action.text.length(), nullptr);
+            } break;
+        }
+        emit textChanged(context_->edit_text);
+        requestUpdate(true);
+    }
 }
 
 void Editor::breakIntoNewLine(bool should_update) {
     if (context_->engine.current_block()->text_len() == 0) { return; }
-    context_->remove_sel_region();
+    context_->remove_sel_region(nullptr);
     context_->engine.break_block_at_cursor_pos();
     context_->cursor_moved = true;
     if (should_update) { requestUpdate(true); }
@@ -444,7 +516,7 @@ void Editor::init() {
     const auto text_area = textArea();
     context_             = new VisualTextEditContext(fontMetrics(), text_area.width());
     context_->resize_viewport(context_->viewport_width, text_area.height());
-    context_->viewport_y_pos    = 0;
+    context_->viewport_y_pos = 0;
 
     restrict_rule_ = new TextRestrictRule;
     tokenizer_     = nullptr;
@@ -550,7 +622,7 @@ bool Editor::updateTextLocToVisualPos(const QPoint &vpos) {
     const auto  loc = context_->get_textloc_at_rel_vpos(vpos, true);
     Q_ASSERT(loc.block_index != -1);
     const auto block = e.active_blocks[loc.block_index];
-    moveTo(block->text_pos + loc.pos, true);
+    move_to(block->text_pos + loc.pos, true);
     const double line_spacing  = e.line_height * e.line_spacing_ratio;
     bool         out_of_bounds = true;
     if (vpos.y() < 0) {
@@ -794,20 +866,22 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::Reject: {
         } break;
         case TextInputCommand::InsertPrintable: {
-            insert(input_manager_->translate_printable_char(e));
+            insert(input_manager_->translate_printable_char(e), false);
         } break;
         case TextInputCommand::InsertTab: {
         } break;
         case TextInputCommand::InsertNewLine: {
-            breakIntoNewLine(true);
+            insert("\n", true);
         } break;
         case TextInputCommand::Cancel: {
             context_->unset_sel();
             requestUpdate(false);
         } break;
         case TextInputCommand::Undo: {
+            undo();
         } break;
         case TextInputCommand::Redo: {
+            redo();
         } break;
         case TextInputCommand::Copy: {
             copy();
@@ -839,7 +913,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
                 const auto word   = tokenizer()->get_last_word(block->text().left(len).toString());
                 const int  offset = word.length();
                 Q_ASSERT(offset <= cursor.pos);
-                moveTo(block->text_pos + cursor.pos - offset, false);
+                move_to(block->text_pos + cursor.pos - offset, false);
             }
         } break;
         case TextInputCommand::MoveToNextWord: {
@@ -851,7 +925,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
                 const auto word = tokenizer()->get_first_word(block->text().right(len).toString());
                 const int  offset = word.length();
                 Q_ASSERT(offset <= len);
-                moveTo(block->text_pos + cursor.pos + offset, false);
+                move_to(block->text_pos + cursor.pos + offset, false);
             }
         } break;
         case TextInputCommand::MoveToPrevLine: {
@@ -863,27 +937,27 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::MoveToStartOfLine: {
             const auto block = engine.current_block();
             const auto line  = block->current_line();
-            moveTo(block->text_pos + line.text_offset(), false);
+            move_to(block->text_pos + line.text_offset(), false);
         } break;
         case TextInputCommand::MoveToEndOfLine: {
             const auto block = engine.current_block();
             const auto line  = block->current_line();
             const auto pos   = block->text_pos + line.text_offset() + line.text().length();
-            moveTo(pos, false);
+            move_to(pos, false);
         } break;
         case TextInputCommand::MoveToStartOfBlock: {
-            moveTo(engine.current_block()->text_pos, false);
+            move_to(engine.current_block()->text_pos, false);
         } break;
         case TextInputCommand::MoveToEndOfBlock: {
             const auto block = engine.current_block();
-            moveTo(block->text_pos + block->text_len(), false);
+            move_to(block->text_pos + block->text_len(), false);
         } break;
         case TextInputCommand::MoveToStartOfDocument: {
-            moveTo(0, false);
+            move_to(0, false);
             scrollToStart();
         } break;
         case TextInputCommand::MoveToEndOfDocument: {
-            moveTo(engine.text_ref->length(), false);
+            move_to(engine.text_ref->length(), false);
             scrollToEnd();
         } break;
         case TextInputCommand::MoveToPrevPage: {
@@ -980,10 +1054,10 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             if (len == 0) {
                 move(-1, true);
             } else {
-                const auto word   = tokenizer_->get_last_word(block->text().left(len).toString());
+                const auto word   = tokenizer()->get_last_word(block->text().left(len).toString());
                 const int  offset = word.length();
                 Q_ASSERT(offset <= cursor.pos);
-                moveTo(block->text_pos + cursor.pos - offset, true);
+                move_to(block->text_pos + cursor.pos - offset, true);
             }
         } break;
         case TextInputCommand::SelectNextWord: {
@@ -992,10 +1066,10 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             if (len == 0) {
                 move(1, true);
             } else {
-                const auto word   = tokenizer_->get_first_word(block->text().right(len).toString());
+                const auto word = tokenizer()->get_first_word(block->text().right(len).toString());
                 const int  offset = word.length();
                 Q_ASSERT(offset <= len);
-                moveTo(block->text_pos + cursor.pos + offset, true);
+                move_to(block->text_pos + cursor.pos + offset, true);
             }
         } break;
         case TextInputCommand::SelectToPrevLine: {
@@ -1021,11 +1095,11 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             move(engine.current_line().text().length() - cursor.col, true);
         } break;
         case TextInputCommand::SelectToStartOfBlock: {
-            moveTo(engine.current_block()->text_pos, true);
+            move_to(engine.current_block()->text_pos, true);
         } break;
         case TextInputCommand::SelectToEndOfBlock: {
             const auto block = engine.current_block();
-            moveTo(block->text_pos + block->text_len(), true);
+            move_to(block->text_pos + block->text_len(), true);
         } break;
         case TextInputCommand::SelectBlock: {
             const auto block = engine.current_block();
@@ -1039,7 +1113,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             const auto dest_loc = context_->get_textloc_at_rel_vpos(dest, false);
             Q_ASSERT(dest_loc.block_index != -1);
             const int pos = engine.active_blocks[dest_loc.block_index]->text_pos + dest_loc.pos;
-            moveTo(pos, true);
+            move_to(pos, true);
             jwrite_profiler_record(SelectPage);
         } break;
         case TextInputCommand::SelectNextPage: {
@@ -1050,31 +1124,30 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             const auto dest_loc = context_->get_textloc_at_rel_vpos(dest, false);
             Q_ASSERT(dest_loc.block_index != -1);
             const int pos = engine.active_blocks[dest_loc.block_index]->text_pos + dest_loc.pos;
-            moveTo(pos, true);
+            move_to(pos, true);
             jwrite_profiler_record(SelectPage);
         } break;
         case TextInputCommand::SelectToStartOfDoc: {
-            moveTo(0, true);
+            move_to(0, true);
         } break;
         case TextInputCommand::SelectToEndOfDoc: {
-            moveTo(engine.text_ref->length(), true);
+            move_to(engine.text_ref->length(), true);
         } break;
         case TextInputCommand::SelectAll: {
             select(0, context_->engine.text_ref->length());
         } break;
         case TextInputCommand::InsertBeforeBlock: {
             if (engine.current_block()->text_len() == 0) { break; }
-            engine.insert_block(engine.active_block_index);
-            --engine.active_block_index;
-            cursor.reset();
-            context_->edit_cursor_pos = engine.current_block()->text_pos;
-            requestUpdate(true);
+            const auto block = engine.current_block();
+            move_to(block->text_pos, false);
+            insert("\n", true);
+            move(-1, false);
         } break;
         case TextInputCommand::InsertAfterBlock: {
             if (engine.current_block()->text_len() == 0) { break; }
-            engine.insert_block(engine.active_block_index + 1);
-            auto block = engine.current_block();
-            move(block->text_len() - cursor.pos + 1, false);
+            const auto block = engine.current_block();
+            move_to(block->text_pos + block->text_len(), false);
+            insert("\n", true);
         } break;
     }
 
@@ -1199,7 +1272,7 @@ void Editor::inputMethodEvent(QInputMethodEvent *e) {
         if (!engine.preedit) { context_->begin_preedit(); }
         context_->update_preedit(e->preeditString());
     } else {
-        insert(e->commitString());
+        insert(e->commitString(), false);
     }
     requestUpdate(true);
     jwrite_profiler_record(InputMethodEditorResponse);
