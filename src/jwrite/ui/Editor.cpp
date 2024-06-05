@@ -918,7 +918,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             if (context_->has_sel() || len == 0) {
                 del(-1);
             } else {
-                const auto word   = tokenizer_->get_last_word(block->text().left(len).toString());
+                const auto word   = tokenizer()->get_last_word(block->text().left(len).toString());
                 const int  offset = word.length();
                 Q_ASSERT(offset <= cursor.pos);
                 del(-offset);
@@ -930,7 +930,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             if (context_->has_sel() || len == 0) {
                 del(1);
             } else {
-                const auto word   = tokenizer_->get_first_word(block->text().right(len).toString());
+                const auto word = tokenizer()->get_first_word(block->text().right(len).toString());
                 const int  offset = word.length();
                 Q_ASSERT(offset <= len);
                 del(offset);
