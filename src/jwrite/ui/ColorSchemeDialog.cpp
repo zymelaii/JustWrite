@@ -25,26 +25,26 @@ void ColorSchemeDialog::init() {
 
     auto theme_container        = new QWidget;
     auto layout_theme           = new QHBoxLayout(theme_container);
-    auto theme_label            = new QLabel("颜色主题");
+    auto theme_label            = new QLabel(tr("ColorSchemeDialog.theme_label.text"));
     auto theme_select           = new QComboBox;
     auto scheme_check_container = new QWidget;
     auto layout_scheme_check    = new QHBoxLayout(scheme_check_container);
-    auto keep_scheme_check      = new QCheckBox("改变主题时保持色彩方案");
+    auto keep_scheme_check      = new QCheckBox(tr("ColorSchemeDialog.keep_scheme_check.text"));
     auto color_picker_conatiner = new QFrame;
     auto layout_color_picker    = new QGridLayout(color_picker_conatiner);
 
     QList<QPair<QString, ColorScheme::ColorRole>> color_entries{
-        {"背景",          ColorScheme::Window            },
-        {"前景",          ColorScheme::WindowText        },
-        {"边框",          ColorScheme::Border            },
-        {"面板",          ColorScheme::Panel             },
-        {"文本",          ColorScheme::Text              },
-        {"文本背景",    ColorScheme::TextBase          },
-        {"选中文本",    ColorScheme::SelectedText      },
-        {"悬停",          ColorScheme::Hover             },
-        {"选中项",       ColorScheme::SelectedItem      },
-        {"悬浮项",       ColorScheme::FloatingItem      },
-        {"悬浮项边框", ColorScheme::FloatingItemBorder},
+        {tr("ColorSchemeDialog.color_entry.window"),               ColorScheme::Window            },
+        {tr("ColorSchemeDialog.color_entry.window_text"),          ColorScheme::WindowText        },
+        {tr("ColorSchemeDialog.color_entry.border"),               ColorScheme::Border            },
+        {tr("ColorSchemeDialog.color_entry.panel"),                ColorScheme::Panel             },
+        {tr("ColorSchemeDialog.color_entry.text"),                 ColorScheme::Text              },
+        {tr("ColorSchemeDialog.color_entry.text_base"),            ColorScheme::TextBase          },
+        {tr("ColorSchemeDialog.color_entry.selected_text"),        ColorScheme::SelectedText      },
+        {tr("ColorSchemeDialog.color_entry.hover"),                ColorScheme::Hover             },
+        {tr("ColorSchemeDialog.color_entry.selected_item"),        ColorScheme::SelectedItem      },
+        {tr("ColorSchemeDialog.color_entry.floating_item"),        ColorScheme::FloatingItem      },
+        {tr("ColorSchemeDialog.color_entry.floating_item_border"), ColorScheme::FloatingItemBorder},
     };
 
     int index = 0;
@@ -84,9 +84,9 @@ void ColorSchemeDialog::init() {
 
     auto button_container = new QWidget;
     auto layout_button    = new QHBoxLayout(button_container);
-    auto ok_button        = new QPushButton("确定");
-    auto apply_button     = new QPushButton("应用");
-    auto cancel_button    = new QPushButton("取消");
+    auto ok_button        = new QPushButton(tr("ColorSchemeDialog.ok_button.text"));
+    auto apply_button     = new QPushButton(tr("ColorSchemeDialog.apply_button.text"));
+    auto cancel_button    = new QPushButton(tr("ColorSchemeDialog.cancel_button.text"));
 
     layout_theme->addWidget(theme_label);
     layout_theme->addWidget(theme_select);
@@ -109,13 +109,15 @@ void ColorSchemeDialog::init() {
     layout_color_picker->setContentsMargins(margins);
     layout_button->setContentsMargins(margins);
 
-    color_picker_conatiner->setWindowTitle("色彩方案");
+    color_picker_conatiner->setWindowTitle(tr("ColorSchemeDialog.color_picker.caption"));
     color_picker_conatiner->setFrameShape(QFrame::Box);
     color_picker_conatiner->setContentsMargins(2, 2, 2, 2);
     color_picker_conatiner->setFrameShadow(QFrame::Sunken);
 
-    theme_select->addItem("亮色", QVariant::fromValue(ColorTheme::Light));
-    theme_select->addItem("暗色", QVariant::fromValue(ColorTheme::Dark));
+    theme_select->addItem(
+        tr("ColorSchemeDialog.theme_select.light"), QVariant::fromValue(ColorTheme::Light));
+    theme_select->addItem(
+        tr("ColorSchemeDialog.theme_select.dark"), QVariant::fromValue(ColorTheme::Dark));
     theme_select->setCurrentIndex(theme_ == ColorTheme::Light ? 0 : 1);
 
     connect(ok_button, &QPushButton::clicked, this, &ColorSchemeDialog::accept);

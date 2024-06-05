@@ -5,7 +5,7 @@
 int main(int argc, char *argv[]) {
     QApplication headless(argc, argv);
 
-    const auto font_name = u8"更纱黑体 SC Light";
+    const auto font_name = u8"SarasaGothicSC-Light";
     QFontDatabase::addApplicationFont(QString("fonts/%1.ttf").arg(font_name));
     QApplication::setFont(QFont(font_name, 16));
 

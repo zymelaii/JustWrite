@@ -12,6 +12,9 @@
     "[cpp]": {
         "editor.defaultFormatter": "xaver.clang-format",
     },
+    "[xml]": {
+        "editor.formatOnSave": false,
+    },
     "clangd.path": "clangd",
     "clangd.onConfigChanged": "restart",
     "clangd.restartAfterCrash": true,

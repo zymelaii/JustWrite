@@ -217,7 +217,7 @@ QRect Gallery::getDisplayCaseMenuButtonRect(const QRect &cover_bb, int &out_v_sp
     const int height    = 32;
     const int margin    = 12;
     const int spacing   = (cover_bb.height() - margin * 2 - height * total_btn) / (total_btn + 1);
-    const int width     = 56;
+    const int width     = 64;
     const int dx        = (cover_bb.width() - width) / 2;
 
     out_v_spacing = spacing;
@@ -331,7 +331,11 @@ void Gallery::drawDisplayCaseMenu(QPainter *p, int index, const QRect &cover_bb)
     auto      bb        = getDisplayCaseMenuButtonRect(cover_bb, spacing);
     const int stride    = bb.height() + spacing;
 
-    const QStringList btn_text{"打开", "编辑", "删除"};
+    const QStringList btn_text{
+        tr("Gallery.display_case_menu.open"),
+        tr("Gallery.display_case_menu.edit"),
+        tr("Gallery.display_case_menu.remove"),
+    };
 
     for (int i = 0; i < total_btn; ++i) {
         p->setPen(Qt::transparent);

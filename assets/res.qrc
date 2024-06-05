@@ -52,5 +52,7 @@
         <file>res/themes/light/icons/toolbar/trash.svg</file>
         <file>res/default-cover.png</file>
         <file>res/template/epub/style.css</file>
+        <file alias="lang.en_US">lang/en_US.qm</file>
+        <file alias="lang.zh_CN">lang/zh_CN.qm</file>
     </qresource>
 </RCC>

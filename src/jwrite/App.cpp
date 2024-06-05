@@ -139,6 +139,13 @@ void init_logger() {
 #endif
 }
 
+void init_language() {
+    auto       translator = new QTranslator;
+    const bool succeed    = translator->load(":/lang.zh_CN");
+    Q_ASSERT(succeed);
+    QApplication::installTranslator(translator);
+}
+
 int main(int argc, char *argv[]) {
     //! TODO: ensure single jwrite instance in the system
     //! HINT: or ensure the book is always editable in only one instance
@@ -147,13 +154,14 @@ int main(int argc, char *argv[]) {
     JwriteApplication app(argc, argv);
 
     init_logger();
+    init_language();
 
     spdlog::info("start up jwrite v{}", jwrite::VERSION.toString().toStdString());
 
     QApplication::setOrganizationDomain("jwrite");
     QApplication::setOrganizationName("github.com/zymelaii/jwrite");
     QApplication::setApplicationName("JustWrite");
-    QApplication::setApplicationDisplayName("只写");
+    QApplication::setApplicationDisplayName(QObject::tr("App.display_name"));
     QApplication::setApplicationVersion(jwrite::VERSION.toString());
 
     load_default_fonts();

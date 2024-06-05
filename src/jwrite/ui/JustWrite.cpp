@@ -97,7 +97,7 @@ void JustWrite::request_create_new_book() {
 void JustWrite::do_create_book(BookInfo &book_info) {
     Q_ASSERT(!books_.contains(book_info.uuid));
 
-    book_info.title            = "未命名书籍";
+    book_info.title            = tr("JustWrite.default_book_title");
     book_info.author           = get_default_author();
     book_info.cover_url        = ":/res/default-cover.png";
     book_info.creation_time    = QDateTime::currentDateTimeUtc();
@@ -110,8 +110,8 @@ void JustWrite::request_remove_book(const QString &book_id) {
     Q_ASSERT(books_.contains(book_id));
     const auto choice = MessageBox::show(
         ui_surface_,
-        "删除书籍",
-        "删除后，作品将无法恢复，请谨慎操作。",
+        tr("JustWrite.request_remove_book.caption"),
+        tr("JustWrite.request_remove_book.text"),
         MessageBox::StandardIcon::Warning);
     if (choice == MessageBox::Yes) {
         const int item_index = ui_gallery_->indexOf(book_id);
@@ -176,7 +176,7 @@ void JustWrite::request_update_book_info(const QString &book_id) {
 
 void JustWrite::do_update_book_info(BookInfo &book_info) {
     Q_ASSERT(books_.contains(book_info.uuid));
-    if (book_info.title.isEmpty()) { book_info.title = "未命名书籍"; }
+    if (book_info.title.isEmpty()) { book_info.title = tr("JustWrite.default_book_title"); }
     if (book_info.author.isEmpty()) { book_info.author = get_default_author(); }
     if (book_info.cover_url.isEmpty()) { book_info.cover_url = ":/res/default-cover.png"; }
     Q_ASSERT(book_info.creation_time.isValid());
@@ -192,8 +192,10 @@ void JustWrite::request_rename_toc_item(const QString &book_id, int toc_id, TocT
     Q_ASSERT(type != TocType::Volume || bm->has_volume(toc_id));
     Q_ASSERT(type != TocType::Chapter || bm->has_chapter(toc_id));
 
-    const auto caption = type == TocType::Volume ? "分卷名" : "章节名";
-    const auto hint    = "请输入新标题";
+    const auto caption = type == TocType::Volume
+                           ? tr("JustWrite.request_rename_toc_item.volume_caption")
+                           : tr("JustWrite.request_rename_toc_item.chapter_caption");
+    const auto hint    = tr("JustWrite.request_rename_toc_item.placeholder");
     if (auto opt = TextInputDialog::getInputText(
             ui_surface_, bm->get_title(toc_id).value(), caption, hint)) {
         const auto &title = *opt;
@@ -227,11 +229,14 @@ void JustWrite::request_export_book(const QString &book_id) {
         MessageBox::Option option{};
         option.type        = MessageBox::Type::Ternary;
         option.icon        = MessageBox::StandardIcon::Info;
-        option.cancel_text = "取消";
-        option.yes_text    = "是";
-        option.no_text     = "否";
+        option.cancel_text = tr("JustWrite.request_export_book.ask_sync.cancel");
+        option.yes_text    = tr("JustWrite.request_export_book.ask_sync.yes");
+        option.no_text     = tr("JustWrite.request_export_book.ask_sync.no");
         const auto choice  = MessageBox::show(
-            ui_surface_, "导出作品", "当前章节正在编辑中，是否立即同步以导出最新内容？", option);
+            ui_surface_,
+            tr("JustWrite.request_export_book.ask_sync.caption"),
+            tr("JustWrite.request_export_book.ask_sync.text"),
+            option);
         if (choice == MessageBox::Cancel) { return; }
         if (choice == MessageBox::Yes) {
             wait([&] {
@@ -250,19 +255,27 @@ void JustWrite::request_export_book(const QString &book_id) {
     };
 
     QMap<QString, ExportInfo> filters{
-        {"文本文件 (*.txt)",    {ExportType::PlainText, ".txt"}},
-        {"EPUB 电子书 (*.epub)", {ExportType::ePub, ".epub"}    },
+        {tr("JustWrite.request_export_book.filter.plain_text"), {ExportType::PlainText, ".txt"}},
+        {tr("JustWrite.request_export_book.filter.epub"),       {ExportType::ePub, ".epub"}    },
     };
 
     QString selected{};
     auto    path = QFileDialog::getSaveFileName(
-        this, "导出到本地", title, filters.keys().join("\n"), &selected);
+        this,
+        tr("JustWrite.request_export_book.caption"),
+        title,
+        filters.keys().join("\n"),
+        &selected);
 
     if (path.isEmpty()) {
         MessageBox::Option option{};
         option.type = MessageBox::Type::Notify;
         option.icon = MessageBox::StandardIcon::Warning;
-        MessageBox::show(ui_surface_, "导出失败", "无效路径名，已取消导出。", option);
+        MessageBox::show(
+            ui_surface_,
+            tr("JustWrite.request_export_book.throw_invalid_path.caption"),
+            tr("JustWrite.request_export_book.throw_invalid_path.text"),
+            option);
         return;
     }
 
@@ -284,13 +297,20 @@ void JustWrite::request_export_book(const QString &book_id) {
         MessageBox::Option option{};
         option.type = MessageBox::Type::Notify;
         option.icon = MessageBox::StandardIcon::Info;
-        MessageBox::show(ui_surface_, "导出成功", "作品已导出至本地。", option);
+        MessageBox::show(
+            ui_surface_,
+            tr("JustWrite.request_export_book.success.caption"),
+            tr("JustWrite.request_export_book.success.text"),
+            option);
     } else {
         MessageBox::Option option{};
         option.type = MessageBox::Type::Notify;
         option.icon = MessageBox::StandardIcon::Error;
         MessageBox::show(
-            ui_surface_, "导出失败", "出现未知错误，请检查用户权限或稍后再试。", option);
+            ui_surface_,
+            tr("JustWrite.request_export_book.unknown_error.caption"),
+            tr("JustWrite.request_export_book.unknown_error.text"),
+            option);
         spdlog::error("export book {} failed: unknown error", book_id.toStdString());
     }
 }
@@ -320,11 +340,17 @@ bool JustWrite::do_export_book_as_plain_text(const QString &book_id, const QStri
     int       chap_index    = 0;
     for (int i = 0; i < total_volumes; ++i) {
         const auto vid = bm->get_volumes()[i];
-        out << QStringLiteral("【第 %1 卷 %2】\n\n").arg(i + 1).arg(bm->get_title(vid).value());
+        out << tr("JustWrite.do_export_book_as_plain_text.default_volume_format")
+                   .arg(i + 1)
+                   .arg(bm->get_title(vid).value())
+            << "\n\n";
         const auto &chaps = bm->get_chapters_of_volume(vid);
         for (const auto cid : chaps) {
             const auto content = bm->fetch_chapter_content(cid).value();
-            out << QStringLiteral("第 %1 章 %2\n").arg(++chap_index).arg(bm->get_title(cid).value())
+            out << tr("JustWrite.do_export_book_as_plain_text.default_chapter_format")
+                       .arg(++chap_index)
+                       .arg(bm->get_title(cid).value())
+                << "\n"
                 << content << "\n\n";
         }
     }
@@ -347,7 +373,9 @@ bool JustWrite::do_export_book_as_epub(const QString &book_id, const QString &pa
     for (int i = 0; i < total_volumes; ++i) {
         const int vid = bm->get_volumes()[i];
         builder.with_volume(
-            QString("第 %1 卷 %2").arg(i + 1).arg(bm->get_title(vid).value()),
+            tr("JustWrite.do_export_book_as_epub.default_volume_format")
+                .arg(i + 1)
+                .arg(bm->get_title(vid).value()),
             bm->get_chapters_of_volume(vid).size());
     }
 
@@ -356,10 +384,11 @@ bool JustWrite::do_export_book_as_epub(const QString &book_id, const QString &pa
         .with_author(author)
         .feed([this, bm, &global_chap_index](
                   int vol_index, int chap_index, QString &out_chap_title, QString &out_content) {
-            const int vid = bm->get_volumes()[vol_index];
-            const int cid = bm->get_chapters_of_volume(vid)[chap_index];
-            out_chap_title =
-                QString("第 %1 章 %2").arg(++global_chap_index).arg(bm->get_title(cid).value());
+            const int vid  = bm->get_volumes()[vol_index];
+            const int cid  = bm->get_chapters_of_volume(vid)[chap_index];
+            out_chap_title = tr("JustWrite.do_export_book_as_epub.default_chapter_format")
+                                 .arg(++global_chap_index)
+                                 .arg(bm->get_title(cid).value());
             out_content = bm->fetch_chapter_content(cid).value();
         })
         .build();
@@ -651,7 +680,7 @@ void JustWrite::trigger_shortcut(GlobalCommand shortcut) {
 }
 
 QString JustWrite::get_default_author() const {
-    return likely_author_.isEmpty() ? "佚名" : likely_author_;
+    return likely_author_.isEmpty() ? tr("JustWrite.default_author") : likely_author_;
 }
 
 void JustWrite::set_default_author(const QString &author, bool force) {
@@ -731,13 +760,14 @@ void JustWrite::handle_edit_page_on_export() {
 void JustWrite::handle_on_page_change(PageType page) {
     switch (page) {
         case PageType::Gallery: {
-            ui_title_bar_->setTitle("只写 丶 阐释你的梦");
+            ui_title_bar_->setTitle(tr("JustWrite.default_title"));
         } break;
         case PageType::Edit: {
             const auto &book_id = ui_edit_page_->get_book_id_of_source();
             Q_ASSERT(books_.contains(book_id));
-            const auto &info  = books_.value(book_id)->info_ref();
-            const auto  title = QString("%1\u3000%2 [著]").arg(info.title).arg(info.author);
+            const auto &info = books_.value(book_id)->info_ref();
+            const auto  title =
+                tr("JustWrite.on_edit_title_prompt").arg(info.title).arg(info.author);
             ui_title_bar_->setTitle(title);
         } break;
     }
@@ -804,11 +834,14 @@ void JustWrite::handle_on_request_toggle_maximize() {
 void JustWrite::handle_on_request_close() {
     if (current_page_ == PageType::Edit) {
         MessageBox::Option opt{};
-        opt.type     = MessageBox::Type::Confirm;
-        opt.yes_text = "开润";
-        opt.no_text  = "彳亍";
-        const auto choice =
-            MessageBox::show(ui_surface_, "关闭只写", "真的不能再多码会儿了吗 T^T", opt);
+        opt.type          = MessageBox::Type::Confirm;
+        opt.yes_text      = tr("JustWrite.handle_on_request_close.yes");
+        opt.no_text       = tr("JustWrite.handle_on_request_close.no");
+        const auto choice = MessageBox::show(
+            ui_surface_,
+            tr("JustWrite.handle_on_request_close.caption"),
+            tr("JustWrite.handle_on_request_close.text"),
+            opt);
         if (choice != MessageBox::Yes) { return; }
     }
 
@@ -936,16 +969,40 @@ void JustWrite::setupUi() {
     };
 
     QList<ToolbarItem> toolbar_items{
-        {TI_Gallery,        "书库",       "toolbar/gallery",         AppAction::OpenBookGallery, false},
-        {TI_Draft,          "编辑",       "toolbar/draft",           AppAction::OpenEditor,      false},
-        {TI_Favorites,      "素材收藏", "toolbar/favorites",       AppAction::OpenFavorites,   false},
-        {TI_Trash,          "回收站",    "toolbar/trash",           AppAction::OpenTrashBin,    false},
-        {TI_Export,         "导出",       "toolbar/export",          AppAction::Export,          false},
-        {TI_Share,          "分享",       "toolbar/share",           AppAction::Share,           false},
-        {TI_Fullscreen,     "全屏",       "toolbar/fullscreen",      AppAction::Fullscreen,      true },
-        {TI_ExitFullscreen, "退出全屏", "toolbar/fullscreen-exit", AppAction::ExitFullscreen,  true },
-        {TI_Help,           "帮助",       "toolbar/help",            AppAction::OpenHelp,        true },
-        {TI_Settings,       "设置",       "toolbar/settings",        AppAction::OpenSettings,    true },
+        {TI_Gallery,
+         tr("JustWrite.toolbar_item.gallery"),
+         "toolbar/gallery",                                                      AppAction::OpenBookGallery,
+         false                                                                                                    },
+        {TI_Draft,
+         tr("JustWrite.toolbar_item.draft"),
+         "toolbar/draft",                                                        AppAction::OpenEditor,
+         false                                                                                                    },
+        {TI_Favorites,
+         tr("JustWrite.toolbar_item.favorites"),
+         "toolbar/favorites",                                                    AppAction::OpenFavorites,
+         false                                                                                                    },
+        {TI_Trash,
+         tr("JustWrite.toolbar_item.trash"),
+         "toolbar/trash",                                                        AppAction::OpenTrashBin,
+         false                                                                                                    },
+        {TI_Export,
+         tr("JustWrite.toolbar_item.export"),
+         "toolbar/export",                                                       AppAction::Export,
+         false                                                                                                    },
+        {TI_Share,          tr("JustWrite.toolbar_item.share"), "toolbar/share", AppAction::Share,           false},
+        {TI_Fullscreen,
+         tr("JustWrite.toolbar_item.fullscreen"),
+         "toolbar/fullscreen",                                                   AppAction::Fullscreen,
+         true                                                                                                     },
+        {TI_ExitFullscreen,
+         tr("JustWrite.toolbar_item.exit_fullscreen"),
+         "toolbar/fullscreen-exit",                                              AppAction::ExitFullscreen,
+         true                                                                                                     },
+        {TI_Help,           tr("JustWrite.toolbar_item.help"),  "toolbar/help",  AppAction::OpenHelp,        true },
+        {TI_Settings,
+         tr("JustWrite.toolbar_item.settings"),
+         "toolbar/settings",                                                     AppAction::OpenSettings,
+         true                                                                                                     },
     };
 
     const auto &actions = AppAction::get_instance();
@@ -982,7 +1039,7 @@ void JustWrite::setupUi() {
 
     ui_tray_icon_ = new QSystemTrayIcon(this);
     ui_tray_icon_->setIcon(QIcon(":/app.ico"));
-    ui_tray_icon_->setToolTip("只写");
+    ui_tray_icon_->setToolTip(tr("JustWrite.tray_icon.tooltip"));
     ui_tray_icon_->setVisible(false);
 
     update_color_scheme(AppConfig::get_instance().scheme());

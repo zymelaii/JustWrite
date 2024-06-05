@@ -100,12 +100,13 @@ private:
 class BookDirItemRenderProxy : public TwoLevelTreeItemRenderProxy {
 public:
     void render(QPainter *p, const QRect &clip_bb, const ItemInfo &item_info) {
-        const auto fm    = p->fontMetrics();
-        const auto flags = Qt::AlignLeft | Qt::AlignVCenter;
-        const auto format =
-            item_info.is_top_item ? QStringLiteral("第 %1 卷 %2") : QStringLiteral("第 %1 章 %2");
-        const auto title = format.arg(item_info.level_index + 1).arg(item_info.value);
-        const auto text  = fm.elidedText(title, Qt::ElideRight, clip_bb.width());
+        const auto fm     = p->fontMetrics();
+        const auto flags  = Qt::AlignLeft | Qt::AlignVCenter;
+        const auto format = item_info.is_top_item
+                              ? QObject::tr("BookDirItemRenderProxy.default_volume_format")
+                              : QObject::tr("BookDirItemRenderProxy.default_chapter_format");
+        const auto title  = format.arg(item_info.level_index + 1).arg(item_info.value);
+        const auto text   = fm.elidedText(title, Qt::ElideRight, clip_bb.width());
         p->drawText(clip_bb, flags, text);
     }
 };
@@ -116,11 +117,12 @@ void EditPage::request_rename_toc_item(int vid, int cid) {
 }
 
 void EditPage::request_invalidate_wcstate() {
-    ui_word_count_->set_text("统计中");
+    ui_word_count_->set_text(tr("EditPage.word_count_unavailable"));
 }
 
 void EditPage::request_sync_wcstate() {
-    ui_word_count_->set_text(QString("字数 %1").arg(get_friendly_word_count(chap_words_)));
+    ui_word_count_->set_text(
+        tr("EditPage.word_count_format").arg(get_friendly_word_count(chap_words_)));
 }
 
 void EditPage::do_update_wcstate(const QString &text, bool text_changed) {
@@ -192,9 +194,10 @@ void EditPage::do_open_chapter(int cid) {
 
 QString EditPage::get_friendly_word_count(int count) {
     if (count > 1000 * 100) {
-        return " " + QString::number(count * 1e-4, 'f', 2) + " 万";
+        return " " + QString::number(count * 1e-4, 'f', 2)
+             + tr("EditPage.ten_thousand_unit_suffix");
     } else if (count > 1000 * 10) {
-        return " " + QString::number(count * 1e-3, 'f', 1) + " 千";
+        return " " + QString::number(count * 1e-3, 'f', 1) + tr("EditPage.thousand_unit_suffix");
     } else {
         return " " + QString::number(count) + " ";
     }
@@ -362,7 +365,7 @@ void EditPage::create_and_open_chapter(int vid) {
     }
 
     if (volume_index == -1) {
-        add_volume(0, "默认卷");
+        add_volume(0, tr("EditPage.default_volume_title"));
         volume_index = 0;
     } else if (volume_index >= ui_book_dir_->totalTopItems()) {
         add_volume(volume_index, "");
@@ -530,8 +533,8 @@ void EditPage::init() {
     splitter->setCollapsible(0, false);
     splitter->setCollapsible(1, false);
 
-    ui_new_volume_->setText("新建卷");
-    ui_new_chapter_->setText("新建章");
+    ui_new_volume_->setText(tr("EditPage.new_volume.text"));
+    ui_new_chapter_->setText(tr("EditPage.new_chapter.text"));
 
     auto font = this->font();
     font.setPointSize(10);

@@ -33,8 +33,9 @@ void BookInfoEdit::set_book_info(const BookInfo &info) {
 }
 
 QString BookInfoEdit::select_cover(QWidget *parent, bool validate, QImage *out_image) {
-    const auto filter = "图片 (*.bmp *.jpg *.jpeg *.png)";
-    auto       path   = QFileDialog::getOpenFileName(parent, "选择封面", "", filter);
+    const auto filter = tr("BookInfoEdit.select_cover.filter");
+    auto       path =
+        QFileDialog::getOpenFileName(parent, tr("BookInfoEdit.select_cover.caption"), "", filter);
 
     if (path.isEmpty()) { return ""; }
 
@@ -109,15 +110,15 @@ void BookInfoEdit::init() {
     ui_cover_->setViewSize(QSize(150, 200));
     ui_cover_->setBorderVisible(true);
 
-    ui_title_edit_->setLabel("书名");
-    ui_title_edit_->setPlaceholderText("请输入书名");
+    ui_title_edit_->setLabel(tr("BookInfoEdit.title_edit.label"));
+    ui_title_edit_->setPlaceholderText(tr("BookInfoEdit.title_edit.placeholder"));
 
-    ui_author_edit_->setLabel("作者");
-    ui_author_edit_->setPlaceholderText("请输入作者");
+    ui_author_edit_->setLabel(tr("BookInfoEdit.author_edit.label"));
+    ui_author_edit_->setPlaceholderText(tr("BookInfoEdit.author_edit.placeholder"));
 
-    ui_cover_select_->setText("选择封面");
-    ui_submit_->setText("确认");
-    ui_cancel_->setText("返回");
+    ui_cover_select_->setText(tr("BookInfoEdit.cover_select.caption"));
+    ui_submit_->setText(tr("BookInfoEdit.submit.text"));
+    ui_cancel_->setText(tr("BookInfoEdit.cancel.text"));
 
     layout->setContentsMargins(32, 32, 32, 32);
     layout_row->setSpacing(8);

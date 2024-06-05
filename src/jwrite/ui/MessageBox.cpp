@@ -160,13 +160,13 @@ void MessageBox::setupUi() {
     layout->setSpacing(16);
     layout_button->setSpacing(8);
 
-    ui_caption_->setText("提示");
+    ui_caption_->setText(tr("MessageBox.caption"));
     ui_close_->setPixmap(
         QIcon(AppConfig::get_instance().icon("button/close")).pixmap(QSize(16, 16)));
     ui_message_->setText("");
-    ui_btn_cancel_->setText("返回");
-    ui_btn_no_->setText("取消");
-    ui_btn_yes_->setText("确定");
+    ui_btn_cancel_->setText(tr("MessageBox.cancel"));
+    ui_btn_no_->setText(tr("MessageBox.no"));
+    ui_btn_yes_->setText(tr("MessageBox.yes"));
 
     auto font = this->font();
     font.setPixelSize(20);
