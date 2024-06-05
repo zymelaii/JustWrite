@@ -438,6 +438,7 @@ void Editor::init() {
     const auto text_area = textArea();
     context_             = new VisualTextEditContext(fontMetrics(), text_area.width());
     context_->resize_viewport(context_->viewport_width, text_area.height());
+    context_->viewport_y_pos    = 0;
 
     restrict_rule_ = new TextRestrictRule;
     tokenizer_     = Tokenizer::build();

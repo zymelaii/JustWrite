@@ -22,7 +22,7 @@ void VisualTextEditContext::resize_viewport(int width, int height) {
     //! FIXME: viewport_y_pos will be dirty after viewport width changed
 
     if (height != viewport_height) {
-        if (height < viewport_height) { cached_render_data_ready = false; }
+        if (height > viewport_height) { cached_render_data_ready = false; }
         viewport_height = height;
     }
 
@@ -160,7 +160,7 @@ bool VisualTextEditContext::set_cursor_to_textloc(const TextLoc &loc, int hint) 
 }
 
 int VisualTextEditContext::get_column_at_vpos(const TextLine &line, double x_pos) const {
-    Q_ASSERT(!line.parent->is_dirty());
+    if (line.parent->is_dirty()) { line.parent->render(); }
 
     const auto  &fm      = engine.fm;
     const auto  &text    = line.text();
@@ -201,6 +201,7 @@ VisualTextEditContext::TextLoc
         index = d.visible_block.first;
         while (index < d.visible_block.last) {
             const auto block = engine.active_blocks[index];
+            Q_ASSERT(!block->is_dirty());
             Q_ASSERT(d.cached_block_y_pos.contains(index));
             const double block_y_pos   = d.cached_block_y_pos[index];
             const double stride        = block->lines.size() * line_spacing + engine.block_spacing;
