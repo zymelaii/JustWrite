@@ -535,6 +535,15 @@ bool VisualTextEditContext::vertical_move(bool up) {
 
     move(offset, false);
 
+    //! NOTE: default hint of move action would block the movement to the bound of line, mannually
+    //! shift it again to ensure the cursor could arrive at the target line
+    if (!cross_block && cursor.row != target_line->line_nr) {
+        Q_ASSERT(qAbs(target_line->line_nr - cursor.row) == 1);
+        const int diff = target_line->line_nr - cursor.row;
+        move(diff, false);
+        move(-diff, false);
+    }
+
     //! move always set vertical_move to false, restore the value here
     vertical_move_state = true;
 
