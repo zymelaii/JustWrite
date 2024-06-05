@@ -356,6 +356,11 @@ void Editor::verticalMove(bool up) {
     requestUpdate(true);
 }
 
+Tokenizer *Editor::tokenizer() const {
+    if (!tokenizer_) { const_cast<Editor *>(this)->tokenizer_ = fut_tokenizer_.result(); }
+    return tokenizer_;
+}
+
 void Editor::setTimerEnabled(bool enabled) {
     if (enabled) {
         stable_timer_.start();
@@ -442,7 +447,8 @@ void Editor::init() {
     context_->viewport_y_pos    = 0;
 
     restrict_rule_ = new TextRestrictRule;
-    tokenizer_     = Tokenizer::build();
+    tokenizer_     = nullptr;
+    fut_tokenizer_ = std::move(Tokenizer::build());
 
     timer_enabled_ = true;
 
@@ -830,7 +836,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             if (len == 0) {
                 move(-1, false);
             } else {
-                const auto word   = tokenizer_->get_last_word(block->text().left(len).toString());
+                const auto word   = tokenizer()->get_last_word(block->text().left(len).toString());
                 const int  offset = word.length();
                 Q_ASSERT(offset <= cursor.pos);
                 moveTo(block->text_pos + cursor.pos - offset, false);
@@ -842,7 +848,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             if (len == 0) {
                 move(1, false);
             } else {
-                const auto word   = tokenizer_->get_first_word(block->text().right(len).toString());
+                const auto word = tokenizer()->get_first_word(block->text().right(len).toString());
                 const int  offset = word.length();
                 Q_ASSERT(offset <= len);
                 moveTo(block->text_pos + cursor.pos + offset, false);

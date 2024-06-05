@@ -57,6 +57,8 @@ public:
     void breakIntoNewLine(bool should_update);
     void verticalMove(bool up);
 
+    Tokenizer *tokenizer() const;
+
     void setTimerEnabled(bool enabled);
 
     void setTextEngineLocked(bool locked) {
@@ -115,6 +117,7 @@ private:
     AbstractTextRestrictRule *restrict_rule_;
     TextInputCommandManager  *input_manager_;
     Tokenizer                *tokenizer_;
+    QFuture<Tokenizer *>      fut_tokenizer_;
 
     int    min_text_line_chars_;
     bool   soft_center_mode_;

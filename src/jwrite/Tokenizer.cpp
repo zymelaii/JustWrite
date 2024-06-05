@@ -1,25 +1,28 @@
 #include <jwrite/Tokenizer.h>
+#include <QtConcurrent/QtConcurrent>
 #include <QCoreApplication>
 #include <vector>
 #include <string>
 
 namespace jwrite {
 
-Tokenizer *Tokenizer::build() {
-    const auto dir      = QCoreApplication::applicationDirPath() + "/dicts";
-    auto       instance = new Tokenizer;
-    instance->cutter_   = std::make_unique<cppjieba::Jieba>(
-        (dir + "/jieba.dict.utf8").toLocal8Bit().toStdString(),
-        (dir + "/hmm_model.utf8").toLocal8Bit().toStdString(),
-        (dir + "/user.dict.utf8").toLocal8Bit().toStdString(),
-        (dir + "/idf.utf8").toLocal8Bit().toStdString(),
-        (dir + "/stop_words.utf8").toLocal8Bit().toStdString());
-    return instance;
+QFuture<Tokenizer *> Tokenizer::build() {
+    return QtConcurrent::run([] {
+        const auto dir      = QCoreApplication::applicationDirPath() + "/dicts";
+        auto       instance = new Tokenizer;
+        instance->cutter_   = std::make_unique<cppjieba::Jieba>(
+            (dir + "/jieba.dict.utf8").toLocal8Bit().toStdString(),
+            (dir + "/hmm_model.utf8").toLocal8Bit().toStdString(),
+            (dir + "/user.dict.utf8").toLocal8Bit().toStdString(),
+            (dir + "/idf.utf8").toLocal8Bit().toStdString(),
+            (dir + "/stop_words.utf8").toLocal8Bit().toStdString());
+        return instance;
+    });
 }
 
 Tokenizer &Tokenizer::get_instance() {
     static std::unique_ptr<Tokenizer> instance{};
-    if (!instance) { instance.reset(Tokenizer::build()); }
+    if (!instance) { instance.reset(Tokenizer::build().result()); }
     return *instance;
 }
 
