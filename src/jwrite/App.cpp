@@ -8,6 +8,9 @@
 #include <QMouseEvent>
 #include <memory>
 #include <magic_enum.hpp>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 using jwrite::AppConfig;
 using jwrite::ui::JustWrite;
@@ -111,12 +114,41 @@ void load_default_fonts() {
     QApplication::setFont(config.font(AppConfig::FontStyle::Light, 16));
 }
 
+void init_logger() {
+    auto      &config   = AppConfig::get_instance();
+    const auto log_path = QString("%1/jwrite-%2.log")
+                              .arg(config.path(AppConfig::StandardPath::Log))
+                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmm"));
+#ifdef NDEBUG
+    auto logger = spdlog::basic_logger_mt("jwrite.default", log_path.toLocal8Bit().toStdString());
+    logger->set_pattern("%Y-%m-%d %H:%M:%S.%e [%l] %v");
+    logger->set_level(spdlog::level::info);
+    spdlog::set_default_logger(logger);
+#else
+    auto con_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    con_sink->set_pattern("%^%Y-%m-%d %H:%M:%S.%e [%l]%$ %v");
+    con_sink->set_level(spdlog::level::trace);
+
+    auto file_sink =
+        std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_path.toLocal8Bit().toStdString());
+    file_sink->set_pattern("%Y-%m-%d %H:%M:%S.%e [%l] %v");
+    file_sink->set_level(spdlog::level::info);
+
+    spdlog::set_default_logger(std::make_shared<spdlog::logger>(
+        "jwrite.default", spdlog::sinks_init_list{con_sink, file_sink}));
+#endif
+}
+
 int main(int argc, char *argv[]) {
     //! TODO: ensure single jwrite instance in the system
     //! HINT: or ensure the book is always editable in only one instance
 
     QApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
     JwriteApplication app(argc, argv);
+
+    init_logger();
+
+    spdlog::info("start up jwrite v{}", jwrite::VERSION.toString().toStdString());
 
     QApplication::setOrganizationDomain("jwrite");
     QApplication::setOrganizationName("github.com/zymelaii/jwrite");
@@ -137,5 +169,10 @@ int main(int argc, char *argv[]) {
     client->setGeometry(compute_preferred_geometry(screen_geo));
     client->show();
 
-    return app.exec();
+    spdlog::info("Hello, JustWrite!");
+    const int exit_code = app.exec();
+    spdlog::info("jwrite exited with code {}", exit_code);
+    spdlog::info("Bye, JustWrite!");
+
+    return exit_code;
 }

@@ -54,6 +54,7 @@ void Editor::reset(QString &text, bool swap) {
 
     int active_block_index = context_->engine.active_block_index != -1 ? 0 : -1;
 
+    context_->viewport_y_pos    = 0;
     context_->engine.clear_all();
     context_->engine.insert_block(0);
     context_->engine.active_block_index = 0;

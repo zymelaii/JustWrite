@@ -67,6 +67,9 @@ QString AppConfig::path(StandardPath path_type) const {
         case StandardPath::UserData: {
             return QDir::cleanPath(QCoreApplication::applicationDirPath() + "/data");
         } break;
+        case StandardPath::Log: {
+            return QDir::cleanPath(QCoreApplication::applicationDirPath() + "/data/logs");
+        } break;
     }
 }
 

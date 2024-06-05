@@ -12,6 +12,7 @@ public:
     enum class StandardPath {
         AppHome,
         UserData,
+        Log,
     };
 
     enum class FontStyle {

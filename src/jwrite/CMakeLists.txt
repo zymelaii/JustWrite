@@ -20,8 +20,9 @@ add_library(jwrite-core STATIC ${CORE_SOURCE_FILES})
 target_link_libraries(
 	jwrite-core
 	PUBLIC Qt${QT_VERSION_MAJOR}::Gui
-	PUBLIC magic_enum::magic_enum
 	PUBLIC cppjieba
+	PUBLIC magic_enum::magic_enum
+	PUBLIC spdlog::spdlog
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCE_FILES})

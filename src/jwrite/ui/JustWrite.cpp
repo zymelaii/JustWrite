@@ -12,6 +12,7 @@
 #include <jwrite/ProfileUtils.h>
 #include <widget-kit/TextInputDialog.h>
 #include <widget-kit/OverlaySurface.h>
+#include <spdlog/spdlog.h>
 #include <QMouseEvent>
 #include <QScrollBar>
 #include <QVBoxLayout>
@@ -60,6 +61,7 @@ public:
 
     bool sync_chapter_content(int cid, const QString &text) override {
         if (!has_chapter(cid)) { return false; }
+        spdlog::info("from book {}: sync chapter {}", info().uuid.toStdString(), cid);
         chapters_[cid] = text;
         modified_.insert(cid);
         return true;
@@ -204,6 +206,14 @@ void JustWrite::request_rename_toc_item(const QString &book_id, int toc_id, TocT
 void JustWrite::do_rename_toc_item(const QString &book_id, int toc_id, const QString &title) {
     auto bm = books_.value(book_id);
     Q_ASSERT(bm->has_toc_item(toc_id));
+    if (bm->get_title(toc_id) == title) { return; }
+    spdlog::info(
+        "from book {}: rename {}[id={}]: \"{}\" -> \"{}\"",
+        book_id.toStdString(),
+        bm->has_volume(toc_id) ? "volume" : "chapter",
+        toc_id,
+        bm->get_title(toc_id).value().get().toLocal8Bit().toStdString(),
+        title.toLocal8Bit().toStdString());
     const bool succeed = bm->update_title(toc_id, title);
     Q_ASSERT(succeed);
 }
@@ -259,6 +269,12 @@ void JustWrite::request_export_book(const QString &book_id) {
     const auto &export_info = filters.value(selected);
     if (QFileInfo(path).suffix().isEmpty()) { path.append(export_info.extesion); }
 
+    spdlog::info(
+        "export book {} to {} with type {}",
+        book_id.toStdString(),
+        path.toLocal8Bit().toStdString(),
+        magic_enum::enum_name(export_info.type));
+
     bool succeed = true;
     wait([&] {
         succeed = do_export_book(book_id, path, export_info.type);
@@ -275,6 +291,7 @@ void JustWrite::request_export_book(const QString &book_id) {
         option.icon = MessageBox::StandardIcon::Error;
         MessageBox::show(
             ui_surface_, "导出失败", "出现未知错误，请检查用户权限或稍后再试。", option);
+        spdlog::error("export book {} failed: unknown error", book_id.toStdString());
     }
 }
 
@@ -507,6 +524,8 @@ void JustWrite::do_load_local_storage() {
 }
 
 void JustWrite::do_sync_local_storage() {
+    spdlog::info("sync data from local storage");
+
     QJsonObject local_storage;
     QJsonArray  book_data;
 
@@ -584,6 +603,8 @@ void JustWrite::do_sync_local_storage() {
 
         dir.cdUp();
     }
+
+    spdlog::info("sync finished");
 }
 
 void JustWrite::request_switch_page(PageType page) {
@@ -792,13 +813,13 @@ void JustWrite::handle_on_request_close() {
     }
 
     close();
-    qDebug() << "JustWrite is closed.";
+    spdlog::info("client is closed");
 
     if (!testAttribute(Qt::WA_QuitOnClose)) { qApp->quit(); }
 }
 
 void JustWrite::handle_on_about_to_quit() {
-    qDebug() << "JustWrite is about to quit.";
+    spdlog::info("client is about to quit");
     if (current_page_ == PageType::Edit) { ui_edit_page_->sync_chapter_from_editor(); }
     wait([this] {
         do_sync_local_storage();
