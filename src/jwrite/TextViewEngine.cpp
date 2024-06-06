@@ -385,7 +385,10 @@ int TextViewEngine::commit_deletion(int times, int &deleted, bool hard_del) {
     while (tail_block_index + 1 < active_blocks.size()) {
         int stride = active_blocks[tail_block_index + 1]->text_len();
         if (!hard_del) { ++stride; }
-        if (times < stride) { break; }
+        //! NOTE: in hard_del mode, without stride == 0, del action will remove all the empty blocks
+        //! at the boundary, otherwise it will keep them. neither of cases is a good choice, but we
+        //! prefer to keep it since jwrite is designed to eliminate the redundant terms
+        if (times < stride || stride == 0) { break; }
         times       -= stride;
         total_shift += stride;
         if (!hard_del) { --total_shift; }
