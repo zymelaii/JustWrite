@@ -137,6 +137,9 @@ void init_logger() {
     spdlog::set_default_logger(std::make_shared<spdlog::logger>(
         "jwrite.default", spdlog::sinks_init_list{con_sink, file_sink}));
 #endif
+
+    spdlog::flush_every(std::chrono::minutes(1));
+    spdlog::flush_on(spdlog::level::warn);
 }
 
 void init_language() {
@@ -173,6 +176,9 @@ int main(int argc, char *argv[]) {
 
     auto client = std::make_unique<JustWrite>();
     app.bind(client.get());
+
+    //! NOTE: helps to find the window
+    client->setWindowTitle(QApplication::applicationName());
 
     client->setGeometry(compute_preferred_geometry(screen_geo));
     client->show();
