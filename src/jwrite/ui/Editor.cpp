@@ -55,6 +55,8 @@ void Editor::reset(QString &text, bool swap) {
 
     int active_block_index = context_->engine.active_block_index != -1 ? 0 : -1;
 
+    last_text_loc_ = std::nullopt;
+
     context_->viewport_y_pos = 0;
     context_->engine.clear_all();
     context_->engine.insert_block(0);
@@ -92,6 +94,8 @@ QString Editor::take() {
     context_->vertical_move_state      = false;
 
     history_.clear();
+
+    last_text_loc_ = std::nullopt;
 
     return std::move(text);
 }
@@ -822,12 +826,19 @@ void Editor::paintEvent(QPaintEvent *e) {
 
 void Editor::focusInEvent(QFocusEvent *e) {
     QWidget::focusInEvent(e);
-    if (auto &e = context_->engine; e.is_empty()) {
-        e.insert_block(0);
+
+    if (auto &engine = context_->engine; engine.is_empty()) {
+        engine.insert_block(0);
         //! TODO: move it into a safe method
-        e.active_block_index = 0;
+        engine.active_block_index = 0;
         emit activated();
+    } else if (last_text_loc_ && last_text_loc_->block_index != -1) {
+        if (e->reason() != Qt::FocusReason::MouseFocusReason) {
+            setCursorToTextLoc(*last_text_loc_);
+        }
+        last_text_loc_ = std::nullopt;
     }
+
     requestUpdate(true);
 }
 
@@ -837,6 +848,7 @@ void Editor::focusOutEvent(QFocusEvent *e) {
     blink_timer_.stop();
 
     const auto text_loc = currentTextLoc();
+    last_text_loc_      = text_loc;
 
     context_->engine.active_block_index = -1;
 

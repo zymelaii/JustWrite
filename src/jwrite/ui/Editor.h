@@ -128,6 +128,8 @@ private:
     QFuture<Tokenizer *>      fut_tokenizer_;
     TextEditHistory           history_;
 
+    std::optional<VisualTextEditContext::TextLoc> last_text_loc_;
+
     int    min_text_line_chars_;
     bool   soft_center_mode_;
     bool   inserted_filter_enabled_;
