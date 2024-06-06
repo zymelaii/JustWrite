@@ -54,8 +54,9 @@ std::optional<QString>
 
     if (c2 == Category::Space) {
         if ((c1 == Category::Digit || c1 == Category::Alpha)
-            && (c3 == Category::Digit || c3 == Category::Alpha || c3 == Category::Null
-                || c3 == Category::Normal)) {
+                && (c3 == Category::Digit || c3 == Category::Alpha || c3 == Category::Null
+                    || c3 == Category::Normal)
+            || (c1 == Category::Normal && ((c3 == Category::Digit || c3 == Category::Alpha)))) {
             return {QChar(QChar::Space)};
         }
         if (c1 == Category::LatinPunct && c3 != Category::LatinPunct) {
