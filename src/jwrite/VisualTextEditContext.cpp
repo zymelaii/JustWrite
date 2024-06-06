@@ -420,7 +420,7 @@ void VisualTextEditContext::del(int times, bool hard_mode, QString *deleted_text
 
         if (loc_start.block_index == loc_end.block_index) {
             const int pos = engine.active_blocks[loc_start.block_index]->text_pos + loc_start.pos;
-            *deleted_text = edit_text.mid(edit_cursor_pos, loc_end.pos - loc_start.pos);
+            *deleted_text = edit_text.mid(pos, loc_end.pos - loc_start.pos);
         } else {
             QStringList blocks{};
             blocks << engine.active_blocks[loc_start.block_index]
