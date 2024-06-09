@@ -7,7 +7,6 @@
 #include <jwrite/Tokenizer.h>
 #include <QTimer>
 #include <QWidget>
-#include <atomic>
 
 namespace jwrite::ui {
 
@@ -69,14 +68,25 @@ public:
 
     void setTimerEnabled(bool enabled);
 
-    void setTextEngineLocked(bool locked) {
-        busy_loading_ = locked;
+    void prepare_render_data() {
+        context_->prepare_render_data();
     }
 
-    void prepareRenderData() {
-        setTextEngineLocked(true);
-        context_->prepare_render_data();
-        setTextEngineLocked(false);
+    auto lock_guard() const {
+        struct LockGuard {
+            LockGuard(VisualTextEditContext *context)
+                : lock(context->lock) {
+                lock.lock_write();
+            }
+
+            ~LockGuard() {
+                lock.unlock_write();
+            }
+
+            core::RwLock &lock;
+        };
+
+        return LockGuard(context_);
     }
 
 protected slots:
@@ -148,8 +158,6 @@ private:
     bool   auto_scroll_mode_;
     double scroll_base_y_pos_;
     double scroll_ref_y_pos_;
-
-    std::atomic_bool busy_loading_;
 
     QMargins        ui_margins_;
     Qt::CursorShape ui_cursor_shape_[2];

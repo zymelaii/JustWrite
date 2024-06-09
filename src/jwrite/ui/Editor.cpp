@@ -46,8 +46,6 @@ QRect Editor::textArea() const {
 }
 
 void Editor::reset(QString &text, bool swap) {
-    busy_loading_ = true;
-
     context_->quit_preedit();
 
     auto text_out = this->text();
@@ -77,8 +75,6 @@ void Editor::reset(QString &text, bool swap) {
     context_->engine.cursor.reset();
 
     if (swap) { text.swap(text_out); }
-
-    busy_loading_ = false;
 }
 
 QString Editor::take() {
@@ -145,8 +141,14 @@ void Editor::scrollToCursor() {
 }
 
 QString Editor::text() const {
+    auto      &lock   = context_->lock;
+    const bool locked = !lock.on_write() && lock.try_lock_read();
+
     QStringList blocks{};
     for (auto block : context_->engine.active_blocks) { blocks << block->text().toString(); }
+
+    if (locked) { lock.unlock_read(); }
+
     return blocks.join("\n");
 }
 
@@ -380,7 +382,6 @@ void Editor::paste() {
     auto mime      = clipboard->mimeData();
     if (!mime->hasText()) { return; }
     insert(clipboard->text(), true);
-    scrollToCursor();
 }
 
 void Editor::undo() {
@@ -511,7 +512,6 @@ void Editor::init() {
     drag_sel_flag_             = false;
     oob_drag_sel_flag_         = false;
     auto_scroll_mode_          = false;
-    busy_loading_              = false;
     ui_cursor_shape_[0]        = Qt::ArrowCursor;
     ui_cursor_shape_[1]        = Qt::ArrowCursor;
 
@@ -537,8 +537,6 @@ void Editor::init() {
 
     input_manager_ = new GeneralTextInputCommandManager(context_->engine);
     input_manager_->load_default();
-
-    busy_loading_ = false;
 
     scrollToStart();
 
@@ -781,13 +779,6 @@ void Editor::resizeEvent(QResizeEvent *e) {
 }
 
 void Editor::paintEvent(QPaintEvent *e) {
-    if (busy_loading_) { return; }
-
-    jwrite_profiler_start(FrameRenderCost);
-
-    QPainter p(this);
-    auto     pal = palette();
-
     //! smooth scroll
     if (qAbs(context_->viewport_y_pos - expected_scroll_) > 1e-3) {
         const double new_scroll_pos = context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51;
@@ -800,10 +791,17 @@ void Editor::paintEvent(QPaintEvent *e) {
         }
     }
 
-    //! prepare render data
     jwrite_profiler_start(PrepareRenderData);
     context_->prepare_render_data();
     jwrite_profiler_record(PrepareRenderData);
+
+    if (!context_->lock.try_lock_read()) { return; }
+    if (!context_->cached_render_data_ready) { return; }
+
+    jwrite_profiler_start(FrameRenderCost);
+
+    QPainter p(this);
+    auto     pal = palette();
 
     //! draw selection
     drawSelection(&p);
@@ -822,6 +820,8 @@ void Editor::paintEvent(QPaintEvent *e) {
     }
 
     jwrite_profiler_record(FrameRenderCost);
+
+    context_->lock.unlock_read();
 }
 
 void Editor::focusInEvent(QFocusEvent *e) {

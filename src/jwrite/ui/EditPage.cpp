@@ -168,7 +168,11 @@ void EditPage::do_open_chapter(int cid) {
     }
 
     do_update_wcstate(text, false);
-    ui_editor_->reset(text, true);
+
+    {
+        auto guard = ui_editor_->lock_guard();
+        ui_editor_->reset(text, true);
+    }
 
     book_manager_->sync_chapter_content(last_cid, text);
 
@@ -328,10 +332,10 @@ void EditPage::sync_chapter_from_editor() {
 
     Q_ASSERT(book_manager_);
 
-    //! FIXME: unsafe multi-thread sync
-    ui_editor_->setTextEngineLocked(true);
-    book_manager_->sync_chapter_content(current_cid_, ui_editor_->take());
-    ui_editor_->setTextEngineLocked(false);
+    {
+        auto guard = ui_editor_->lock_guard();
+        book_manager_->sync_chapter_content(current_cid_, ui_editor_->take());
+    }
 
     current_cid_ = -1;
 }

@@ -19,6 +19,8 @@ void VisualTextEditContext::resize_viewport(int width, int height) {
     Q_ASSERT(width >= 0);
     Q_ASSERT(height >= 0);
 
+    lock.lock_write();
+
     //! FIXME: viewport_y_pos will be dirty after viewport width changed
 
     if (height != viewport_height) {
@@ -30,11 +32,15 @@ void VisualTextEditContext::resize_viewport(int width, int height) {
         engine.reset_max_width(width);
         cached_render_data_ready = false;
     }
+
+    lock.unlock_write();
 }
 
 void VisualTextEditContext::prepare_render_data() {
     cached_render_data_ready = cached_render_data_ready && !engine.is_dirty() && !cursor_moved;
     if (cached_render_data_ready) { return; }
+
+    lock.lock_write();
 
     jwrite_profiler_start(TextEngineRenderCost);
     engine.render();
@@ -94,6 +100,8 @@ void VisualTextEditContext::prepare_render_data() {
     }
 
     cached_render_data_ready = true;
+
+    lock.unlock_write();
 }
 
 VisualTextEditContext::TextLoc VisualTextEditContext::current_textloc() const {

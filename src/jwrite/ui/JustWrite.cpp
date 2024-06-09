@@ -144,7 +144,7 @@ void JustWrite::request_open_book(const QString &book_id) {
             if (const auto &chapters = bm->get_all_chapters(); !chapters.isEmpty()) {
                 ui_edit_page_->do_open_chapter(chapters.back());
             }
-            ui_edit_page_->editor()->prepareRenderData();
+            ui_edit_page_->editor()->prepare_render_data();
         })
         .exec(ui_surface_);
 
@@ -447,6 +447,8 @@ void JustWrite::do_init_local_storage() {
 }
 
 void JustWrite::do_load_local_storage() {
+    spdlog::info("sync data from local storage");
+
     QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
     Q_ASSERT(dir.exists());
 
@@ -550,10 +552,12 @@ void JustWrite::do_load_local_storage() {
 
         dir.cdUp();
     }
+
+    spdlog::info("sync finished");
 }
 
 void JustWrite::do_sync_local_storage() {
-    spdlog::info("sync data from local storage");
+    spdlog::info("sync data to local storage");
 
     QJsonObject local_storage;
     QJsonArray  book_data;

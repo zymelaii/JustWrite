@@ -1,6 +1,7 @@
 #pragma once
 
 #include <jwrite/TextViewEngine.h>
+#include <jwrite/CoreTextViewEngine.h>
 
 namespace jwrite {
 
@@ -48,6 +49,8 @@ struct VisualTextEditContext {
         TextLoc           sel_loc_to;
         QMap<int, double> cached_block_y_pos;
     };
+
+    jwrite::core::RwLock lock;
 
     TextViewEngine engine;
 
