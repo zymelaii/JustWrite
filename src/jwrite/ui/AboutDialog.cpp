@@ -26,7 +26,7 @@ int AboutDialog::exec(widgetkit::OverlaySurface* surface) {
 }
 
 void AboutDialog::show(OverlaySurface* surface) {
-    auto dialog = std::make_shared<AboutDialog>();
+    auto dialog = std::make_unique<AboutDialog>();
     dialog->exec(surface);
 }
 
