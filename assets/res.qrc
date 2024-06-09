@@ -2,6 +2,7 @@
     <qresource prefix="/">
         <file alias="app.ico">icon/app.ico</file>
         <file alias="app.png">icon/app.png</file>
+        <file alias="open-source license">../misc/license/deps.toml</file>
         <file>res/themes/dark/icons/button/close.svg</file>
         <file>res/themes/dark/icons/indicator/edit.svg</file>
         <file>res/themes/dark/icons/indicator/ellapse.svg</file>

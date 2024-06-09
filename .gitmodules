@@ -10,3 +10,6 @@
 [submodule "deps/spdlog"]
 	path = deps/spdlog
 	url = git@github.com:gabime/spdlog.git
+[submodule "deps/tomlplusplus"]
+	path = deps/tomlplusplus
+	url = git@github.com:marzer/tomlplusplus.git

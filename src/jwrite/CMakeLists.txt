@@ -23,6 +23,7 @@ target_link_libraries(
 	PUBLIC cppjieba
 	PUBLIC magic_enum::magic_enum
 	PUBLIC spdlog::spdlog
+	PUBLIC tomlplusplus::tomlplusplus
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCE_FILES})

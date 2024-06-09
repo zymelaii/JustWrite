@@ -29,25 +29,33 @@ set(CMAKE_AUTORCC ON)
 
 option(JWRITE_BUILD_TESTS "Build the unittests" ON)
 
+# deps QT
 set(QT_DEPENDENCY Core Gui Widgets StateMachine Concurrent)
 find_package(QT NAMES Qt6 COMPONENTS ${QT_DEPENDENCY} REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS ${QT_DEPENDENCY} REQUIRED)
 
+# deps magic_enum
 set(MAGIC_ENUM_OPT_BUILD_EXAMPLES OFF)
 set(MAGIC_ENUM_OPT_BUILD_TESTS OFF)
 set(MAGIC_ENUM_OPT_INSTALL OFF)
 add_subdirectory(deps/magic_enum)
 
+# deps qwindowkit
 set(QWINDOWKIT_INSTALL OFF)
 set(QWINDOWKIT_BUILD_STATIC ON)
 set(QWINDOWKIT_BUILD_EXAMPLES OFF)
 add_subdirectory(deps/qwindowskit)
 
+# deps zlib
 set(ZLIB_BUILD_EXAMPLES OFF)
 set(SKIP_INSTALL_ALL ON)
 add_subdirectory(deps/zlib)
 
+# deps spdlog
 add_subdirectory(deps/spdlog)
+
+# deps tomlplusplus
+add_subdirectory(deps/tomlplusplus)
 
 if(JWRITE_BUILD_TESTS)
     find_package(GTest)

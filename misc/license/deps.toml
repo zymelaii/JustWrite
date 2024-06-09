@@ -1,0 +1,53 @@
+[tomlplusplus]
+authors = ["Mark Gillard"]
+years = ""
+url = "https://github.com/marzer/tomlplusplus"
+license = "MIT"
+
+[magic_enum]
+authors = ["Daniil Goncharov"]
+years = "2019-2024"
+url = "https://github.com/Neargye/magic_enum"
+license = "MIT"
+
+[qwindowkit]
+authors = ["Stdware Collections@2023-2024", "Yuhang Zhao@2021-2023"]
+years = ""
+url = "https://github.com/stdware/qwindowkit"
+license = "Apache-2.0"
+
+[spdlog]
+authors = ["Gabi Melman"]
+years = "2016"
+url = "https://github.com/gabime/spdlog"
+license = "MIT"
+
+[zlib]
+authors = ["Jean-loup Gailly", "Mark Adler"]
+years = "1995-2024"
+url = "https://zlib.net"
+license = "zlib"
+
+[MiniZip]
+authors = ["Gilles Vollant"]
+years = "1998-2010"
+url = "http://www.winimage.com/zLibDll/minizip.html"
+license = "MiniZip"
+
+[cppjieba]
+authors = ["yanyiwu"]
+years = "2013"
+url = "https://github.com/yanyiwu/cppjieba"
+license = "MIT"
+
+[limonp]
+authors = ["yanyiwu"]
+years = "2013"
+url = "https://github.com/yanyiwu/limonp"
+license = "MIT"
+
+[qt-material-widgets]
+authors = ["Johannes Hilden"]
+years = "2017"
+url = "https://github.com/laserpants/qt-material-widgets"
+license = "BSD-3-Clause"
