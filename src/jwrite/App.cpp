@@ -47,6 +47,7 @@ protected:
 
     bool filter_key_press_event(QKeyEvent *event) {
         Q_ASSERT(client_);
+        if (client_->has_overlay()) { return false; }
         if (auto opt = client_->try_match_shortcut(event)) {
             client_->trigger_shortcut(*opt);
             return true;
