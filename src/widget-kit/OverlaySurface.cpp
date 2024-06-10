@@ -123,4 +123,12 @@ void OverlaySurface::paintEvent(QPaintEvent *event) {
     p.fillRect(rect(), overlay_color);
 }
 
+void OverlaySurface::resizeEvent(QResizeEvent *event) {
+    QWidget::resizeEvent(event);
+    if (overlay_) {
+        overlay_->updateGeometry();
+        overlay_->update();
+    }
+}
+
 } // namespace widgetkit

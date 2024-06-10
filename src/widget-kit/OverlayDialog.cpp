@@ -6,7 +6,8 @@ namespace widgetkit {
 OverlayDialog::OverlayDialog()
     : QWidget()
     , event_loop_{nullptr}
-    , result_{0} {}
+    , result_{0}
+    , surface_{nullptr} {}
 
 OverlayDialog::~OverlayDialog() {}
 
@@ -39,12 +40,16 @@ int OverlayDialog::exec(OverlaySurface *surface) {
     surface->reload(this);
     surface->showOverlay();
 
+    surface_ = surface;
+
     QEventLoop loop;
     event_loop_ = &loop;
     event_loop_->exec();
     event_loop_ = nullptr;
 
     if (this == surface->overlay()) { surface->closeOverlay(); }
+
+    surface_ = nullptr;
 
     return result();
 }

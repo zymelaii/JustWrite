@@ -27,6 +27,10 @@ public slots:
 public:
     virtual int exec(OverlaySurface *surface);
 
+    QWidget *surface() const {
+        return surface_;
+    }
+
     bool isAccepted() const {
         return accepted_or_rejected_ ? accepted_or_rejected_.value() : false;
     }
@@ -52,6 +56,7 @@ private:
     QEventLoop         *event_loop_;
     int                 result_;
     std::optional<bool> accepted_or_rejected_;
+    QWidget            *surface_;
 };
 
 } // namespace widgetkit

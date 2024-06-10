@@ -32,6 +32,7 @@ public slots:
 protected:
     void setupUi();
     void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     OverlayDialog *overlay_;
