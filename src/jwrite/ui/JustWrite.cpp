@@ -3,6 +3,7 @@
 #include <jwrite/ui/BookInfoEdit.h>
 #include <jwrite/ui/ColorSchemeDialog.h>
 #include <jwrite/ui/MessageBox.h>
+#include <jwrite/ui/SettingsDialog.h>
 #include <jwrite/ui/AboutDialog.h>
 #include <jwrite/ui/ToolbarIcon.h>
 #include <jwrite/ColorScheme.h>
@@ -782,6 +783,9 @@ void JustWrite::handle_on_open_help() {
 }
 
 void JustWrite::handle_on_open_settings() {
+    SettingsDialog::show(ui_surface_);
+    return;
+
     //! TODO: currently only support editing the color scheme, impl it later
 
     auto &config = AppConfig::get_instance();
@@ -932,8 +936,10 @@ JustWrite::~JustWrite() {
     for (auto book : books_) { delete book; }
     books_.clear();
 
+#if 0
     jwrite_profiler_dump(QString("jwrite-profiler.%1.log")
                              .arg(QDateTime::currentDateTimeUtc().toString("yyyyMMddHHmmss")));
+#endif
 }
 
 void JustWrite::setupUi() {
