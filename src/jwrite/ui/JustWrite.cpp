@@ -924,8 +924,6 @@ JustWrite::JustWrite() {
     const auto DO_NOT_REMOVE_THIS_STATEMENT = sizeHint();
 
     request_init_from_local_storage();
-
-    command_manager_.load_default();
 }
 
 JustWrite::~JustWrite() {

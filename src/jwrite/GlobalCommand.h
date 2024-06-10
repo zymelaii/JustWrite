@@ -16,11 +16,14 @@ enum class GlobalCommand {
 
 class GlobalCommandManager {
 public:
-    void load_default();
-    void clear();
-    void insert_or_update(QKeySequence key, GlobalCommand cmd);
+    void         load_default();
+    void         clear();
+    void         insert_or_update(QKeySequence key, GlobalCommand cmd);
+    QKeySequence get(GlobalCommand command) const;
 
     std::optional<GlobalCommand> match(QKeyEvent* e) const;
+
+    static GlobalCommandManager& get_instance();
 
 private:
     QMap<QKeySequence, GlobalCommand> shortcuts_;

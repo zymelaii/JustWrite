@@ -103,7 +103,7 @@ public:
     void update_color_scheme(const ColorScheme &scheme);
 
     std::optional<GlobalCommand> try_match_shortcut(QKeyEvent *event) const {
-        return command_manager_.match(event);
+        return GlobalCommandManager::get_instance().match(event);
     }
 
     void wait(std::function<void()> job) {
@@ -112,6 +112,10 @@ public:
 
     static widgetkit::Progress::Builder get_wait_builder() {
         return widgetkit::Progress::Builder{};
+    }
+
+    bool has_overlay() const {
+        return ui_surface_->overlay() != nullptr;
     }
 
 public slots:
@@ -154,7 +158,6 @@ private:
     PageType                             current_page_;
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;
-    GlobalCommandManager                 command_manager_;
     bool                                 fullscreen_;
 
     QSystemTrayIcon           *ui_tray_icon_;
