@@ -162,7 +162,7 @@ void MessageBox::setupUi() {
 
     ui_caption_->setText(tr("MessageBox.caption"));
     ui_close_->setPixmap(
-        QIcon(AppConfig::get_instance().icon("button/close")).pixmap(QSize(16, 16)));
+        QIcon(AppConfig::get_instance().icon("button/close-large")).pixmap(QSize(16, 16)));
     ui_message_->setText("");
     ui_btn_cancel_->setText(tr("MessageBox.cancel"));
     ui_btn_no_->setText(tr("MessageBox.no"));

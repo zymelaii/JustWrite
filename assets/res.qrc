@@ -4,12 +4,16 @@
         <file alias="app.png">icon/app.png</file>
         <file alias="open-source license">../misc/license/deps.toml</file>
         <file>res/themes/dark/icons/button/close.svg</file>
+        <file>res/themes/dark/icons/button/up.svg</file>
+        <file>res/themes/dark/icons/button/down.svg</file>
+        <file>res/themes/dark/icons/button/close-large.svg</file>
         <file>res/themes/dark/icons/indicator/edit.svg</file>
         <file>res/themes/dark/icons/indicator/ellapse.svg</file>
         <file>res/themes/dark/icons/indicator/expand.svg</file>
         <file>res/themes/dark/icons/sys/close.svg</file>
         <file>res/themes/dark/icons/sys/maximize.svg</file>
         <file>res/themes/dark/icons/sys/minimize.svg</file>
+        <file>res/themes/dark/icons/sign/done.svg</file>
         <file>res/themes/dark/icons/sign/info.svg</file>
         <file>res/themes/dark/icons/sign/warning.svg</file>
         <file>res/themes/dark/icons/sign/error.svg</file>
@@ -28,12 +32,16 @@
         <file>res/themes/dark/icons/toolbar/share.svg</file>
         <file>res/themes/dark/icons/toolbar/trash.svg</file>
         <file>res/themes/light/icons/button/close.svg</file>
+        <file>res/themes/light/icons/button/up.svg</file>
+        <file>res/themes/light/icons/button/down.svg</file>
+        <file>res/themes/light/icons/button/close-large.svg</file>
         <file>res/themes/light/icons/indicator/edit.svg</file>
         <file>res/themes/light/icons/indicator/ellapse.svg</file>
         <file>res/themes/light/icons/indicator/expand.svg</file>
         <file>res/themes/light/icons/sys/close.svg</file>
         <file>res/themes/light/icons/sys/maximize.svg</file>
         <file>res/themes/light/icons/sys/minimize.svg</file>
+        <file>res/themes/light/icons/sign/done.svg</file>
         <file>res/themes/light/icons/sign/info.svg</file>
         <file>res/themes/light/icons/sign/warning.svg</file>
         <file>res/themes/light/icons/sign/error.svg</file>

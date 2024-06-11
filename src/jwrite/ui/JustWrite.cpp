@@ -6,6 +6,7 @@
 #include <jwrite/ui/SettingsDialog.h>
 #include <jwrite/ui/AboutDialog.h>
 #include <jwrite/ui/ToolbarIcon.h>
+#include <jwrite/ui/FontSelectDialog.h>
 #include <jwrite/ColorScheme.h>
 #include <jwrite/epub/EpubBuilder.h>
 #include <jwrite/AppAction.h>
@@ -21,7 +22,6 @@
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QPainter>
-#include <QFontDialog>
 #include <QFileDialog>
 #include <QCoreApplication>
 #include <QFontDatabase>
@@ -792,15 +792,10 @@ void JustWrite::handle_on_open_settings() {
     auto settings = std::make_unique<SettingsDialog>();
 
     connect(settings.get(), &SettingsDialog::on_request_editor_font_select, this, [&]() {
-        //! FIXME: implement custom font select dialog
-        bool ok   = false;
-        auto font = QFontDialog::getFont(
-            &ok,
-            ui_edit_page_->editor()->font(),
-            nullptr,
-            tr("JustWrite.editor_select_font.caption"));
-        if (auto &config = AppConfig::get_instance(); ok) {
-            config.set_value(AppConfig::ValOption::TextFont, font.families().join(','));
+        auto      &config   = AppConfig::get_instance();
+        const auto families = config.value(AppConfig::ValOption::TextFont).split(",");
+        if (auto opt = FontSelectDialog::get_font_families(ui_surface_, families)) {
+            config.set_value(AppConfig::ValOption::TextFont, opt->join(','));
         }
     });
     connect(settings.get(), &SettingsDialog::on_request_color_scheme_editor, this, [this]() {
@@ -984,6 +979,7 @@ void JustWrite::handle_config_on_option_change(AppConfig::Option opt, bool on) {
 
 void JustWrite::handle_config_on_value_change(AppConfig::ValOption opt, const QString &value) {
     using Option = AppConfig::ValOption;
+    auto &config = AppConfig::get_instance();
     switch (opt) {
         case Option::Language: {
             auto       translator = new QTranslator;
@@ -999,12 +995,18 @@ void JustWrite::handle_config_on_value_change(AppConfig::ValOption opt, const QS
         case Option::DefaultEditMode: {
         } break;
         case Option::TextFont: {
-            QStringList families{};
-            for (const auto &family : value.split(',')) {
-                if (QFontDatabase::hasFamily(family)) { families << family; }
+            if (value.isEmpty()) {
+                //! NOTE: point size here is not used but only for the fn call
+                const auto default_font = config.font(AppConfig::FontStyle::Light, 16);
+                ui_edit_page_->editor()->set_font(default_font);
+            } else {
+                QStringList families{};
+                for (const auto &family : value.split(',')) {
+                    if (QFontDatabase::hasFamily(family)) { families << family; }
+                }
+                if (families.empty()) { break; }
+                ui_edit_page_->editor()->set_font(QFont(families));
             }
-            if (families.empty()) { break; }
-            ui_edit_page_->editor()->set_font(QFont(families));
         } break;
         case Option::TextFontSize: {
             bool      ok   = false;
