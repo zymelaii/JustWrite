@@ -116,7 +116,7 @@ void Editor::scrollToCursor() {
         }
     } else if (e.active_block_index < d.visible_block.first) {
         y_pos = d.cached_block_y_pos[d.visible_block.first];
-        for (int index = d.visible_block.first; index > e.active_block_index; --index) {
+        for (int index = d.visible_block.first - 1; index >= e.active_block_index; --index) {
             y_pos -= e.block_spacing + line_spacing * e.active_blocks[index]->lines.size();
         }
     } else if (e.active_block_index > d.visible_block.last) {
