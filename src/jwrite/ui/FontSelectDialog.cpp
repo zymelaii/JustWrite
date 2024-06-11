@@ -152,7 +152,7 @@ void FontSelectDialog::init() {
     fonts_area->setFixedHeight(200);
     fonts_area->setVerticalScrollBar(fonts_scroll);
     fonts_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    fonts_area->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    fonts_area->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
 
     auto font_families = new QWidget;
     ui_font_layout_    = new QVBoxLayout(font_families);
