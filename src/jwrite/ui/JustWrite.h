@@ -4,6 +4,7 @@
 #include <jwrite/ui/Toolbar.h>
 #include <jwrite/ui/EditPage.h>
 #include <jwrite/ui/Gallery.h>
+#include <jwrite/AppConfig.h>
 #include <jwrite/BookManager.h>
 #include <jwrite/GlobalCommand.h>
 #include <widget-kit/OverlaySurface.h>
@@ -27,11 +28,6 @@ public:
         Chapter,
     };
 
-    enum class PageType {
-        Gallery,
-        Edit,
-    };
-
     enum class ExportType {
         PlainText,
         ePub,
@@ -53,7 +49,7 @@ protected:
 
 signals:
     void on_trigger_shortcut(GlobalCommand shortcut);
-    void on_page_change(PageType page);
+    void on_page_change(AppConfig::Page page);
 
 protected:
     bool do_load_book(const BookInfo &book_info);
@@ -86,7 +82,7 @@ protected:
     void do_sync_local_storage();
     void do_load_local_storage();
 
-    void request_switch_page(PageType page);
+    void request_switch_page(AppConfig::Page page);
 
 public:
     bool is_fullscreen_mode() const {
@@ -124,7 +120,7 @@ public slots:
     void handle_book_dir_on_rename_toc_item(const QString &book_id, int toc_id, TocType type);
     void handle_book_dir_on_rename_toc_item__adapter(const BookInfo &book_info, int vid, int cid);
     void handle_edit_page_on_export();
-    void handle_on_page_change(PageType page);
+    void handle_on_page_change(AppConfig::Page page);
     void handle_on_open_help();
     void handle_on_open_settings();
     void handle_on_theme_change();
@@ -138,6 +134,8 @@ public slots:
     void handle_on_exit_fullscreen();
     void handle_on_visiblity_change(bool visible);
     void handle_on_trigger_shortcut(GlobalCommand shortcut);
+    void handle_config_on_option_change(AppConfig::Option opt, bool on);
+    void handle_config_on_value_change(AppConfig::ValOption opt, const QString &value);
 
 public:
     JustWrite();
@@ -146,6 +144,7 @@ public:
 protected:
     void setupUi();
     void setupConnections();
+    void init();
 
     bool eventFilter(QObject *watched, QEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -153,12 +152,13 @@ protected:
     void hideEvent(QHideEvent *event) override;
 
 private:
-    QMap<PageType, QWidget *>            page_map_;
-    QMap<PageType, QSet<int>>            page_toolbar_mask_;
-    PageType                             current_page_;
+    QMap<AppConfig::Page, QWidget *>     page_map_;
+    QMap<AppConfig::Page, QSet<int>>     page_toolbar_mask_;
+    AppConfig::Page                      current_page_;
     QMap<QString, AbstractBookManager *> books_;
     QString                              likely_author_;
     bool                                 fullscreen_;
+    bool                                 auto_hide_toolbar_on_fullscreen_;
 
     QSystemTrayIcon           *ui_tray_icon_;
     TitleBar                  *ui_title_bar_;

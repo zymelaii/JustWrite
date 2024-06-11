@@ -21,6 +21,44 @@ signals:
     void focusLost(VisualTextEditContext::TextLoc last_loc);
     void activated();
 
+public slots:
+
+    void set_line_spacing_ratio(double ratio) {
+        context_->engine.line_spacing_ratio = ratio;
+        context_->cached_render_data_ready  = false;
+        update();
+    }
+
+    void set_block_spacing(double spacing) {
+        context_->engine.block_spacing     = spacing;
+        context_->cached_render_data_ready = false;
+        update();
+    }
+
+    void set_font_size(int size) {
+        ui_content_font_.setPointSize(size);
+        context_->engine.reset_font_metrics(QFontMetrics(ui_content_font_));
+        update();
+    }
+
+    void set_font(QFont font) {
+        const int size   = ui_content_font_.pointSize();
+        ui_content_font_ = font;
+        ui_content_font_.setPointSize(size);
+        context_->engine.reset_font_metrics(QFontMetrics(ui_content_font_));
+        update();
+    }
+
+    void set_active_block_highlight_enabled(bool enabled) {
+        ui_highlight_active_block_ = enabled;
+        update();
+    }
+
+public:
+    bool active_block_highlight_enabled() const {
+        return ui_highlight_active_block_;
+    }
+
 public:
     bool softCenterMode() const;
     void setSoftCenterMode(bool value);
@@ -159,8 +197,10 @@ private:
     double scroll_base_y_pos_;
     double scroll_ref_y_pos_;
 
+    QFont           ui_content_font_;
     QMargins        ui_margins_;
     Qt::CursorShape ui_cursor_shape_[2];
+    bool            ui_highlight_active_block_;
 };
 
 } // namespace jwrite::ui

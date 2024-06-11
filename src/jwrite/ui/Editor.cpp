@@ -496,6 +496,8 @@ Editor::~Editor() {
 }
 
 void Editor::init() {
+    ui_content_font_ = font();
+
     setFocusPolicy(Qt::ClickFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
     setAutoFillBackground(true);
@@ -514,11 +516,12 @@ void Editor::init() {
     auto_scroll_mode_          = false;
     ui_cursor_shape_[0]        = Qt::ArrowCursor;
     ui_cursor_shape_[1]        = Qt::ArrowCursor;
+    ui_highlight_active_block_ = true;
 
     setSoftCenterMode(true);
 
     const auto text_area = textArea();
-    context_             = new VisualTextEditContext(fontMetrics(), text_area.width());
+    context_ = new VisualTextEditContext(QFontMetrics(ui_content_font_), text_area.width());
     context_->resize_viewport(context_->viewport_width, text_area.height());
     context_->viewport_y_pos = 0;
 
@@ -702,6 +705,8 @@ void Editor::drawSelection(QPainter *p) {
 }
 
 void Editor::drawHighlightBlock(QPainter *p) {
+    if (!ui_highlight_active_block_) { return; }
+
     const auto &d = context_->cached_render_state;
     const auto &e = context_->engine;
     if (!e.is_cursor_available() || context_->has_sel()) { return; }
@@ -802,6 +807,8 @@ void Editor::paintEvent(QPaintEvent *e) {
 
     QPainter p(this);
     auto     pal = palette();
+
+    p.setFont(ui_content_font_);
 
     //! draw selection
     drawSelection(&p);

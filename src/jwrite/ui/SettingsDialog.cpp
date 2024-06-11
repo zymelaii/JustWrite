@@ -3,8 +3,8 @@
 #include <jwrite/AppConfig.h>
 #include <jwrite/Version.h>
 #include <qt-material/qtmaterialscrollbar.h>
-#include <qt-material/qtmaterialslider.h>
 #include <qt-material/qtmaterialtoggle.h>
+#include <widget-kit/LayoutHelper.h>
 #include <QSpinBox>
 #include <QSlider>
 #include <QComboBox>
@@ -77,36 +77,33 @@ protected:
         : SettingsItemBuilder(parent) {}
 
 public:
-    ComboBuilder &with_item(const QString &key, const QVariant &value) {
+    ComboBuilder &with_item(const QString &key, const QString &value) {
         items_.append({key, value});
         return *this;
     }
 
-    ComboBuilder &with_value(const QString &key) {
-        value_ = key;
+    ComboBuilder &with_source(AppConfig::ValOption option) {
+        option_ = option;
         return *this;
     }
 
 protected:
     QWidget *build() override {
-        Q_ASSERT(
-            std::find_if(
-                items_.begin(),
-                items_.end(),
-                [this](const QPair<QString, QVariant> &item) {
-                    return item.first == value_;
-                })
-            != items_.end());
+        auto      &config = AppConfig::get_instance();
+        const auto it     = std::find_if(items_.begin(), items_.end(), [&](const auto &item) {
+            return item.second == config.value(option_);
+        });
+        Q_ASSERT(it != items_.end());
         auto combo = new QComboBox;
         for (auto &item : items_) { combo->addItem(std::move(item.first), std::move(item.second)); }
         for (int i = 0; i < combo->count(); ++i) {
             combo->setItemData(i, Qt::AlignCenter, Qt::TextAlignmentRole);
         }
-        combo->setCurrentText(value_);
+        combo->setCurrentText(it->first);
         combo->setStyleSheet(R"(
             QComboBox {
                 color: #666666;
-                font-size: 16pt;
+                font-size: 12pt;
                 padding: 4px 10px 4px 10px;
                 border: 1px solid rgba(228,228,228,1);
                 border-radius: 5px 5px 0px 0px;
@@ -138,12 +135,19 @@ protected:
             }
         )");
         combo->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        QObject::connect(
+            combo,
+            &QComboBox::currentIndexChanged,
+            &config,
+            [&, sender = combo, opt = option_](int index) {
+                config.set_value(opt, sender->itemData(index).toString());
+            });
         return combo;
     }
 
 private:
-    QList<QPair<QString, QVariant>> items_;
-    QString                         value_;
+    QList<QPair<QString, QString>> items_;
+    AppConfig::ValOption           option_;
 };
 
 class SpinBuilder : public SettingsItemBuilder {
@@ -166,11 +170,6 @@ public:
         return *this;
     }
 
-    SpinBuilder &with_value(int value) {
-        value_ = value;
-        return *this;
-    }
-
     SpinBuilder &with_prefix(const QString &prefix) {
         prefix_ = prefix;
         return *this;
@@ -181,18 +180,27 @@ public:
         return *this;
     }
 
+    SpinBuilder &with_source(AppConfig::ValOption option) {
+        option_ = option;
+        return *this;
+    }
+
 protected:
     QWidget *build() override {
+        auto     &config = AppConfig::get_instance();
+        bool      ok     = false;
+        const int value  = config.value(option_).toInt(&ok);
+        Q_ASSERT(ok);
         auto spin = new QSpinBox;
         spin->setMinimum(minval_);
         spin->setMaximum(maxval_);
         spin->setSingleStep(step_);
-        spin->setValue(qBound(minval_, value_, maxval_));
+        spin->setValue(qBound(minval_, value, maxval_));
         spin->setPrefix(prefix_);
         spin->setSuffix(suffix_);
         spin->setStyleSheet(R"(
             QSpinBox {
-                font-size: 14pt;
+                font-size: 12pt;
                 padding: 4px 10px 4px 10px;
                 color: #000000;
                 background-color: #ffffff;
@@ -203,16 +211,19 @@ protected:
         spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         spin->setButtonSymbols(QAbstractSpinBox::NoButtons);
         spin->setAlignment(Qt::AlignCenter);
+        QObject::connect(spin, &QSpinBox::valueChanged, &config, [&, opt = option_](int value) {
+            config.set_value(opt, QString::number(value));
+        });
         return spin;
     }
 
 private:
-    int     minval_;
-    int     maxval_;
-    int     step_;
-    int     value_;
-    QString prefix_;
-    QString suffix_;
+    AppConfig::ValOption option_;
+    int                  minval_;
+    int                  maxval_;
+    int                  step_;
+    QString              prefix_;
+    QString              suffix_;
 };
 
 class DoubleSpinBuilder : public SettingsItemBuilder {
@@ -235,11 +246,6 @@ public:
         return *this;
     }
 
-    DoubleSpinBuilder &with_value(double value) {
-        value_ = value;
-        return *this;
-    }
-
     DoubleSpinBuilder &with_prefix(const QString &prefix) {
         prefix_ = prefix;
         return *this;
@@ -250,18 +256,27 @@ public:
         return *this;
     }
 
+    DoubleSpinBuilder &with_source(AppConfig::ValOption option) {
+        option_ = option;
+        return *this;
+    }
+
 protected:
     QWidget *build() override {
+        auto        &config = AppConfig::get_instance();
+        bool         ok     = false;
+        const double value  = config.value(option_).toDouble(&ok);
+        Q_ASSERT(ok);
         auto spin = new QDoubleSpinBox;
         spin->setMinimum(minval_);
         spin->setMaximum(maxval_);
         spin->setSingleStep(step_);
-        spin->setValue(qBound(minval_, value_, maxval_));
+        spin->setValue(qBound(minval_, value, maxval_));
         spin->setPrefix(prefix_);
         spin->setSuffix(suffix_);
         spin->setStyleSheet(R"(
             QDoubleSpinBox {
-                font-size: 14pt;
+                font-size: 12pt;
                 padding: 4px 10px 4px 10px;
                 color: #000000;
                 background-color: #ffffff;
@@ -272,17 +287,20 @@ protected:
         spin->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         spin->setButtonSymbols(QAbstractSpinBox::NoButtons);
         spin->setAlignment(Qt::AlignCenter);
-        return spin;
+        QObject::connect(
+            spin, &QDoubleSpinBox::valueChanged, &config, [&, opt = option_](double value) {
+                config.set_value(opt, QString::number(value));
+            });
         return spin;
     }
 
 private:
-    double  minval_;
-    double  maxval_;
-    double  step_;
-    double  value_;
-    QString prefix_;
-    QString suffix_;
+    AppConfig::ValOption option_;
+    double               minval_;
+    double               maxval_;
+    double               step_;
+    QString              prefix_;
+    QString              suffix_;
 };
 
 class ToggleBuilder : public SettingsItemBuilder {
@@ -293,64 +311,25 @@ protected:
         : SettingsItemBuilder(parent) {}
 
 public:
-    ToggleBuilder &with_value(bool checked) {
-        checked_ = checked;
+    ToggleBuilder &with_source(AppConfig::Option option) {
+        option_ = option;
         return *this;
     }
 
 protected:
     QWidget *build() override {
-        auto toggle = new QtMaterialToggle;
-        toggle->setChecked(checked_);
+        auto &config = AppConfig::get_instance();
+        auto  toggle = new QtMaterialToggle;
+        toggle->setChecked(config.option_enabled(option_));
+        QObject::connect(
+            toggle, &QtMaterialToggle::toggled, &config, [&, opt = option_](bool checked) {
+                config.set_option(opt, checked);
+            });
         return toggle;
     }
 
 private:
-    bool checked_;
-};
-
-class SliderBuilder : public SettingsItemBuilder {
-    friend SettingsPanelBuilder;
-
-protected:
-    SliderBuilder(SettingsPanelBuilder &parent)
-        : SettingsItemBuilder(parent) {}
-
-public:
-    SliderBuilder &with_bounds(int minval, int maxval) {
-        Q_ASSERT(minval <= maxval);
-        minval_ = minval;
-        maxval_ = maxval;
-        return *this;
-    }
-
-    SliderBuilder &with_step(int step) {
-        step_ = step;
-        return *this;
-    }
-
-    SliderBuilder &with_value(int value) {
-        value_ = value;
-        return *this;
-    }
-
-protected:
-    QWidget *build() override {
-        auto slider = new QtMaterialSlider;
-        slider->setFixedWidth(180);
-        slider->setMinimum(minval_);
-        slider->setMaximum(maxval_);
-        slider->setSingleStep(step_);
-        slider->setValue(qBound(minval_, value_, maxval_));
-        slider->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        return slider;
-    }
-
-private:
-    int minval_;
-    int maxval_;
-    int step_;
-    int value_;
+    AppConfig::Option option_;
 };
 
 class ButtonBuilder : public SettingsItemBuilder {
@@ -366,6 +345,12 @@ public:
         return *this;
     }
 
+    ButtonBuilder &with_signal(SettingsDialog *sender, void (SettingsDialog::*signal)()) {
+        sender_ = sender;
+        signal_ = signal;
+        return *this;
+    }
+
 protected:
     QWidget *build() override {
         auto button = new FlatButton;
@@ -376,7 +361,7 @@ protected:
         button->setContentsMargins(12, 0, 12, 0);
         button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         auto font = button->font();
-        font.setPointSize(14);
+        font.setPointSize(12);
         button->setFont(font);
         auto pal = button->palette();
         pal.setColor(QPalette::Base, "#7c95a2");
@@ -384,11 +369,16 @@ protected:
         pal.setColor(QPalette::Window, "#6d838e");
         pal.setColor(QPalette::WindowText, "#ffffff");
         button->setPalette(pal);
+        if (sender_ && signal_) {
+            QObject::connect(button, &FlatButton::pressed, sender_, signal_);
+        }
         return button;
     }
 
 private:
-    QString text_;
+    QString         text_;
+    SettingsDialog *sender_;
+    void (SettingsDialog::*signal_)();
 };
 
 class ShortcutBuilder : public SettingsItemBuilder {
@@ -399,21 +389,30 @@ protected:
         : SettingsItemBuilder(parent) {}
 
 public:
-    ShortcutBuilder &with_shortcut(const QKeySequence &shortcut) {
-        shortcut_ = shortcut;
+    ShortcutBuilder &with_action(GlobalCommand command) {
+        command_ = command;
         return *this;
     }
 
 protected:
     QWidget *build() override {
-        auto shortcut = new ShortcutEditor;
-        if (!shortcut_.isEmpty()) { shortcut->set_shortcut(shortcut_); }
+        auto &config   = AppConfig::get_instance();
+        auto &man      = GlobalCommandManager::get_instance();
+        auto  shortcut = new ShortcutEditor;
+        shortcut->set_shortcut(man.get(command_));
         shortcut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        QObject::connect(
+            shortcut,
+            &ShortcutEditor::on_shortcut_change,
+            &config,
+            [&, cmd = command_](const QKeySequence &shortcut) {
+                man.update_command_shortcut(cmd, shortcut);
+            });
         return shortcut;
     }
 
 private:
-    QKeySequence shortcut_;
+    GlobalCommand command_;
 };
 
 struct SettingsPanelBuilder {
@@ -483,10 +482,6 @@ public:
 
     auto with_toggle(const QString &name, const QString &desc) {
         return new_item<ToggleBuilder>(name, desc);
-    }
-
-    auto with_slider(const QString &name, const QString &desc) {
-        return new_item<SliderBuilder>(name, desc);
     }
 
     auto with_button(const QString &name, const QString &desc) {
@@ -703,6 +698,8 @@ void SettingsDialog::init() {
 }
 
 QWidget *SettingsDialog::createNormalPanel() {
+    auto &config = AppConfig::get_instance();
+
     auto w      = new QWidget;
     auto layout = new QVBoxLayout(w);
     layout->setContentsMargins(54, 0, 54, 0);
@@ -713,14 +710,17 @@ QWidget *SettingsDialog::createNormalPanel() {
         .with_combo("语言", "界面语言")
         .with_item("简体中文", "zh_CN")
         .with_item("English", "en_US")
-        .with_value("简体中文")
+        .with_source(AppConfig::ValOption::Language)
         .complete()
         .with_combo(
             "默认视图",
             "应用启动时进入的默认视图\n指定编辑视图时，只写将自动定位到上一次退出时的编辑位置")
-        .with_item("书库", static_cast<int>(JustWrite::PageType::Gallery))
-        .with_item("编辑页面", static_cast<int>(JustWrite::PageType::Edit))
-        .with_value("书库")
+        .with_item("书库", "gallery")
+        .with_item("编辑页面", "edit")
+        .with_source(AppConfig::ValOption::PrimaryPage)
+        .complete()
+        .with_toggle("侧边栏隐藏", "全屏模式自动隐藏侧边栏")
+        .with_source(AppConfig::Option::AutoHideToolbarOnFullscreen)
         .complete()
         .build();
 
@@ -738,77 +738,86 @@ QWidget *SettingsDialog::createEditorPanel() {
 
     SettingsPanelBuilder(layout)
         .with_combo("默认编辑模式", "默认采用的编辑模式")
-        .with_item("普通模式", false)
-        .with_item("只读模式", true)
-        .with_value("普通模式")
+        .with_item("普通模式", "normal")
+        .with_item("只读模式", "readonly")
+        .with_source(AppConfig::ValOption::DefaultEditMode)
         .complete()
         .with_button("正文字体", "编辑器的正文字体候选列表")
         .with_text("选择")
+        .with_signal(this, &SettingsDialog::on_request_editor_font_select)
         .complete()
         .with_spin("字体大小", "编辑视图字体大小")
         .with_bounds(8, 72)
         .with_step(1)
-        .with_value(16)
         .with_suffix("pt")
+        .with_source(AppConfig::ValOption::TextFontSize)
         .complete()
         .with_toggle("首行缩进", "正文文本段落首行的缩进大小，默认为两个全角空格字符的大小")
-        .with_value(true)
+        .with_source(AppConfig::Option::FirstLineIndent)
         .complete()
         .with_double_spin("行距", "正文文本使用的段落内行间距倍率")
         .with_bounds(0.0, 5.0)
         .with_step(0.2)
-        .with_value(1.0)
         .with_prefix("x")
+        .with_source(AppConfig::ValOption::LineSpacingRatio)
         .complete()
         .with_double_spin("段落间距", "正文文本的段落间距")
         .with_bounds(0.0, 64.0)
         .with_step(1.0)
-        .with_value(6.0)
         .with_suffix("px")
+        .with_source(AppConfig::ValOption::BlockSpacing)
         .complete()
         .with_toggle("段落聚焦", "高亮当前正在编辑的段落")
-        .with_value(true)
+        .with_source(AppConfig::Option::HighlightActiveBlock)
         .complete()
         .with_toggle("弹性伸缩", "启用后，当页面宽度发生变化时，优先压缩边距以保持文本视图宽度不变")
-        .with_value(false)
+        .with_source(AppConfig::Option::ElasticTextViewResize)
         .complete()
         .with_toggle("自动居中", "启用后，自动将编辑位置滚动到文本视图中心")
-        .with_value(false)
+        .with_source(AppConfig::Option::CentreEditLine)
         .complete()
-        .with_toggle(
+        .with_spin(
             "自动分章",
-            "当字数超过设定值时，自动在新的章节编辑下一个段落\n此动作只会在最后一个段落换行时触发")
-        .with_value(false)
+            "当字数超过设定值时，自动在新的章节编辑下一个段落，设定值为零时，禁用分章\n此动作只"
+            "会在"
+            "最后一个段落换行时触发")
+        .with_bounds(0, 100000)
+        .with_step(1000)
+        .with_source(AppConfig::ValOption::AutoChapterThreshold)
         .complete()
         .with_toggle(
             "配对符号匹配",
-            "启用该功能后，键入操作将在上下文双向匹配配对符号并触发增强编辑\n其中增强编辑包括：键入"
+            "启用该功能后，键入操作将在上下文双向匹配配对符号并触发增强编辑\n其中增强编辑包括："
+            "键入"
             "符号修正、智能符号补全、符号配对删除、冗余符号过滤")
-        .with_value(true)
+        .with_source(AppConfig::Option::PairingSymbolMatch)
         .complete()
         .with_combo("目录样式", "设置目录的显示风格")
-        .with_item("树形模式", 0)
-        .with_item("平铺模式", 1)
-        .with_value("树形模式")
+        .with_item("树形模式", "tree")
+        .with_item("平铺模式", "list")
+        .with_source(AppConfig::ValOption::BookDirStyle)
         .complete()
         .with_spin(
             "文本告警阈限",
-            "指定触发告警的文本阈限\n当单章字数以异常的高速状态超过阈限时，只写将立即抛出警告并冻结"
-            "该章节的编辑权限，直到编辑者手动解冻\n该功能用于监测异常的超量文本输入，规避巨量数据冲"
+            "指定触发告警的文本阈限\n当单章字数以异常的高速状态超过阈限时，只写将立即抛出警告并"
+            "冻结"
+            "该章节的编辑权限，直到编辑者手动解冻\n该功能用于监测异常的超量文本输入，规避巨量数"
+            "据冲"
             "击可能产生的应用卡顿、无响应乃至数据丢失")
         .with_bounds(0, 10000)
         .with_step(1)
-        .with_value(20)
         .with_suffix(" 万")
+        .with_source(AppConfig::ValOption::CriticalChapterLimit)
         .complete()
         .with_spin(
             "单章字数上限",
-            "指定单章的字数上限\n达到上限后将拒绝任何形式的文本插入，若指定了自动分章，则立即执行一"
+            "指定单章的字数上限\n达到上限后将拒绝任何形式的文本插入，若指定了自动分章，则立即执"
+            "行一"
             "次分章并将溢出的文本存入下一章节")
         .with_bounds(1, 1000)
         .with_step(1)
-        .with_value(100)
         .with_suffix(" 千")
+        .with_source(AppConfig::ValOption::ChapterLimit)
         .complete()
         .build();
 
@@ -825,28 +834,23 @@ QWidget *SettingsDialog::createAppearancePanel() {
     layout->addSpacing(32);
 
     SettingsPanelBuilder(layout)
-        .with_combo("颜色主题", "界面的基础颜色，主要用于指定图标的色彩")
-        .with_item("亮色", static_cast<int>(ColorTheme::Light))
-        .with_item("暗色", static_cast<int>(ColorTheme::Dark))
-        .with_value("暗色")
-        .complete()
-        .with_button("色彩方案", "界面元素色彩配置")
+        .with_button("色彩方案", "主题与界面元素色彩配置")
         .with_text("设置")
+        .with_signal(this, &SettingsDialog::on_request_color_scheme_editor)
         .complete()
         .with_button("背景图片", "设置应用的背景底图")
         .with_text("选择")
+        .with_signal(this, &SettingsDialog::on_request_background_image_picker)
         .complete()
         .with_button("编辑背景", "设置编辑视图的背景底图\n未指定时，继承“背景图片”的配置")
         .with_text("选择")
+        .with_signal(this, &SettingsDialog::on_request_editor_background_image_picker)
         .complete()
         .with_spin("背景不透明度", "应用背景图片的不透明度")
         .with_bounds(0, 100)
         .with_step(1)
-        .with_value(100)
         .with_suffix("%")
-        .complete()
-        .with_toggle("侧边栏隐藏", "全屏模式自动隐藏侧边栏")
-        .with_value(true)
+        .with_source(AppConfig::ValOption::BackgroundImageOpacity)
         .complete()
         .build();
 
@@ -866,20 +870,22 @@ QWidget *SettingsDialog::createBackupPanel() {
         .with_double_spin("定时备份", "指定定时备份的时间间隔")
         .with_bounds(0.5, 120)
         .with_step(1)
-        .with_value(5)
         .with_suffix("min")
+        .with_source(AppConfig::ValOption::TimingBackupInterval)
         .complete()
-        .with_toggle(
+        .with_spin(
             "定量备份", "指定定量备份的文本规模，当总编辑量达到指定值时，立即触发一次备份动作")
-        .with_value(false)
+        .with_bounds(50, 5000)
+        .with_step(100)
+        .with_source(AppConfig::ValOption::QuantitativeBackupThreshold)
         .complete()
         .with_toggle("智能压缩", "启用后，将尝试合并连续的零碎备份记录")
-        .with_value(false)
+        .with_source(AppConfig::Option::BackupSmartMerge)
         .complete()
         .with_toggle(
             "关键版本识别",
             "启用后，将根据历史编辑动作识别当前文档关键编辑节点，并生成独立的备份记录")
-        .with_value(false)
+        .with_source(AppConfig::Option::KeyVersionRecognition)
         .complete()
         .build();
 
@@ -899,6 +905,7 @@ QWidget *SettingsDialog::createStatisticsPanel() {
         .with_toggle(
             "严格字数统计",
             "启用后，将忽略对标点符号等非字母符号的计数，并将数字、英文单词视作单个字符统计")
+        .with_source(AppConfig::Option::StrictWordCount)
         .complete()
         .build();
 
@@ -914,24 +921,22 @@ QWidget *SettingsDialog::createShortcutPanel() {
     layout->setSpacing(8);
     layout->addSpacing(32);
 
-    const auto &man = GlobalCommandManager::get_instance();
-
     SettingsPanelBuilder(layout)
         .with_group("通用")
         .with_shortcut("全屏模式", "切换/退出全屏模式")
-        .with_shortcut(man.get(GlobalCommand::ToggleFullscreen))
+        .with_action(GlobalCommand::ToggleFullscreen)
         .complete()
         .with_shortcut("目录显示", "显示/隐藏作品目录")
-        .with_shortcut(man.get(GlobalCommand::ToggleSidebar))
+        .with_action(GlobalCommand::ToggleSidebar)
         .complete()
         .with_shortcut("软居中模式", "切换/退出软居中模式")
-        .with_shortcut(man.get(GlobalCommand::ToggleSoftCenterMode))
+        .with_action(GlobalCommand::ToggleSoftCenterMode)
         .complete()
         .with_shortcut("创建新章节", "在当前卷的末尾创建新章节")
-        .with_shortcut(man.get(GlobalCommand::CreateNewChapter))
+        .with_action(GlobalCommand::CreateNewChapter)
         .complete()
         .with_shortcut("重命名", "在编辑视图时，重命名当前选中的目录项（卷名、章名）")
-        .with_shortcut(man.get(GlobalCommand::Rename))
+        .with_action(GlobalCommand::Rename)
         .complete()
         .with_group("文本编辑")
         .build();
@@ -951,6 +956,7 @@ QWidget *SettingsDialog::createAboutPanel() {
     SettingsPanelBuilder(layout)
         .with_button("应用版本", QString("当前版本：v%1").arg(jwrite::VERSION.toString()))
         .with_text("检查更新")
+        .with_signal(this, &SettingsDialog::on_request_check_update)
         .complete()
         .build();
 
@@ -981,8 +987,8 @@ QWidget *SettingsDialog::createDeepCustomizePanel() {
         .with_spin("侧边栏图标大小", "指定侧边栏工具图标的大小\n该设置不会改变与侧边栏边框的间距")
         .with_bounds(8, 64)
         .with_step(1)
-        .with_value(12)
         .with_suffix("px")
+        .with_source(AppConfig::ValOption::ToolbarIconSize)
         .complete()
         .build();
 

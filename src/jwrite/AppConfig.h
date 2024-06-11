@@ -2,6 +2,8 @@
 
 #include <jwrite/ColorScheme.h>
 #include <QObject>
+#include <QMap>
+#include <QSet>
 
 namespace jwrite {
 
@@ -22,6 +24,56 @@ public:
         Italic,
     };
 
+    enum class Option {
+        AutoHideToolbarOnFullscreen,
+        FirstLineIndent,
+        HighlightActiveBlock,
+        ElasticTextViewResize,
+        CentreEditLine,
+        AutoChapter,
+        PairingSymbolMatch,
+        CriticalChapterLimit,
+        ChapterLimit,
+        TimingBackup,
+        QuantitativeBackup,
+        BackupSmartMerge,
+        KeyVersionRecognition,
+        StrictWordCount,
+    };
+
+    enum class ValOption {
+        Language,
+        PrimaryPage,
+        DefaultEditMode,
+        TextFont,
+        //! in units of point
+        TextFontSize,
+        LineSpacingRatio,
+        //! in units of pixel
+        BlockSpacing,
+        BookDirStyle,
+        AutoChapterThreshold,
+        //! in units of ten thousand
+        CriticalChapterLimit,
+        //! in units of thousand
+        ChapterLimit,
+        //! in units of minute
+        TimingBackupInterval,
+        QuantitativeBackupThreshold,
+        BackgroundImage,
+        EditorBackgroundImage,
+        //! in units of percentage
+        BackgroundImageOpacity,
+        //! in units of pixel
+        ToolbarIconSize,
+        LastEditingBookOnQuit,
+    };
+
+    enum class Page {
+        Gallery,
+        Edit,
+    };
+
 public:
     AppConfig();
     ~AppConfig() override;
@@ -29,42 +81,64 @@ public:
 signals:
     void on_theme_change(ColorTheme theme);
     void on_scheme_change(const ColorScheme& scheme);
+    void on_option_change(Option opt, bool on);
+    void on_value_change(ValOption opt, const QString& value);
 
 public:
-    QString theme_name() const;
+    QString    theme_name() const;
+    ColorTheme theme() const;
+    void       set_theme(ColorTheme theme);
 
-    ColorTheme theme() const {
-        return theme_;
-    }
-
-    void set_theme(ColorTheme theme);
-
-    const ColorScheme& scheme() const {
-        return scheme_;
-    }
-
-    void set_scheme(const ColorScheme& scheme);
+    const ColorScheme& scheme() const;
+    void               set_scheme(const ColorScheme& scheme);
 
     QString icon(const QString& name) const;
-
     QString path(StandardPath path_type) const;
-
     QString settings_file() const;
 
-    QString default_font_family() const {
-        return "Sarasa Gothic SC";
-    }
+    QString default_font_family() const;
+    QFont   font(FontStyle style, int point_size) const;
 
-    QFont font(FontStyle style, int point_size) const;
+    bool option_enabled(Option opt) const;
+    void set_option(Option opt, bool on);
 
-    static AppConfig& get_instance();
+    QString value(ValOption opt) const;
+    void    set_value(ValOption opt, const QString& value);
+
+    Page primary_page() const;
 
     void load();
     void save();
 
+    static AppConfig& get_instance();
+    static bool       default_option(Option opt);
+    static QString    default_option(ValOption opt);
+
+protected:
+    void load_default();
+
 private:
-    ColorTheme  theme_;
-    ColorScheme scheme_;
+    QMap<ValOption, QString> settings_values_;
+    QSet<Option>             settings_options_;
+    ColorTheme               theme_;
+    ColorScheme              scheme_;
 };
+
+inline ColorTheme AppConfig::theme() const {
+    return theme_;
+}
+
+inline const ColorScheme& AppConfig::scheme() const {
+    return scheme_;
+}
+
+inline bool AppConfig::option_enabled(Option opt) const {
+    return settings_options_.contains(opt);
+}
+
+inline QString AppConfig::value(ValOption opt) const {
+    //! FIXME: consider update to default value if not found
+    return settings_values_.value(opt, default_option(opt));
+}
 
 } // namespace jwrite

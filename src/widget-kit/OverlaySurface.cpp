@@ -1,5 +1,6 @@
 #include <widget-kit/OverlaySurface.h>
 #include <widget-kit/OverlayDialog.h>
+#include <widget-kit/LayoutHelper.h>
 #include <QStackedLayout>
 #include <QPainter>
 
@@ -69,13 +70,15 @@ void OverlaySurface::reload(OverlayDialog *overlay) {
 
     overlay_ = overlay;
 
-    ui_layout_->activate();
+    force_update_geometry(this);
 }
 
 bool OverlaySurface::showOverlay() {
     if (!overlay_) { return false; }
 
     show();
+
+    overlay_->updateGeometry();
 
     overlay_->setVisible(true);
     overlay_->raise();
@@ -125,10 +128,7 @@ void OverlaySurface::paintEvent(QPaintEvent *event) {
 
 void OverlaySurface::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
-    if (overlay_) {
-        overlay_->updateGeometry();
-        overlay_->update();
-    }
+    if (overlay_) { force_update_geometry(this); }
 }
 
 } // namespace widgetkit

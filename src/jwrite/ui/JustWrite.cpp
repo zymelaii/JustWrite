@@ -8,8 +8,8 @@
 #include <jwrite/ui/ToolbarIcon.h>
 #include <jwrite/ColorScheme.h>
 #include <jwrite/epub/EpubBuilder.h>
-#include <jwrite/AppConfig.h>
 #include <jwrite/AppAction.h>
+#include <jwrite/WordCounter.h>
 #include <jwrite/ProfileUtils.h>
 #include <widget-kit/TextInputDialog.h>
 #include <widget-kit/OverlaySurface.h>
@@ -21,8 +21,10 @@
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QPainter>
+#include <QFontDialog>
 #include <QFileDialog>
 #include <QCoreApplication>
+#include <QFontDatabase>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -137,7 +139,7 @@ void JustWrite::request_open_book(const QString &book_id) {
         .withPolicy(Progress::UseMinimumDisplayTime, false)
         .withBlockingJob([this, bm] {
             ui_edit_page_->reset_source(bm);
-            request_switch_page(PageType::Edit);
+            request_switch_page(AppConfig::Page::Edit);
             ui_edit_page_->request_invalidate_wcstate();
         })
         .withAsyncJob([this, bm] {
@@ -151,6 +153,9 @@ void JustWrite::request_open_book(const QString &book_id) {
 
     ui_edit_page_->focus_editor();
     ui_edit_page_->request_sync_wcstate();
+
+    auto &config = AppConfig::get_instance();
+    config.set_value(AppConfig::ValOption::LastEditingBookOnQuit, book_id);
 }
 
 void JustWrite::do_open_book(const QString &book_id) {
@@ -448,7 +453,7 @@ void JustWrite::do_init_local_storage() {
 }
 
 void JustWrite::do_load_local_storage() {
-    spdlog::info("sync data from local storage");
+    spdlog::info("sync data from local storage BEGIN -->");
 
     QDir dir{AppConfig::get_instance().path(AppConfig::StandardPath::UserData)};
     Q_ASSERT(dir.exists());
@@ -554,11 +559,11 @@ void JustWrite::do_load_local_storage() {
         dir.cdUp();
     }
 
-    spdlog::info("sync finished");
+    spdlog::info("<-- DONE");
 }
 
 void JustWrite::do_sync_local_storage() {
-    spdlog::info("sync data to local storage");
+    spdlog::info("sync data to local storage BEGIN -->");
 
     QJsonObject local_storage;
     QJsonArray  book_data;
@@ -638,10 +643,10 @@ void JustWrite::do_sync_local_storage() {
         dir.cdUp();
     }
 
-    spdlog::info("sync finished");
+    spdlog::info("<-- DONE");
 }
 
-void JustWrite::request_switch_page(PageType page) {
+void JustWrite::request_switch_page(AppConfig::Page page) {
     Q_ASSERT(page_map_.contains(page));
     Q_ASSERT(page_map_.value(page, nullptr));
     if (auto w = page_map_[page]; w != ui_page_stack_->currentWidget()) {
@@ -668,7 +673,7 @@ void JustWrite::set_fullscreen_mode(bool enable) {
 
     if (enable) {
         ui_title_bar_->setVisible(false);
-        ui_toolbar_->setVisible(false);
+        if (auto_hide_toolbar_on_fullscreen_) { ui_toolbar_->setVisible(false); }
         ui_toolbar_->installEventFilter(this);
     } else {
         ui_title_bar_->setVisible(true);
@@ -703,7 +708,8 @@ void JustWrite::update_color_scheme(const ColorScheme &scheme) {
     pal.setColor(QPalette::ButtonText, scheme.window_text());
     setPalette(pal);
 
-    if (auto w = static_cast<QScrollArea *>(page_map_[PageType::Gallery])->verticalScrollBar()) {
+    if (auto w =
+            static_cast<QScrollArea *>(page_map_[AppConfig::Page::Gallery])->verticalScrollBar()) {
         auto pal = w->palette();
         pal.setColor(w->backgroundRole(), scheme.text_base());
         pal.setColor(w->foregroundRole(), scheme.window());
@@ -757,17 +763,17 @@ void JustWrite::handle_book_dir_on_rename_toc_item__adapter(
 }
 
 void JustWrite::handle_edit_page_on_export() {
-    Q_ASSERT(current_page_ == PageType::Edit);
+    Q_ASSERT(current_page_ == AppConfig::Page::Edit);
     const auto &book_id = ui_edit_page_->get_book_id_of_source();
     request_export_book(book_id);
 }
 
-void JustWrite::handle_on_page_change(PageType page) {
+void JustWrite::handle_on_page_change(AppConfig::Page page) {
     switch (page) {
-        case PageType::Gallery: {
+        case AppConfig::Page::Gallery: {
             ui_title_bar_->setTitle(tr("JustWrite.default_title"));
         } break;
-        case PageType::Edit: {
+        case AppConfig::Page::Edit: {
             const auto &book_id = ui_edit_page_->get_book_id_of_source();
             Q_ASSERT(books_.contains(book_id));
             const auto &info = books_.value(book_id)->info_ref();
@@ -783,38 +789,50 @@ void JustWrite::handle_on_open_help() {
 }
 
 void JustWrite::handle_on_open_settings() {
-    SettingsDialog::show(ui_surface_);
-    return;
+    auto settings = std::make_unique<SettingsDialog>();
 
-    //! TODO: currently only support editing the color scheme, impl it later
+    connect(settings.get(), &SettingsDialog::on_request_editor_font_select, this, [&]() {
+        //! FIXME: implement custom font select dialog
+        bool ok   = false;
+        auto font = QFontDialog::getFont(
+            &ok,
+            ui_edit_page_->editor()->font(),
+            nullptr,
+            tr("JustWrite.editor_select_font.caption"));
+        if (auto &config = AppConfig::get_instance(); ok) {
+            config.set_value(AppConfig::ValOption::TextFont, font.families().join(','));
+        }
+    });
+    connect(settings.get(), &SettingsDialog::on_request_color_scheme_editor, this, [this]() {
+        //! FIXME: implement custom color scheme editor
+        auto &config = AppConfig::get_instance();
 
-    auto &config = AppConfig::get_instance();
+        const auto old_theme  = config.theme();
+        const auto old_scheme = config.scheme();
 
-    const auto old_theme  = config.theme();
-    const auto old_scheme = config.scheme();
+        auto dialog = std::make_unique<ColorSchemeDialog>(old_theme, old_scheme, this);
 
-    auto dialog = std::make_unique<ColorSchemeDialog>(old_theme, old_scheme, this);
+        connect(
+            dialog.get(),
+            &ColorSchemeDialog::on_request_apply,
+            this,
+            [this, &config](ColorTheme theme, const ColorScheme &scheme) {
+                config.set_theme(theme);
+                config.set_scheme(scheme);
+            });
 
-    connect(
-        dialog.get(),
-        &ColorSchemeDialog::on_request_apply,
-        this,
-        [this, &config](ColorTheme theme, const ColorScheme &scheme) {
-            config.set_theme(theme);
-            config.set_scheme(scheme);
-        });
+        const int result = dialog->exec();
 
-    const int result = dialog->exec();
+        if (result != QDialog::Accepted) {
+            config.set_theme(old_theme);
+            config.set_scheme(old_scheme);
+        } else {
+            config.set_theme(dialog->theme());
+            config.set_scheme(dialog->scheme());
+        }
+    });
 
-    if (result != QDialog::Accepted) {
-        config.set_theme(old_theme);
-        config.set_scheme(old_scheme);
-        update_color_scheme(old_scheme);
-    } else {
-        config.set_theme(dialog->theme());
-        config.set_scheme(dialog->scheme());
-        update_color_scheme(config.scheme());
-    }
+    settings->exec(ui_surface_);
 }
 
 void JustWrite::handle_on_theme_change() {
@@ -840,7 +858,7 @@ void JustWrite::handle_on_request_toggle_maximize() {
 }
 
 void JustWrite::handle_on_request_close() {
-    if (current_page_ == PageType::Edit) {
+    if (current_page_ == AppConfig::Page::Edit) {
         MessageBox::Option opt{};
         opt.type          = MessageBox::Type::Confirm;
         opt.yes_text      = tr("JustWrite.handle_on_request_close.yes");
@@ -861,20 +879,20 @@ void JustWrite::handle_on_request_close() {
 
 void JustWrite::handle_on_about_to_quit() {
     spdlog::info("client is about to quit");
-    if (current_page_ == PageType::Edit) { ui_edit_page_->sync_chapter_from_editor(); }
+    if (current_page_ == AppConfig::Page::Edit) { ui_edit_page_->sync_chapter_from_editor(); }
     wait([this] {
         do_sync_local_storage();
     });
 }
 
 void JustWrite::handle_on_open_gallery() {
-    if (current_page_ == PageType::Gallery) { return; }
-    if (current_page_ == PageType::Edit) {
+    if (current_page_ == AppConfig::Page::Gallery) { return; }
+    if (current_page_ == AppConfig::Page::Edit) {
         wait([this] {
             ui_edit_page_->sync_chapter_from_editor();
         });
     }
-    request_switch_page(PageType::Gallery);
+    request_switch_page(AppConfig::Page::Gallery);
 }
 
 void JustWrite::handle_on_enter_fullscreen() {
@@ -895,44 +913,155 @@ void JustWrite::handle_on_trigger_shortcut(GlobalCommand shortcut) {
             set_fullscreen_mode(!fullscreen_);
         } break;
         case GlobalCommand::ToggleSidebar: {
-            if (current_page_ == PageType::Edit) { ui_edit_page_->toggle_sidebar(); }
+            if (current_page_ == AppConfig::Page::Edit) { ui_edit_page_->toggle_sidebar(); }
         } break;
         case GlobalCommand::ToggleSoftCenterMode: {
-            if (current_page_ == PageType::Edit) { ui_edit_page_->toggle_soft_center_mode(); }
+            if (current_page_ == AppConfig::Page::Edit) {
+                ui_edit_page_->toggle_soft_center_mode();
+            }
         } break;
         case GlobalCommand::CreateNewChapter: {
-            if (current_page_ == PageType::Edit) { ui_edit_page_->handle_on_create_chapter(); }
+            if (current_page_ == AppConfig::Page::Edit) {
+                ui_edit_page_->handle_on_create_chapter();
+            }
         } break;
         case GlobalCommand::Rename: {
-            if (current_page_ == PageType::Edit) {
+            if (current_page_ == AppConfig::Page::Edit) {
                 ui_edit_page_->handle_on_rename_selected_toc_item();
             }
         } break;
     }
 }
 
-JustWrite::JustWrite() {
+void JustWrite::handle_config_on_option_change(AppConfig::Option opt, bool on) {
+    using Option = AppConfig::Option;
+    switch (opt) {
+        case Option::AutoHideToolbarOnFullscreen: {
+            auto_hide_toolbar_on_fullscreen_ = on;
+            if (!auto_hide_toolbar_on_fullscreen_) {
+                ui_toolbar_->setVisible(true);
+            } else if (is_fullscreen_mode()) {
+                ui_toolbar_->setVisible(false);
+            }
+        } break;
+        case Option::FirstLineIndent: {
+        } break;
+        case Option::HighlightActiveBlock: {
+            ui_edit_page_->editor()->set_active_block_highlight_enabled(on);
+        } break;
+        case Option::ElasticTextViewResize: {
+        } break;
+        case Option::CentreEditLine: {
+        } break;
+        case Option::AutoChapter: {
+        } break;
+        case Option::PairingSymbolMatch: {
+        } break;
+        case Option::CriticalChapterLimit: {
+        } break;
+        case Option::ChapterLimit: {
+        } break;
+        case Option::TimingBackup: {
+        } break;
+        case Option::QuantitativeBackup: {
+        } break;
+        case Option::BackupSmartMerge: {
+        } break;
+        case Option::KeyVersionRecognition: {
+        } break;
+        case Option::StrictWordCount: {
+            if (on) {
+                ui_edit_page_->reset_word_counter(new StrictWordCounter);
+            } else {
+                ui_edit_page_->reset_word_counter(new LossenWordCounter);
+            }
+        } break;
+    }
+}
+
+void JustWrite::handle_config_on_value_change(AppConfig::ValOption opt, const QString &value) {
+    using Option = AppConfig::ValOption;
+    switch (opt) {
+        case Option::Language: {
+            auto       translator = new QTranslator;
+            const bool succeed    = translator->load(QString(":/lang.%1").arg(value));
+            if (!succeed) {
+                delete translator;
+                return;
+            }
+            QApplication::installTranslator(translator);
+        } break;
+        case Option::PrimaryPage: {
+        } break;
+        case Option::DefaultEditMode: {
+        } break;
+        case Option::TextFont: {
+            QStringList families{};
+            for (const auto &family : value.split(',')) {
+                if (QFontDatabase::hasFamily(family)) { families << family; }
+            }
+            if (families.empty()) { break; }
+            ui_edit_page_->editor()->set_font(QFont(families));
+        } break;
+        case Option::TextFontSize: {
+            bool      ok   = false;
+            const int size = value.toUInt(&ok);
+            if (!ok) { break; }
+            ui_edit_page_->editor()->set_font_size(size);
+        } break;
+        case Option::LineSpacingRatio: {
+            bool         ok    = false;
+            const double ratio = value.toDouble(&ok);
+            if (!ok) { break; }
+            ui_edit_page_->editor()->set_line_spacing_ratio(ratio);
+        } break;
+        case Option::BlockSpacing: {
+            bool      ok      = false;
+            const int spacing = value.toDouble(&ok);
+            if (!ok) { break; }
+            ui_edit_page_->editor()->set_block_spacing(spacing);
+        } break;
+        case Option::BookDirStyle: {
+        } break;
+        case Option::AutoChapterThreshold: {
+        } break;
+        case Option::CriticalChapterLimit: {
+        } break;
+        case Option::ChapterLimit: {
+        } break;
+        case Option::TimingBackupInterval: {
+        } break;
+        case Option::QuantitativeBackupThreshold: {
+        } break;
+        case Option::BackgroundImage: {
+        } break;
+        case Option::EditorBackgroundImage: {
+        } break;
+        case Option::BackgroundImageOpacity: {
+        } break;
+        case Option::ToolbarIconSize: {
+            bool      ok   = false;
+            const int size = value.toUInt(&ok);
+            if (!ok) { break; }
+            ui_toolbar_->set_icon_size(size);
+        } break;
+        case Option::LastEditingBookOnQuit: {
+        } break;
+    }
+}
+
+JustWrite::JustWrite()
+    : auto_hide_toolbar_on_fullscreen_{true} {
     setupUi();
     setupConnections();
     setMouseTracking(true);
 
     set_fullscreen_mode(windowState().testFlag(Qt::WindowFullScreen));
 
-    request_switch_page(PageType::Gallery);
-
-    //! NOTE: Qt gives out an unexpected minimum height to my widgets and QLayout::invalidate()
-    //! could not solve the problem, maybe there is some dirty cached data at the bottom level.
-    //! I eventually found that an explicit call to the expcted-to-be-readonly method sizeHint()
-    //! could make effects on the confusing issue. so, **DO NOT TOUCH THE CODE** unless you
-    //! figure out a better way to solve the problem
-    const auto DO_NOT_REMOVE_THIS_STATEMENT = sizeHint();
-
-    request_init_from_local_storage();
+    init();
 }
 
 JustWrite::~JustWrite() {
-    AppConfig::get_instance().save();
-
     for (auto book : books_) { delete book; }
     books_.clear();
 
@@ -1021,8 +1150,8 @@ void JustWrite::setupUi() {
     }
 
     page_toolbar_mask_.insert(
-        PageType::Gallery, {TI_Gallery, TI_Export, TI_Share, TI_ExitFullscreen});
-    page_toolbar_mask_.insert(PageType::Edit, {TI_Draft, TI_ExitFullscreen});
+        AppConfig::Page::Gallery, {TI_Gallery, TI_Export, TI_Share, TI_ExitFullscreen});
+    page_toolbar_mask_.insert(AppConfig::Page::Edit, {TI_Draft, TI_ExitFullscreen});
 
     ui_surface_        = new OverlaySurface;
     const bool succeed = ui_surface_->setup(container);
@@ -1042,8 +1171,8 @@ void JustWrite::setupUi() {
     top_layout->setContentsMargins({});
     top_layout->setSpacing(0);
 
-    page_map_[PageType::Gallery] = gallery_page;
-    page_map_[PageType::Edit]    = ui_edit_page_;
+    page_map_[AppConfig::Page::Gallery] = gallery_page;
+    page_map_[AppConfig::Page::Edit]    = ui_edit_page_;
 
     ui_tray_icon_ = new QSystemTrayIcon(this);
     ui_tray_icon_->setIcon(QIcon(":/app.ico"));
@@ -1070,6 +1199,9 @@ void JustWrite::setupConnections() {
     connect(&config, &AppConfig::on_theme_change, this, &JustWrite::handle_on_theme_change);
     connect(&config, &AppConfig::on_scheme_change, this, &JustWrite::handle_on_scheme_change);
     connect(
+        &config, &AppConfig::on_option_change, this, &JustWrite::handle_config_on_option_change);
+    connect(&config, &AppConfig::on_value_change, this, &JustWrite::handle_config_on_value_change);
+    connect(
         ui_title_bar_, &TitleBar::minimizeRequested, this, &JustWrite::handle_on_request_minimize);
     connect(
         ui_title_bar_,
@@ -1094,10 +1226,41 @@ void JustWrite::setupConnections() {
     connect(this, &JustWrite::on_trigger_shortcut, this, &JustWrite::handle_on_trigger_shortcut);
 }
 
+void JustWrite::init() {
+    auto &config = AppConfig::get_instance();
+
+    //! NOTE: Qt gives out an unexpected minimum height to my widgets and QLayout::invalidate()
+    //! could not solve the problem, maybe there is some dirty cached data at the bottom level.
+    //! I eventually found that an explicit call to the expcted-to-be-readonly method sizeHint()
+    //! could make effects on the confusing issue. so, **DO NOT TOUCH THE CODE** unless you
+    //! figure out a better way to solve the problem
+    const auto DO_NOT_REMOVE_THIS_STATEMENT = sizeHint();
+
+    request_init_from_local_storage();
+
+    for (const auto &opt : magic_enum::enum_values<AppConfig::Option>()) {
+        handle_config_on_option_change(opt, config.option_enabled(opt));
+    }
+    for (const auto &opt : magic_enum::enum_values<AppConfig::ValOption>()) {
+        handle_config_on_value_change(opt, config.value(opt));
+    }
+
+    auto       page    = config.primary_page();
+    const auto book_id = config.value(AppConfig::ValOption::LastEditingBookOnQuit);
+    if (page == AppConfig::Page::Edit && !books_.contains(book_id)) {
+        page = AppConfig::Page::Gallery;
+    }
+    if (page == AppConfig::Page::Edit) {
+        request_open_book(book_id);
+    } else {
+        request_switch_page(page);
+    }
+}
+
 bool JustWrite::eventFilter(QObject *watched, QEvent *event) {
     if (watched == ui_toolbar_ && event->type() == QEvent::Leave) {
         Q_ASSERT(fullscreen_);
-        ui_toolbar_->hide();
+        if (auto_hide_toolbar_on_fullscreen_) { ui_toolbar_->hide(); }
     }
     return QWidget::eventFilter(watched, event);
 }

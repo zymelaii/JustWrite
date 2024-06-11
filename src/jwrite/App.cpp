@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <toml++/toml.h>
 
 using jwrite::AppConfig;
 using jwrite::ui::JustWrite;
@@ -144,10 +145,26 @@ void init_logger() {
 }
 
 void init_language() {
+    auto lang = AppConfig::get_instance().value(AppConfig::ValOption::Language);
+    if (!QFile::exists(QString(":/lang.%1").arg(lang))) {
+        lang = AppConfig::default_option(AppConfig::ValOption::Language);
+    }
     auto       translator = new QTranslator;
-    const bool succeed    = translator->load(":/lang.zh_CN");
+    const bool succeed    = translator->load(QString(":/lang.%1").arg(lang));
     Q_ASSERT(succeed);
     QApplication::installTranslator(translator);
+}
+
+void init_settings() {
+    spdlog::info("load settings BEGIN -->");
+    AppConfig::get_instance().load();
+    spdlog::info("<-- DONE");
+}
+
+void save_settings() {
+    spdlog::info("write out settings BEGIN -->");
+    AppConfig::get_instance().save();
+    spdlog::info("<-- DONE");
 }
 
 int main(int argc, char *argv[]) {
@@ -158,9 +175,11 @@ int main(int argc, char *argv[]) {
     JwriteApplication app(argc, argv);
 
     init_logger();
-    init_language();
 
     spdlog::info("start up jwrite v{}", jwrite::VERSION.toString().toStdString());
+
+    init_settings();
+    init_language();
 
     QApplication::setOrganizationDomain("jwrite");
     QApplication::setOrganizationName("github.com/zymelaii/jwrite");
@@ -184,9 +203,30 @@ int main(int argc, char *argv[]) {
     client->setGeometry(compute_preferred_geometry(screen_geo));
     client->show();
 
+    QFile file(":/open-source license");
+    file.open(QIODevice::ReadOnly | QIODevice::Text);
+    auto toml_doc = file.readAll();
+    file.close();
+
+    for (auto &[key, val] : toml::parse(toml_doc.toStdString())) {
+        auto       &table = *val.as_table();
+        QStringList authors{};
+        table["authors"].as_array()->for_each([&](auto &author) {
+            authors << QString::fromStdString(author.as_string()->get()).split('@').first();
+        });
+        qDebug().noquote() << QString("%1 - %2\n%3\n%4 License\n===")
+                                  .arg(key.data())
+                                  .arg(authors.join(", "))
+                                  .arg(table["url"].value_or(""))
+                                  .arg(table["license"].value_or(""));
+    }
+
     spdlog::info("Hello, JustWrite!");
     const int exit_code = app.exec();
     spdlog::info("jwrite exited with code {}", exit_code);
+
+    save_settings();
+
     spdlog::info("Bye, JustWrite!");
 
     return exit_code;
