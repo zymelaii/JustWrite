@@ -752,6 +752,10 @@ QWidget *SettingsDialog::createEditorPanel() {
         .with_suffix("pt")
         .with_source(AppConfig::ValOption::TextFontSize)
         .complete()
+        .with_toggle(
+            "平滑滚动", "渐慢平滑滚动视图\n对于滚动到固定点的滚动，如滚动到文首、文末，该选项无效")
+        .with_source(AppConfig::Option::SmoothScroll)
+        .complete()
         .with_toggle("首行缩进", "正文文本段落首行的缩进大小，默认为两个全角空格字符的大小")
         .with_source(AppConfig::Option::FirstLineIndent)
         .complete()

@@ -181,14 +181,14 @@ QPair<double, double> Editor::scrollBound() const {
 void Editor::scroll(double delta, bool smooth) {
     const auto [min_y_pos, max_y_pos] = scrollBound();
     expected_scroll_ = qBound(min_y_pos, context_->viewport_y_pos + delta, max_y_pos);
-    if (!smooth) { context_->scroll_to(expected_scroll_); }
+    if (!smooth_scroll_enabled_ || !smooth) { context_->scroll_to(expected_scroll_); }
     requestUpdate(true);
 }
 
 void Editor::scrollTo(double pos_y, bool smooth) {
     const auto [min_y_pos, max_y_pos] = scrollBound();
     expected_scroll_                  = qBound(min_y_pos, pos_y, max_y_pos);
-    if (!smooth) { context_->scroll_to(expected_scroll_); }
+    if (!smooth_scroll_enabled_ || !smooth) { context_->scroll_to(expected_scroll_); }
     requestUpdate(true);
 }
 
@@ -515,6 +515,7 @@ void Editor::init() {
     inserted_filter_enabled_   = true;
     drag_sel_flag_             = false;
     oob_drag_sel_flag_         = false;
+    smooth_scroll_enabled_     = true;
     auto_scroll_mode_          = false;
     ui_cursor_shape_[0]        = Qt::ArrowCursor;
     ui_cursor_shape_[1]        = Qt::ArrowCursor;
@@ -789,7 +790,9 @@ void Editor::resizeEvent(QResizeEvent *e) {
 void Editor::paintEvent(QPaintEvent *e) {
     //! smooth scroll
     if (qAbs(context_->viewport_y_pos - expected_scroll_) > 1e-3) {
-        const double new_scroll_pos = context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51;
+        const double new_scroll_pos = smooth_scroll_enabled_
+                                        ? context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51
+                                        : expected_scroll_;
         const double scroll_delta   = new_scroll_pos - context_->viewport_y_pos;
         if (qAbs(scroll_delta) < 10) {
             context_->scroll_to(expected_scroll_);

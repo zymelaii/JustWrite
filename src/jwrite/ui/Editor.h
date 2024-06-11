@@ -54,6 +54,10 @@ public slots:
         update();
     }
 
+    void set_smooth_scroll_enabled(bool enabled) {
+        smooth_scroll_enabled_ = enabled;
+    }
+
 public:
     bool active_block_highlight_enabled() const {
         return ui_highlight_active_block_;
@@ -193,6 +197,7 @@ private:
     QTimer blink_timer_;
     bool   blink_cursor_should_paint_;
 
+    bool   smooth_scroll_enabled_;
     bool   auto_scroll_mode_;
     double scroll_base_y_pos_;
     double scroll_ref_y_pos_;

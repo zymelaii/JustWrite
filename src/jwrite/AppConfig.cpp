@@ -248,6 +248,9 @@ void AppConfig::load() {
             if (auto opt = common->get_as<std::string>("last_editing_book_on_quit")) {
                 set_value(ValOption::LastEditingBookOnQuit, QString::fromStdString(opt->get()));
             }
+            if (auto opt = common->get_as<bool>("smooth_scroll")) {
+                set_option(Option::SmoothScroll, opt->get());
+            }
         } else if (auto edit = value.as_table(); edit && key == "edit") {
             if (auto opt = edit->get_as<bool>("centre_edit_line")) {
                 set_option(Option::CentreEditLine, opt->get());
@@ -388,6 +391,7 @@ void AppConfig::save() {
         common.insert("default_edit_mode", into_str(ValOption::DefaultEditMode));
         common.insert("strict_word_count", into_bool(Option::StrictWordCount));
         common.insert("last_editing_book_on_quit", into_str(ValOption::LastEditingBookOnQuit));
+        common.insert("smooth_scroll", into_bool(Option::SmoothScroll));
 
         settings.insert("common", common);
     }
@@ -474,6 +478,7 @@ bool AppConfig::default_option(Option opt) {
         {Option::BackupSmartMerge,            false},
         {Option::KeyVersionRecognition,       false},
         {Option::StrictWordCount,             true },
+        {Option::SmoothScroll,                true },
     };
     Q_ASSERT(DEFAULT_OPTIONS.size() == magic_enum::enum_count<Option>());
     return DEFAULT_OPTIONS.value(opt);

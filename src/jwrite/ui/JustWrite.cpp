@@ -976,6 +976,9 @@ void JustWrite::handle_config_on_option_change(AppConfig::Option opt, bool on) {
                 ui_edit_page_->reset_word_counter(new LossenWordCounter);
             }
         } break;
+        case Option::SmoothScroll: {
+            ui_edit_page_->editor()->set_smooth_scroll_enabled(on);
+        } break;
     }
 }
 

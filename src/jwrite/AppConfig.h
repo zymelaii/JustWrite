@@ -39,6 +39,7 @@ public:
         BackupSmartMerge,
         KeyVersionRecognition,
         StrictWordCount,
+        SmoothScroll,
     };
 
     enum class ValOption {
