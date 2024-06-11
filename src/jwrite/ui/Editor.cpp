@@ -128,9 +128,10 @@ void Editor::scrollToCursor() {
 
     y_pos += cursor.row * line_spacing;
 
-    const double slack       = e.block_spacing * 0.75;
-    const double y_pos_start = y_pos - slack;
-    const double y_pos_end   = y_pos + line_spacing + slack;
+    const double slack       = qMax<double>(0, line_spacing - e.line_height);
+    const double h_slack     = 6 * 0.75;
+    const double y_pos_start = y_pos - h_slack;
+    const double y_pos_end   = y_pos + line_spacing - slack + h_slack;
 
     if (const double top = context_->viewport_y_pos; y_pos_start < top) {
         scrollTo(y_pos_start, true);
@@ -165,13 +166,14 @@ QPair<double, double> Editor::scrollBound() const {
     const double line_spacing = e.line_spacing_ratio * e.line_height;
 
     //! see drawHighlightBlock(QPainter *p)
-    const double line_gap  = line_spacing + e.block_spacing;
-    const double slack     = e.block_spacing * 0.75;
-    const double min_y_pos = -line_gap;
-    double       max_y_pos = -line_gap - slack;
+    const double h_slack   = 6 * 0.75;
+    const double margin    = qMin(4.0, e.block_spacing);
+    const double min_y_pos = -e.line_height - h_slack;
+    double       max_y_pos = -e.line_height - h_slack - margin;
     for (auto block : e.active_blocks) {
         max_y_pos += block->lines.size() * line_spacing + e.block_spacing;
     }
+    if (!e.is_empty()) { max_y_pos -= e.block_spacing; }
 
     return {min_y_pos, max_y_pos};
 }
@@ -722,16 +724,17 @@ void Editor::drawHighlightBlock(QPainter *p) {
 
     const double line_spacing = e.line_height * e.line_spacing_ratio;
     const double line_slack   = qMax(0.0, line_spacing - e.line_height);
-    const double start_y_pos  = d.active_block_y_start - context_->viewport_y_pos - line_slack;
-    const double end_y_pos    = d.active_block_y_end - context_->viewport_y_pos - e.block_spacing;
+    const double start_y_pos  = d.active_block_y_start - context_->viewport_y_pos;
+    const double end_y_pos    = d.active_block_y_end - context_->viewport_y_pos - line_slack;
 
     const double height  = end_y_pos - start_y_pos;
     const double w_slack = 8.0;
-    const double h_slack = context_->engine.block_spacing * 0.75;
+    const double h_slack = 6 * 0.75;
     const int    radius  = 4;
 
     QRectF bb(0, start_y_pos, context_->viewport_width, height);
     bb.translate(viewport.topLeft());
+    bb.translate(0, -e.fm.descent() * 0.5);
     bb.adjust(-w_slack, -h_slack, w_slack, h_slack);
 
     p->drawRoundedRect(bb, radius, radius);

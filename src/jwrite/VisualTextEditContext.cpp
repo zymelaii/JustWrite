@@ -64,7 +64,7 @@ void VisualTextEditContext::prepare_render_data() {
     for (int index = 0; index < total_blocks; ++index) {
         const auto   block  = engine.active_blocks[index];
         const double stride = block->lines.size() * line_spacing + engine.block_spacing;
-        if (y_pos + stride < viewport_y_pos) {
+        if (y_pos + stride - engine.block_spacing < viewport_y_pos) {
             y_pos += stride;
             continue;
         } else if (y_pos > max_viewport_y_pos) {
@@ -212,7 +212,7 @@ VisualTextEditContext::TextLoc
             Q_ASSERT(d.cached_block_y_pos.contains(index));
             const double block_y_pos   = d.cached_block_y_pos[index];
             const double stride        = block->lines.size() * line_spacing + engine.block_spacing;
-            const double block_y_limit = block_y_pos + stride;
+            const double block_y_limit = block_y_pos + stride - engine.block_spacing * 0.5;
             if (target_y_pos <= block_y_limit) { break; }
             ++index;
         }
@@ -223,7 +223,7 @@ VisualTextEditContext::TextLoc
         while (index + 1 < engine.active_blocks.size()) {
             const auto   block         = engine.active_blocks[index];
             const double stride        = block->lines.size() * line_spacing + engine.block_spacing;
-            const double block_y_limit = y_pos + stride;
+            const double block_y_limit = y_pos + stride - engine.block_spacing * 0.5;
             if (target_y_pos <= block_y_limit) { break; }
             y_pos += stride;
             ++index;
@@ -231,7 +231,7 @@ VisualTextEditContext::TextLoc
         rel_y_pos = target_y_pos - y_pos;
     }
 
-    const int  row_stride = static_cast<int>(rel_y_pos / line_spacing);
+    const int  row_stride = qMax(0, static_cast<int>(rel_y_pos / line_spacing));
     const auto block      = engine.active_blocks[index];
     const int  last_line  = block->lines.size() - 1;
     const int  row        = qBound(0, row_stride, last_line);

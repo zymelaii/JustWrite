@@ -756,7 +756,7 @@ QWidget *SettingsDialog::createEditorPanel() {
         .with_source(AppConfig::Option::FirstLineIndent)
         .complete()
         .with_double_spin("行距", "正文文本使用的段落内行间距倍率")
-        .with_bounds(0.0, 5.0)
+        .with_bounds(1.0, 5.0)
         .with_step(0.2)
         .with_prefix("x")
         .with_source(AppConfig::ValOption::LineSpacingRatio)
