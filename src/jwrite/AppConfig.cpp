@@ -307,8 +307,8 @@ void AppConfig::load() {
                 }
             }
         } else if (auto dev_options = value.as_table(); dev_options && key == "dev-options") {
-            if (auto opt = dev_options->get_as<std::string>("toolbar_icon_size")) {
-                set_value(ValOption::ToolbarIconSize, QString::fromStdString(opt->get()));
+            if (auto opt = dev_options->get_as<int64_t>("toolbar_icon_size")) {
+                set_value(ValOption::ToolbarIconSize, QString::number(opt->get()));
             }
         }
     }
