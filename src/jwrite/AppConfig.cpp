@@ -5,11 +5,106 @@
 #include <QDebug>
 #include <memory>
 #include <QFontDatabase>
+#include <array>
+#include <ctype.h>
+#include <stddef.h>
 #include <magic_enum.hpp>
 #include <toml++/toml.h>
 #include <spdlog/spdlog.h>
 
 namespace jwrite {
+
+static std::string convert_pascal_case_to_snake_case(const std::string_view pascal_name) {
+    std::string sneak_name{};
+    for (int i = 0; i < pascal_name.size(); i++) {
+        const auto c = pascal_name[i];
+        if (isupper(c)) {
+            if (i > 0) { sneak_name.push_back('_'); }
+            sneak_name.push_back(tolower(c));
+        } else {
+            sneak_name.push_back(c);
+        }
+    }
+    return sneak_name;
+}
+
+#define AUTO_NAME_WRAPPER(macro, root, option) \
+    macro(root, option, convert_pascal_case_to_snake_case(#option))
+
+#define OPTIONAL_OPTION_AUTO_NAME_WRAPPER(macro, root, option, val_option, val_option_name) \
+    macro(root, option, convert_pascal_case_to_snake_case(#option), val_option, val_option_name)
+
+#define PARSE_VALUE_OPTION(root, option, type, method, name)       \
+    if (auto opt = root->get_as<type>(name)) {                     \
+        set_value(ValOption::option, QString::method(opt->get())); \
+    }
+
+#define PARSE_BOOL_OPTION_BASE(root, option, name) \
+    if (auto opt = root->get_as<bool>(name)) { set_option(Option::option, opt->get()); }
+#define PARSE_BOOL_OPTION(root, option)               AUTO_NAME_WRAPPER(PARSE_BOOL_OPTION_BASE, root, option)
+#define PARSE_BOOL_OPTION_MANNUAL(root, option, name) PARSE_BOOL_OPTION_BASE(root, option, #name)
+
+#define PARSE_STR_OPTION_BASE(root, option, name) \
+    PARSE_VALUE_OPTION(root, option, std::string, fromStdString, name)
+#define PARSE_STR_OPTION(root, option)               AUTO_NAME_WRAPPER(PARSE_STR_OPTION_BASE, root, option)
+#define PARSE_STR_OPTION_MANNUAL(root, option, name) PARSE_STR_OPTION_BASE(root, option, #name)
+
+#define PARSE_INT_OPTION_BASE(root, option, name) \
+    PARSE_VALUE_OPTION(root, option, int64_t, number, name)
+#define PARSE_INT_OPTION(root, option)               AUTO_NAME_WRAPPER(PARSE_INT_OPTION_BASE, root, option)
+#define PARSE_INT_OPTION_MANNUAL(root, option, name) PARSE_INT_OPTION_BASE(root, option, #name)
+
+#define PARSE_DOUBLE_OPTION_BASE(root, option, name) \
+    PARSE_VALUE_OPTION(root, option, double, number, name)
+#define PARSE_DOUBLE_OPTION(root, option) AUTO_NAME_WRAPPER(PARSE_DOUBLE_OPTION_BASE, root, option)
+#define PARSE_DOUBLE_OPTION_MANNUAL(root, option, name) \
+    PARSE_DOUBLE_OPTION_BASE(root, option, #name)
+
+#define PARSE_STR_ARRAY_OPTION_BASE(root, option, name)   \
+    if (auto opt = root->get_as<toml::array>(name)) {     \
+        QStringList parts{};                              \
+        for (auto& val : *opt) {                          \
+            const auto part = val.as_string();            \
+            if (!part) { continue; }                      \
+            parts << QString::fromStdString(part->get()); \
+        }                                                 \
+        set_value(ValOption::option, parts.join(','));    \
+    }
+#define PARSE_STR_ARRAY_OPTION(root, option) \
+    AUTO_NAME_WRAPPER(PARSE_STR_ARRAY_OPTION_BASE, root, option)
+#define PARSE_STR_ARRAY_OPTION_MANNUAL(root, option, name) \
+    PARSE_STR_ARRAY_OPTION_BASE(root, option, #name)
+
+#define PARSE_OPTIONAL_INT_OPTION_BASE(root, option, option_name, val_option, val_option_name) \
+    if (auto opt = root->get_as<toml::table>(option_name)) {                                   \
+        if (auto enabled = opt->get_as<bool>("enabled")) {                                     \
+            set_option(Option::option, enabled->get());                                        \
+        }                                                                                      \
+        if (auto val = opt->get_as<int64_t>(val_option_name)) {                                \
+            set_value(ValOption::val_option, QString::number(val->get()));                     \
+        }                                                                                      \
+    }
+#define PARSE_OPTIONAL_INT_OPTION(root, option, val_option, val_option_name) \
+    OPTIONAL_OPTION_AUTO_NAME_WRAPPER(                                       \
+        PARSE_OPTIONAL_INT_OPTION_BASE, root, option, val_option, #val_option_name)
+#define PARSE_OPTIONAL_INT_OPTION_MANNUAL(root, option, option_name, val_option, val_option_name) \
+    PARSE_OPTIONAL_INT_OPTION_BASE(root, option, #option_name, val_option, #val_option_name)
+
+#define PARSE_OPTIONAL_DOUBLE_OPTION_BASE(root, option, option_name, val_option, val_option_name) \
+    if (auto opt = root->get_as<toml::table>(option_name)) {                                      \
+        if (auto enabled = opt->get_as<bool>("enabled")) {                                        \
+            set_option(Option::option, enabled->get());                                           \
+        }                                                                                         \
+        if (auto val = opt->get_as<double>(val_option_name)) {                                    \
+            set_value(ValOption::val_option, QString::number(val->get()));                        \
+        }                                                                                         \
+    }
+#define PARSE_OPTIONAL_DOUBLE_OPTION(root, option, val_option, val_option_name) \
+    OPTIONAL_OPTION_AUTO_NAME_WRAPPER(                                          \
+        PARSE_OPTIONAL_DOUBLE_OPTION_BASE, root, option, val_option, #val_option_name)
+#define PARSE_OPTIONAL_DOUBLE_OPTION_MANNUAL(               \
+    root, option, option_name, val_option, val_option_name) \
+    PARSE_OPTIONAL_DOUBLE_OPTION_BASE(root, option, #option_name, val_option, #val_option_name)
 
 class BlockSignalGuard {
 public:
@@ -191,128 +286,47 @@ void AppConfig::load() {
                 set_scheme(new_scheme);
             }
         } else if (auto common = value.as_table(); common && key == "common") {
-            if (auto opt = common->get_as<std::string>("language")) {
-                set_value(ValOption::Language, QString::fromStdString(opt->get()));
-            }
-            if (auto opt = common->get_as<std::string>("primary_page")) {
-                set_value(ValOption::PrimaryPage, QString::fromStdString(opt->get()));
-            }
-            if (auto opt = common->get_as<bool>("auto_hide_toolbar_on_fullscreen")) {
-                set_option(Option::AutoHideToolbarOnFullscreen, opt->get());
-            }
-            if (auto opt = common->get_as<std::string>("book_dir_style")) {
-                set_value(ValOption::BookDirStyle, QString::fromStdString(opt->get()));
-            }
-            if (auto opt = common->get_as<std::string>("background_image")) {
-                set_value(ValOption::BackgroundImage, QString::fromStdString(opt->get()));
-            }
-            if (auto opt = common->get_as<std::string>("editor_background_image")) {
-                set_value(ValOption::EditorBackgroundImage, QString::fromStdString(opt->get()));
-            }
-            if (auto opt = common->get_as<int64_t>("background_image_opacity")) {
-                set_value(ValOption::BackgroundImageOpacity, QString::number(opt->get()));
-            }
-            if (auto opt = common->get_as<double>("line_spacing_ratio")) {
-                set_value(ValOption::LineSpacingRatio, QString::number(opt->get()));
-            }
-            if (auto opt = common->get_as<double>("block_spacing")) {
-                set_value(ValOption::BlockSpacing, QString::number(opt->get()));
-            }
-            if (auto opt = common->get_as<bool>("first_line_indent")) {
-                set_option(Option::FirstLineIndent, opt->get());
-            }
-            if (auto opt = common->get_as<bool>("highlight_active_block")) {
-                set_option(Option::HighlightActiveBlock, opt->get());
-            }
-            if (auto opt = common->get_as<bool>("elastic_text_view_resize")) {
-                set_option(Option::ElasticTextViewResize, opt->get());
-            }
-            if (auto opt = common->get_as<toml::array>("text_font")) {
-                QStringList families{};
-                for (auto& val : *opt) {
-                    if (auto font = val.as_string()) {
-                        families << QString::fromStdString(font->get()).trimmed();
-                    }
-                }
-                set_value(ValOption::TextFont, families.join(','));
-            }
-            if (auto opt = common->get_as<int64_t>("text_font_size")) {
-                set_value(ValOption::TextFontSize, QString::number(opt->get()));
-            }
-            if (auto opt = common->get_as<std::string>("default_edit_mode")) {
-                set_value(ValOption::DefaultEditMode, QString::fromStdString(opt->get()));
-            }
-            if (auto opt = common->get_as<bool>("strict_word_count")) {
-                set_option(Option::StrictWordCount, opt->get());
-            }
-            if (auto opt = common->get_as<std::string>("last_editing_book_on_quit")) {
-                set_value(ValOption::LastEditingBookOnQuit, QString::fromStdString(opt->get()));
-            }
-            if (auto opt = common->get_as<bool>("smooth_scroll")) {
-                set_option(Option::SmoothScroll, opt->get());
-            }
+            PARSE_STR_OPTION(common, Language);
+            PARSE_STR_OPTION(common, PrimaryPage);
+            PARSE_BOOL_OPTION(common, AutoHideToolbarOnFullscreen);
+            PARSE_STR_OPTION(common, BookDirStyle);
+            PARSE_STR_OPTION(common, BackgroundImage);
+            PARSE_STR_OPTION(common, EditorBackgroundImage);
+            PARSE_INT_OPTION(common, BackgroundImageOpacity);
+            PARSE_DOUBLE_OPTION(common, LineSpacingRatio);
+            PARSE_DOUBLE_OPTION(common, BlockSpacing);
+            PARSE_BOOL_OPTION(common, FirstLineIndent);
+            PARSE_BOOL_OPTION(common, HighlightActiveBlock);
+            PARSE_BOOL_OPTION(common, ElasticTextViewResize);
+            PARSE_INT_OPTION(common, TextFontSize);
+            PARSE_STR_OPTION(common, DefaultEditMode);
+            PARSE_BOOL_OPTION(common, StrictWordCount);
+            PARSE_STR_OPTION(common, LastEditingBookOnQuit);
+            PARSE_BOOL_OPTION(common, SmoothScroll);
+            PARSE_STR_ARRAY_OPTION(common, TextFont);
         } else if (auto edit = value.as_table(); edit && key == "edit") {
-            if (auto opt = edit->get_as<bool>("centre_edit_line")) {
-                set_option(Option::CentreEditLine, opt->get());
-            }
-            if (auto opt = edit->get_as<bool>("pairing_symbol_match")) {
-                set_option(Option::PairingSymbolMatch, opt->get());
-            }
-            if (auto opt = edit->get_as<toml::table>("auto_chapter")) {
-                if (auto enabled = opt->get_as<bool>("enabled")) {
-                    set_option(Option::AutoChapter, enabled->get());
-                }
-                if (auto threshold = opt->get_as<double>("threshold")) {
-                    set_value(ValOption::AutoChapterThreshold, QString::number(threshold->get()));
-                }
-            }
-            if (auto opt = edit->get_as<toml::table>("chapter_limit")) {
-                if (auto enabled = opt->get_as<bool>("enabled")) {
-                    set_option(Option::ChapterLimit, enabled->get());
-                }
-                if (auto threshold = opt->get_as<double>("threshold")) {
-                    set_value(ValOption::ChapterLimit, QString::number(threshold->get()));
-                }
-            }
-            if (auto opt = edit->get_as<toml::table>("critical_chapter_limit")) {
-                if (auto enabled = opt->get_as<bool>("enabled")) {
-                    set_option(Option::CriticalChapterLimit, enabled->get());
-                }
-                if (auto threshold = opt->get_as<double>("threshold")) {
-                    set_value(ValOption::CriticalChapterLimit, QString::number(threshold->get()));
-                }
-            }
+            PARSE_BOOL_OPTION(edit, CentreEditLine);
+            PARSE_BOOL_OPTION(edit, PairingSymbolMatch);
+            PARSE_OPTIONAL_DOUBLE_OPTION(edit, AutoChapter, AutoChapterThreshold, threshold);
+            PARSE_OPTIONAL_INT_OPTION(edit, ChapterLimit, ChapterLimit, threshold);
+            PARSE_OPTIONAL_INT_OPTION(edit, CriticalChapterLimit, CriticalChapterLimit, threshold);
         } else if (auto backup = value.as_table(); backup && key == "backup") {
-            if (auto opt = backup->get_as<bool>("smart_merge")) {
-                set_option(Option::BackupSmartMerge, opt->get());
-            }
-            if (auto opt = backup->get_as<bool>("key_version_recognition")) {
-                set_option(Option::KeyVersionRecognition, opt->get());
-            }
-            if (auto opt = backup->get_as<toml::table>("timing_mode")) {
-                if (auto enabled = opt->get_as<bool>("enabled")) {
-                    set_option(Option::TimingBackup, enabled->get());
-                }
-                if (auto interval = opt->get_as<double>("interval")) {
-                    set_value(ValOption::TimingBackupInterval, QString::number(interval->get()));
-                }
-            }
-            if (auto opt = backup->get_as<toml::table>("quantitative_mode")) {
-                if (auto enabled = opt->get_as<bool>("enabled")) {
-                    set_option(Option::QuantitativeBackup, enabled->get());
-                }
-                if (auto threshold = opt->get_as<int64_t>("threshold")) {
-                    set_value(
-                        ValOption::QuantitativeBackupThreshold, QString::number(threshold->get()));
-                }
-            }
+            PARSE_BOOL_OPTION_MANNUAL(backup, BackupSmartMerge, smart_merge);
+            PARSE_BOOL_OPTION(backup, KeyVersionRecognition);
+            PARSE_OPTIONAL_DOUBLE_OPTION_MANNUAL(
+                backup, TimingBackup, timing_mode, TimingBackupInterval, interval);
+            PARSE_OPTIONAL_INT_OPTION_MANNUAL(
+                backup,
+                QuantitativeBackup,
+                quantitative_mode,
+                QuantitativeBackupThreshold,
+                threshold);
         } else if (auto dev_options = value.as_table(); dev_options && key == "dev-options") {
-            if (auto opt = dev_options->get_as<int64_t>("toolbar_icon_size")) {
-                set_value(ValOption::ToolbarIconSize, QString::number(opt->get()));
-            }
+            PARSE_INT_OPTION(dev_options, ToolbarIconSize);
         }
     }
-}
+
+} // namespace jwrite
 
 void AppConfig::save() {
     const auto conf_path = settings_file();
