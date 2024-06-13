@@ -377,6 +377,7 @@ void EditPage::create_and_open_chapter(int vid) {
 
     const int cid = add_chapter(volume_index, "");
     do_open_chapter(cid);
+    if (ui_editor_->currentTextLoc().block_index == -1) { ui_editor_->scrollToStart(); }
     request_sync_wcstate();
     ui_editor_->update();
     focus_editor();
