@@ -291,7 +291,12 @@ QPointF VisualTextEditContext::get_vpos_at_cursor() const {
             end   = engine.active_block_index;
             inc   = 1;
         } else {
-            Q_UNREACHABLE();
+            //! NOTE: cached-render-data is not ready, but the cursor is in the visible block, only
+            //! the y-pos is dirty
+            y_pos = 0.0;
+            start = 0;
+            end   = engine.active_block_index;
+            inc   = 1;
         }
 
         double offset = 0.0;

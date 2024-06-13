@@ -944,6 +944,7 @@ void JustWrite::handle_config_on_option_change(AppConfig::Option opt, bool on) {
         case Option::ElasticTextViewResize: {
         } break;
         case Option::CentreEditLine: {
+            ui_edit_page_->editor()->set_auto_centre_enabled(on);
         } break;
         case Option::AutoChapter: {
         } break;

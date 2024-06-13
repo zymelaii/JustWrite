@@ -24,6 +24,10 @@ signals:
 
 public slots:
 
+    void set_auto_centre_enabled(bool enabled) {
+        auto_centre_edit_line_ = enabled;
+    }
+
     void set_text_focus_mode(AppConfig::TextFocusMode mode) {
         focus_mode_ = mode;
         update();
@@ -187,6 +191,8 @@ private:
     bool   soft_center_mode_;
     bool   inserted_filter_enabled_;
     double expected_scroll_;
+
+    bool auto_centre_edit_line_;
 
     AppConfig::TextFocusMode focus_mode_;
     double                   unfocused_text_opacity_;

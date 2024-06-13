@@ -244,6 +244,9 @@ void Editor::direct_batch_insert(const QString &multiline_text) {
         context_->engine.break_block_at_cursor_pos();
         direct_insert(lines[i]);
     }
+    //! NOTE: a single newline will not dive into the insert() fncall, mark as cursor-moved
+    //! mannually
+    context_->cursor_moved = true;
 }
 
 void Editor::execute_insert_action(const QString &text, bool batch_mode) {
@@ -464,6 +467,14 @@ void Editor::render() {
 
     if (drag_sel_flag_ && oob_drag_sel_flag_) { updateTextLocToVisualPos(oob_drag_sel_vpos_); }
 
+    if (auto &e = context_->engine; auto_centre_edit_line_ && context_->cursor_moved
+                                    && e.is_cursor_available() && !oob_drag_sel_flag_
+                                    && !context_->has_sel()) {
+        if (e.is_dirty()) { e.render(); }
+        const auto pos = context_->get_vpos_at_cursor();
+        scrollTo(pos.y() + e.line_height - context_->viewport_height * 0.5, true);
+    }
+
     if (update_requested_) {
         update();
         update_requested_ = false;
@@ -512,6 +523,7 @@ void Editor::init() {
     focus_mode_                = AppConfig::TextFocusMode::Highlight;
     soft_center_mode_          = false;
     expected_scroll_           = 0.0;
+    auto_centre_edit_line_     = false;
     blink_cursor_should_paint_ = true;
     inserted_filter_enabled_   = true;
     drag_sel_flag_             = false;
