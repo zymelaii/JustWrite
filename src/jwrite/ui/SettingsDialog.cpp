@@ -787,8 +787,15 @@ QWidget *SettingsDialog::createEditorPanel() {
         .with_toggle("弹性伸缩", "启用后，当页面宽度发生变化时，优先压缩边距以保持文本视图宽度不变")
         .with_source(AppConfig::Option::ElasticTextViewResize)
         .complete()
-        .with_toggle("自动居中", "启用后，自动将编辑位置滚动到文本视图中心")
-        .with_source(AppConfig::Option::CentreEditLine)
+        .with_combo(
+            "自动居中",
+            "启用后，自动将编辑位置滚动到文本视图中心\n“严格”模式下，编辑位置将总是保持在中心位置\n"
+            "“适应”模式下，编辑位置仅在出现在下半屏时回滚到中心位置\n该动作在编辑位置发生变化时触"
+            "发")
+        .with_item("从不", "never")
+        .with_item("严格", "always")
+        .with_item("适应", "adaptive")
+        .with_source(AppConfig::ValOption::CentreEditLine)
         .complete()
         .with_spin(
             "自动分章",

@@ -28,7 +28,6 @@ public:
         AutoHideToolbarOnFullscreen,
         FirstLineIndent,
         ElasticTextViewResize,
-        CentreEditLine,
         AutoChapter,
         PairingSymbolMatch,
         CriticalChapterLimit,
@@ -69,6 +68,7 @@ public:
         LastEditingBookOnQuit,
         UnfocusedTextOpacity,
         TextFocusMode,
+        CentreEditLine,
     };
 
     enum class Page {

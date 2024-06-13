@@ -16,6 +16,13 @@ struct EditorPrivate;
 class Editor : public QWidget {
     Q_OBJECT
 
+public:
+    enum class AutoCentre {
+        Never,
+        Always,
+        Adaptive,
+    };
+
 signals:
     void textAreaChanged(QRect area);
     void textChanged(const QString &text);
@@ -24,8 +31,8 @@ signals:
 
 public slots:
 
-    void set_auto_centre_enabled(bool enabled) {
-        auto_centre_edit_line_ = enabled;
+    void set_auto_centre_mode(AutoCentre mode) {
+        auto_centre_edit_line_ = mode;
     }
 
     void set_text_focus_mode(AppConfig::TextFocusMode mode) {
@@ -187,13 +194,11 @@ private:
 
     std::optional<VisualTextEditContext::TextLoc> last_text_loc_;
 
-    int    min_text_line_chars_;
-    bool   soft_center_mode_;
-    bool   inserted_filter_enabled_;
-    double expected_scroll_;
-
-    bool auto_centre_edit_line_;
-
+    int                      min_text_line_chars_;
+    bool                     soft_center_mode_;
+    bool                     inserted_filter_enabled_;
+    double                   expected_scroll_;
+    AutoCentre               auto_centre_edit_line_;
     AppConfig::TextFocusMode focus_mode_;
     double                   unfocused_text_opacity_;
 

@@ -295,7 +295,7 @@ void AppConfig::load() {
             PARSE_DOUBLE_OPTION(common, UnfocusedTextOpacity);
             PARSE_STR_OPTION(common, TextFocusMode);
         } else if (auto edit = value.as_table(); edit && key == "edit") {
-            PARSE_BOOL_OPTION(edit, CentreEditLine);
+            PARSE_STR_OPTION(edit, CentreEditLine);
             PARSE_BOOL_OPTION(edit, PairingSymbolMatch);
             PARSE_OPTIONAL_DOUBLE_OPTION(edit, AutoChapter, AutoChapterThreshold, threshold);
             PARSE_OPTIONAL_INT_OPTION(edit, ChapterLimit, ChapterLimit, threshold);
@@ -416,7 +416,7 @@ void AppConfig::save() {
         critical_chapter_limit.insert("enabled", into_bool(Option::CriticalChapterLimit));
         critical_chapter_limit.insert("threshold", into_uint(ValOption::CriticalChapterLimit));
 
-        edit.insert("centre_edit_line", into_bool(Option::CentreEditLine));
+        edit.insert("centre_edit_line", into_str(ValOption::CentreEditLine));
         edit.insert("pairing_symbol_match", into_bool(Option::PairingSymbolMatch));
         edit.insert("auto_chapter", auto_chapter);
         edit.insert("chapter_limit", chapter_limit);
@@ -504,7 +504,6 @@ bool AppConfig::default_option(Option opt) {
         {Option::AutoHideToolbarOnFullscreen, true },
         {Option::FirstLineIndent,             true },
         {Option::ElasticTextViewResize,       false},
-        {Option::CentreEditLine,              false},
         {Option::AutoChapter,                 false},
         {Option::PairingSymbolMatch,          true },
         {Option::CriticalChapterLimit,        false},
@@ -542,6 +541,7 @@ QString AppConfig::default_option(ValOption opt) {
         {ValOption::LastEditingBookOnQuit,       ""         },
         {ValOption::UnfocusedTextOpacity,        "0.25"     },
         {ValOption::TextFocusMode,               "highlight"},
+        {ValOption::CentreEditLine,              "never"    },
     };
     Q_ASSERT(DEFAULT_OPTIONS.size() == magic_enum::enum_count<ValOption>());
     return DEFAULT_OPTIONS.value(opt);

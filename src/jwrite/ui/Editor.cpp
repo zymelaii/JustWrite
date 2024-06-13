@@ -467,12 +467,15 @@ void Editor::render() {
 
     if (drag_sel_flag_ && oob_drag_sel_flag_) { updateTextLocToVisualPos(oob_drag_sel_vpos_); }
 
-    if (auto &e = context_->engine; auto_centre_edit_line_ && context_->cursor_moved
-                                    && e.is_cursor_available() && !oob_drag_sel_flag_
-                                    && !context_->has_sel()) {
+    if (auto &e = context_->engine; auto_centre_edit_line_ != AutoCentre::Never
+                                    && context_->cursor_moved && e.is_cursor_available()
+                                    && !oob_drag_sel_flag_ && !context_->has_sel()) {
         if (e.is_dirty()) { e.render(); }
-        const auto pos = context_->get_vpos_at_cursor();
-        scrollTo(pos.y() + e.line_height - context_->viewport_height * 0.5, true);
+        const auto   pos   = context_->get_vpos_at_cursor();
+        const double y_pos = pos.y() + e.line_height - context_->viewport_height * 0.5;
+        if (auto_centre_edit_line_ == AutoCentre::Always || y_pos > context_->viewport_y_pos) {
+            scrollTo(y_pos, true);
+        }
     }
 
     if (update_requested_) {
@@ -523,7 +526,7 @@ void Editor::init() {
     focus_mode_                = AppConfig::TextFocusMode::Highlight;
     soft_center_mode_          = false;
     expected_scroll_           = 0.0;
-    auto_centre_edit_line_     = false;
+    auto_centre_edit_line_     = AutoCentre::Never;
     blink_cursor_should_paint_ = true;
     inserted_filter_enabled_   = true;
     drag_sel_flag_             = false;

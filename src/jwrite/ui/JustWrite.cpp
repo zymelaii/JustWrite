@@ -943,9 +943,6 @@ void JustWrite::handle_config_on_option_change(AppConfig::Option opt, bool on) {
         } break;
         case Option::ElasticTextViewResize: {
         } break;
-        case Option::CentreEditLine: {
-            ui_edit_page_->editor()->set_auto_centre_enabled(on);
-        } break;
         case Option::AutoChapter: {
         } break;
         case Option::PairingSymbolMatch: {
@@ -1059,6 +1056,17 @@ void JustWrite::handle_config_on_value_change(AppConfig::ValOption opt, const QS
         case Option::TextFocusMode: {
             const auto focus_mode = AppConfig::get_text_focus_mode_name(value.toLower());
             ui_edit_page_->editor()->set_text_focus_mode(focus_mode);
+        } break;
+        case Option::CentreEditLine: {
+            if (const auto mode = value.toLower(); mode == "never") {
+                ui_edit_page_->editor()->set_auto_centre_mode(Editor::AutoCentre::Never);
+            } else if (mode == "always") {
+                ui_edit_page_->editor()->set_auto_centre_mode(Editor::AutoCentre::Always);
+            } else if (mode == "adaptive") {
+                ui_edit_page_->editor()->set_auto_centre_mode(Editor::AutoCentre::Adaptive);
+            } else {
+                Q_UNREACHABLE();
+            }
         } break;
     }
 }
