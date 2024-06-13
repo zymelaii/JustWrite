@@ -27,7 +27,6 @@ public:
     enum class Option {
         AutoHideToolbarOnFullscreen,
         FirstLineIndent,
-        HighlightActiveBlock,
         ElasticTextViewResize,
         CentreEditLine,
         AutoChapter,
@@ -68,11 +67,20 @@ public:
         //! in units of pixel
         ToolbarIconSize,
         LastEditingBookOnQuit,
+        UnfocusedTextOpacity,
+        TextFocusMode,
     };
 
     enum class Page {
         Gallery,
         Edit,
+    };
+
+    enum class TextFocusMode {
+        None,
+        Highlight,
+        FocusLine,
+        FocusBlock,
     };
 
 public:
@@ -106,10 +114,14 @@ public:
     QString value(ValOption opt) const;
     void    set_value(ValOption opt, const QString& value);
 
-    Page primary_page() const;
-
     void load();
     void save();
+
+    Page          primary_page() const;
+    TextFocusMode text_focus_mode() const;
+
+    static Page          get_primary_page_from_name(const QString& name);
+    static TextFocusMode get_text_focus_mode_name(const QString& name);
 
     static AppConfig& get_instance();
     static bool       default_option(Option opt);

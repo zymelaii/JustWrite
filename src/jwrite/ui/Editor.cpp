@@ -509,6 +509,7 @@ void Editor::init() {
     setContentsMargins({});
 
     min_text_line_chars_       = 12;
+    focus_mode_                = AppConfig::TextFocusMode::Highlight;
     soft_center_mode_          = false;
     expected_scroll_           = 0.0;
     blink_cursor_should_paint_ = true;
@@ -519,7 +520,6 @@ void Editor::init() {
     auto_scroll_mode_          = false;
     ui_cursor_shape_[0]        = Qt::ArrowCursor;
     ui_cursor_shape_[1]        = Qt::ArrowCursor;
-    ui_highlight_active_block_ = true;
 
     setSoftCenterMode(true);
 
@@ -589,8 +589,17 @@ void Editor::drawTextArea(QPainter *p) {
     const auto pal   = palette();
     const auto flags = Qt::AlignBaseline | Qt::TextDontClip;
 
+    const auto focused_text_color = pal.color(QPalette::Text);
+    auto       default_text_color = focused_text_color;
+
+    const bool on_focus_mode = focus_mode_ == AppConfig::TextFocusMode::FocusLine
+                            || focus_mode_ == AppConfig::TextFocusMode::FocusBlock;
+    if (on_focus_mode && !context_->has_sel()) {
+        default_text_color.setAlpha(unfocused_text_opacity_ * 255);
+    }
+
     p->save();
-    p->setPen(pal.color(QPalette::Text));
+    p->setPen(default_text_color);
 
     const auto  &e            = context_->engine;
     const double indent       = e.standard_char_width * 2;
@@ -606,17 +615,54 @@ void Editor::drawTextArea(QPainter *p) {
     for (int index = d.visible_block.first; index <= d.visible_block.last; ++index) {
         const auto block = e.active_blocks[index];
 
-        for (const auto &line : block->lines) {
-            const double leading_space = line.is_first_line() ? indent : 0;
-            const double spacing       = line.char_spacing();
-            bb.setLeft(viewport.left() + leading_space);
-            for (const auto c : line.text()) {
-                p->drawText(bb, flags, c);
-                const double advance = e.fm.horizontalAdvance(c);
-                bb.adjust(advance + spacing, 0, 0, 0);
+        if (e.active_block_index != index || !on_focus_mode) {
+            for (const auto &line : block->lines) {
+                const double leading_space = line.is_first_line() ? indent : 0;
+                const double spacing       = line.char_spacing();
+                bb.setLeft(viewport.left() + leading_space);
+                for (const auto c : line.text()) {
+                    p->drawText(bb, flags, c);
+                    const double advance = e.fm.horizontalAdvance(c);
+                    bb.adjust(advance + spacing, 0, 0, 0);
+                }
+                bb.translate(0, line_spacing);
             }
-            bb.translate(0, line_spacing);
+        } else if (focus_mode_ == AppConfig::TextFocusMode::FocusBlock) {
+            p->save();
+            p->setPen(focused_text_color);
+            for (const auto &line : block->lines) {
+                const double leading_space = line.is_first_line() ? indent : 0;
+                const double spacing       = line.char_spacing();
+                bb.setLeft(viewport.left() + leading_space);
+                for (const auto c : line.text()) {
+                    p->drawText(bb, flags, c);
+                    const double advance = e.fm.horizontalAdvance(c);
+                    bb.adjust(advance + spacing, 0, 0, 0);
+                }
+                bb.translate(0, line_spacing);
+            }
+            p->restore();
+        } else if (focus_mode_ == AppConfig::TextFocusMode::FocusLine) {
+            for (const auto &line : block->lines) {
+                const double leading_space = line.is_first_line() ? indent : 0;
+                const double spacing       = line.char_spacing();
+                bb.setLeft(viewport.left() + leading_space);
+                if (line.line_nr == e.cursor.row) {
+                    p->save();
+                    p->setPen(focused_text_color);
+                }
+                for (const auto c : line.text()) {
+                    p->drawText(bb, flags, c);
+                    const double advance = e.fm.horizontalAdvance(c);
+                    bb.adjust(advance + spacing, 0, 0, 0);
+                }
+                if (line.line_nr == e.cursor.row) { p->restore(); }
+                bb.translate(0, line_spacing);
+            }
+        } else {
+            Q_UNREACHABLE();
         }
+
         bb.translate(0, e.block_spacing);
     }
 
@@ -708,7 +754,7 @@ void Editor::drawSelection(QPainter *p) {
 }
 
 void Editor::drawHighlightBlock(QPainter *p) {
-    if (!ui_highlight_active_block_) { return; }
+    if (focus_mode_ != AppConfig::TextFocusMode::Highlight) { return; }
 
     const auto &d = context_->cached_render_state;
     const auto &e = context_->engine;

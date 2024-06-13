@@ -233,17 +233,6 @@ void AppConfig::set_value(ValOption opt, const QString& value) {
     emit on_value_change(opt, value);
 }
 
-AppConfig::Page AppConfig::primary_page() const {
-    const auto page_name = value(ValOption::PrimaryPage).toLower();
-    if (page_name == "gallery") {
-        return Page::Gallery;
-    } else if (page_name == "edit") {
-        return Page::Edit;
-    } else {
-        Q_UNREACHABLE();
-    }
-}
-
 void AppConfig::load() {
     BlockSignalGuard guard(this);
 
@@ -296,7 +285,6 @@ void AppConfig::load() {
             PARSE_DOUBLE_OPTION(common, LineSpacingRatio);
             PARSE_DOUBLE_OPTION(common, BlockSpacing);
             PARSE_BOOL_OPTION(common, FirstLineIndent);
-            PARSE_BOOL_OPTION(common, HighlightActiveBlock);
             PARSE_BOOL_OPTION(common, ElasticTextViewResize);
             PARSE_INT_OPTION(common, TextFontSize);
             PARSE_STR_OPTION(common, DefaultEditMode);
@@ -304,6 +292,8 @@ void AppConfig::load() {
             PARSE_STR_OPTION(common, LastEditingBookOnQuit);
             PARSE_BOOL_OPTION(common, SmoothScroll);
             PARSE_STR_ARRAY_OPTION(common, TextFont);
+            PARSE_DOUBLE_OPTION(common, UnfocusedTextOpacity);
+            PARSE_STR_OPTION(common, TextFocusMode);
         } else if (auto edit = value.as_table(); edit && key == "edit") {
             PARSE_BOOL_OPTION(edit, CentreEditLine);
             PARSE_BOOL_OPTION(edit, PairingSymbolMatch);
@@ -398,7 +388,6 @@ void AppConfig::save() {
         common.insert("line_spacing_ratio", into_double(ValOption::LineSpacingRatio));
         common.insert("block_spacing", into_double(ValOption::BlockSpacing));
         common.insert("first_line_indent", into_bool(Option::FirstLineIndent));
-        common.insert("highlight_active_block", into_bool(Option::HighlightActiveBlock));
         common.insert("elastic_text_view_resize", into_bool(Option::ElasticTextViewResize));
         common.insert("text_font", font_famlies);
         common.insert("text_font_size", into_uint(ValOption::TextFontSize));
@@ -406,6 +395,8 @@ void AppConfig::save() {
         common.insert("strict_word_count", into_bool(Option::StrictWordCount));
         common.insert("last_editing_book_on_quit", into_str(ValOption::LastEditingBookOnQuit));
         common.insert("smooth_scroll", into_bool(Option::SmoothScroll));
+        common.insert("unfocused_text_opacity", into_double(ValOption::UnfocusedTextOpacity));
+        common.insert("text_focus_mode", into_str(ValOption::TextFocusMode));
 
         settings.insert("common", common);
     }
@@ -470,6 +461,38 @@ void AppConfig::save() {
     settings_file.close();
 }
 
+AppConfig::Page AppConfig::primary_page() const {
+    return get_primary_page_from_name(value(ValOption::PrimaryPage).toLower());
+}
+
+AppConfig::TextFocusMode AppConfig::text_focus_mode() const {
+    return get_text_focus_mode_name(value(ValOption::TextFocusMode).toLower());
+}
+
+AppConfig::Page AppConfig::get_primary_page_from_name(const QString& name) {
+    if (name == "gallery") {
+        return Page::Gallery;
+    } else if (name == "edit") {
+        return Page::Edit;
+    } else {
+        Q_UNREACHABLE();
+    }
+}
+
+AppConfig::TextFocusMode AppConfig::get_text_focus_mode_name(const QString& name) {
+    if (name == "none") {
+        return TextFocusMode::None;
+    } else if (name == "highlight") {
+        return TextFocusMode::Highlight;
+    } else if (name == "block") {
+        return TextFocusMode::FocusBlock;
+    } else if (name == "line") {
+        return TextFocusMode::FocusLine;
+    } else {
+        Q_UNREACHABLE();
+    }
+}
+
 AppConfig& AppConfig::get_instance() {
     static std::unique_ptr<AppConfig> instance{nullptr};
     if (!instance) { instance = std::make_unique<AppConfig>(); }
@@ -480,7 +503,6 @@ bool AppConfig::default_option(Option opt) {
     static QMap<Option, bool> DEFAULT_OPTIONS{
         {Option::AutoHideToolbarOnFullscreen, true },
         {Option::FirstLineIndent,             true },
-        {Option::HighlightActiveBlock,        true },
         {Option::ElasticTextViewResize,       false},
         {Option::CentreEditLine,              false},
         {Option::AutoChapter,                 false},
@@ -500,24 +522,26 @@ bool AppConfig::default_option(Option opt) {
 
 QString AppConfig::default_option(ValOption opt) {
     static QMap<ValOption, QString> DEFAULT_OPTIONS{
-        {ValOption::Language,                    "zh_CN"  },
-        {ValOption::PrimaryPage,                 "gallery"},
-        {ValOption::DefaultEditMode,             "normal" },
-        {ValOption::TextFont,                    ""       },
-        {ValOption::TextFontSize,                "16"     },
-        {ValOption::LineSpacingRatio,            "1.0"    },
-        {ValOption::BlockSpacing,                "6"      },
-        {ValOption::BookDirStyle,                "tree"   },
-        {ValOption::AutoChapterThreshold,        "2000"   },
-        {ValOption::CriticalChapterLimit,        "20"     },
-        {ValOption::ChapterLimit,                "100"    },
-        {ValOption::TimingBackupInterval,        "5.0"    },
-        {ValOption::QuantitativeBackupThreshold, "100"    },
-        {ValOption::BackgroundImage,             ""       },
-        {ValOption::EditorBackgroundImage,       ""       },
-        {ValOption::BackgroundImageOpacity,      "100"    },
-        {ValOption::ToolbarIconSize,             "12"     },
-        {ValOption::LastEditingBookOnQuit,       ""       },
+        {ValOption::Language,                    "zh_CN"    },
+        {ValOption::PrimaryPage,                 "gallery"  },
+        {ValOption::DefaultEditMode,             "normal"   },
+        {ValOption::TextFont,                    ""         },
+        {ValOption::TextFontSize,                "16"       },
+        {ValOption::LineSpacingRatio,            "1.0"      },
+        {ValOption::BlockSpacing,                "6"        },
+        {ValOption::BookDirStyle,                "tree"     },
+        {ValOption::AutoChapterThreshold,        "2000"     },
+        {ValOption::CriticalChapterLimit,        "20"       },
+        {ValOption::ChapterLimit,                "100"      },
+        {ValOption::TimingBackupInterval,        "5.0"      },
+        {ValOption::QuantitativeBackupThreshold, "100"      },
+        {ValOption::BackgroundImage,             ""         },
+        {ValOption::EditorBackgroundImage,       ""         },
+        {ValOption::BackgroundImageOpacity,      "100"      },
+        {ValOption::ToolbarIconSize,             "12"       },
+        {ValOption::LastEditingBookOnQuit,       ""         },
+        {ValOption::UnfocusedTextOpacity,        "0.25"     },
+        {ValOption::TextFocusMode,               "highlight"},
     };
     Q_ASSERT(DEFAULT_OPTIONS.size() == magic_enum::enum_count<ValOption>());
     return DEFAULT_OPTIONS.value(opt);

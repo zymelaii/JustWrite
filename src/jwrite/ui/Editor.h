@@ -5,6 +5,7 @@
 #include <jwrite/TextRestrictRule.h>
 #include <jwrite/TextEditHistory.h>
 #include <jwrite/Tokenizer.h>
+#include <jwrite/AppConfig.h>
 #include <QTimer>
 #include <QWidget>
 
@@ -22,6 +23,16 @@ signals:
     void activated();
 
 public slots:
+
+    void set_text_focus_mode(AppConfig::TextFocusMode mode) {
+        focus_mode_ = mode;
+        update();
+    }
+
+    void set_unfocused_text_opacity(double opacity) {
+        unfocused_text_opacity_ = opacity;
+        update();
+    }
 
     void set_line_spacing_ratio(double ratio) {
         context_->engine.line_spacing_ratio = ratio;
@@ -49,18 +60,8 @@ public slots:
         update();
     }
 
-    void set_active_block_highlight_enabled(bool enabled) {
-        ui_highlight_active_block_ = enabled;
-        update();
-    }
-
     void set_smooth_scroll_enabled(bool enabled) {
         smooth_scroll_enabled_ = enabled;
-    }
-
-public:
-    bool active_block_highlight_enabled() const {
-        return ui_highlight_active_block_;
     }
 
 public:
@@ -187,6 +188,9 @@ private:
     bool   inserted_filter_enabled_;
     double expected_scroll_;
 
+    AppConfig::TextFocusMode focus_mode_;
+    double                   unfocused_text_opacity_;
+
     bool   drag_sel_flag_;
     int    oob_drag_sel_flag_;
     QPoint oob_drag_sel_vpos_;
@@ -205,7 +209,6 @@ private:
     QFont           ui_content_font_;
     QMargins        ui_margins_;
     Qt::CursorShape ui_cursor_shape_[2];
-    bool            ui_highlight_active_block_;
 };
 
 } // namespace jwrite::ui
