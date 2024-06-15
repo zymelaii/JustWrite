@@ -1,4 +1,5 @@
 #pragma once
+
 #include <jwrite/ui/JustWrite.h>
 #include <widget-kit/OverlayDialog.h>
 #include <widget-kit/FlatButton.h>

@@ -24,8 +24,6 @@ public:
 
     std::optional<GlobalCommand> match(QKeyEvent* e) const;
 
-    static GlobalCommandManager& get_instance();
-
 private:
     QMap<QKeySequence, GlobalCommand> shortcuts_;
 };

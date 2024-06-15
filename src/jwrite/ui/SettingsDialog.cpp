@@ -386,33 +386,63 @@ class ShortcutBuilder : public SettingsItemBuilder {
 
 protected:
     ShortcutBuilder(SettingsPanelBuilder &parent)
-        : SettingsItemBuilder(parent) {}
+        : SettingsItemBuilder(parent)
+        , command_{0}
+        , text_input_command_{false}
+        , has_command_{false} {}
 
 public:
     ShortcutBuilder &with_action(GlobalCommand command) {
-        command_ = command;
+        Q_ASSERT(!has_command_);
+        command_            = static_cast<int>(command);
+        text_input_command_ = false;
+        has_command_        = true;
+        return *this;
+    }
+
+    ShortcutBuilder &with_action(TextInputCommand command) {
+        Q_ASSERT(!has_command_);
+        command_            = static_cast<int>(command);
+        text_input_command_ = true;
+        has_command_        = true;
         return *this;
     }
 
 protected:
     QWidget *build() override {
+        Q_ASSERT(has_command_);
         auto &config   = AppConfig::get_instance();
-        auto &man      = GlobalCommandManager::get_instance();
         auto  shortcut = new ShortcutEditor;
-        shortcut->set_shortcut(man.get(command_));
+        if (text_input_command_) {
+            auto &man = config.primary_text_input_command_manager();
+            shortcut->set_shortcut(
+                man.keybindings(static_cast<TextInputCommand>(command_)).value_or(QKeySequence()));
+        } else {
+            auto &man = config.global_command_manager();
+            shortcut->set_shortcut(man.get(static_cast<GlobalCommand>(command_)));
+        }
         shortcut->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         QObject::connect(
             shortcut,
             &ShortcutEditor::on_shortcut_change,
             &config,
-            [&, cmd = command_](const QKeySequence &shortcut) {
-                man.update_command_shortcut(cmd, shortcut);
+            [&, cmd = command_, is_text_input_cmd = text_input_command_](
+                const QKeySequence &shortcut) {
+                if (is_text_input_cmd) {
+                    auto &man = config.primary_text_input_command_manager();
+                    man.insert_or_update(shortcut, static_cast<TextInputCommand>(cmd));
+                } else {
+                    auto &man = config.global_command_manager();
+                    man.update_command_shortcut(static_cast<GlobalCommand>(cmd), shortcut);
+                }
             });
         return shortcut;
     }
 
 private:
-    GlobalCommand command_;
+    int  command_;
+    bool text_input_command_;
+    bool has_command_;
 };
 
 struct SettingsPanelBuilder {
@@ -960,6 +990,174 @@ QWidget *SettingsDialog::createShortcutPanel() {
         .with_action(GlobalCommand::Rename)
         .complete()
         .with_group("文本编辑")
+        .with_shortcut("段前插入", "在当前段落前插入一行")
+        .with_action(TextInputCommand::InsertBeforeBlock)
+        .complete()
+        .with_shortcut("段后插入", "在当前段落后插入一行")
+        .with_action(TextInputCommand::InsertAfterBlock)
+        .complete()
+        .with_shortcut("取消选中", "取消文本选中，不改变编辑位置")
+        .with_action(TextInputCommand::Cancel)
+        .complete()
+        .with_shortcut(
+            "撤销", "撤销一次编辑动作，当编辑历史游标处于头部时无效\n该操作不计入编辑历史")
+        .with_action(TextInputCommand::Undo)
+        .complete()
+        .with_shortcut(
+            "重做", "重做一次编辑动作，当编辑历史游标处于尾部时无效\n该操作不计入编辑历史")
+        .with_action(TextInputCommand::Redo)
+        .complete()
+        .with_shortcut("复制", "复制选中文本\n当选中区域不存在时，复制当前段落")
+        .with_action(TextInputCommand::Copy)
+        .complete()
+        .with_shortcut("剪切", "剪切选中文本\n当选中区域不存在时，剪切当前段落")
+        .with_action(TextInputCommand::Cut)
+        .complete()
+        .with_shortcut("粘贴", "在编辑位置粘贴文本\n当存在选中区域时，替换选中区域")
+        .with_action(TextInputCommand::Paste)
+        .complete()
+        .with_shortcut("向上滚动", "视图向上滚动一行")
+        .with_action(TextInputCommand::ScrollUp)
+        .complete()
+        .with_shortcut("向下滚动", "视图向下滚动一行")
+        .with_action(TextInputCommand::ScrollDown)
+        .complete()
+        .with_shortcut(
+            "左移一个字符",
+            "移动到前一个字符位置\n跨段时仅移动到段末\n若存在选中区域，则移动到选中区域开头")
+        .with_action(TextInputCommand::MoveToPrevChar)
+        .complete()
+        .with_shortcut(
+            "右移一个字符",
+            "移动到下一个字符位置\n跨段时仅移动到段首\n若存在选中区域，则移动到选中区域末尾")
+        .with_action(TextInputCommand::MoveToNextChar)
+        .complete()
+        .with_shortcut("左移一个单词", "移动到前一个单词位置")
+        .with_action(TextInputCommand::MoveToPrevWord)
+        .complete()
+        .with_shortcut("右移一个单词", "移动到下一个单词位置")
+        .with_action(TextInputCommand::MoveToNextWord)
+        .complete()
+        .with_shortcut(
+            "移动到上一行",
+            "以初始移动位置为基准，垂直移动到上一行的最近邻位置\n上一行不存在时，移动到段首并清除垂"
+            "直移动状态")
+        .with_action(TextInputCommand::MoveToPrevLine)
+        .complete()
+        .with_shortcut(
+            "移动到下一行",
+            "以初始移动位置为基准，垂直移动到下一行的最近邻位置\n上一行不存在时，移动到段末并清除垂"
+            "直移动状态")
+        .with_action(TextInputCommand::MoveToNextLine)
+        .complete()
+        .with_shortcut("移动到行首", "移动到视觉行首\n若当前已经位于行首，移动到段首")
+        .with_action(TextInputCommand::MoveToStartOfLine)
+        .complete()
+        .with_shortcut("移动到行末", "移动到视觉行末\n若当前已经位于行末，移动到段末")
+        .with_action(TextInputCommand::MoveToEndOfLine)
+        .complete()
+        .with_shortcut("移动到段首", "移动到段首")
+        .with_action(TextInputCommand::MoveToStartOfBlock)
+        .complete()
+        .with_shortcut("移动到段末", "移动到段末")
+        .with_action(TextInputCommand::MoveToEndOfBlock)
+        .complete()
+        .with_shortcut("移动到文章开头", "移动到文章开头并重置滚动到滚动下限位置")
+        .with_action(TextInputCommand::MoveToStartOfDocument)
+        .complete()
+        .with_shortcut("移动到文章末尾", "移动到文章开头并重置滚动到视图中间")
+        .with_action(TextInputCommand::MoveToEndOfDocument)
+        .complete()
+        .with_shortcut("向前滚动一页", "向前滚动一页")
+        .with_action(TextInputCommand::MoveToPrevPage)
+        .complete()
+        .with_shortcut("向后滚动一页", "向后滚动一页")
+        .with_action(TextInputCommand::MoveToNextPage)
+        .complete()
+        .with_shortcut("移动到上一段", "移动到上一段段首")
+        .with_action(TextInputCommand::MoveToPrevBlock)
+        .complete()
+        .with_shortcut("移动到下一段", "移动到下一段段首")
+        .with_action(TextInputCommand::MoveToNextBlock)
+        .complete()
+        .with_shortcut("删除前一个字符", "删除前一个字符\n若位于段首，向前合并段落")
+        .with_action(TextInputCommand::DeletePrevChar)
+        .complete()
+        .with_shortcut("删除后一个字符", "删除下一个字符\n若位于段末，向后合并段落")
+        .with_action(TextInputCommand::DeleteNextChar)
+        .complete()
+        .with_shortcut("删除前一个单词", "删除前一个单词")
+        .with_action(TextInputCommand::DeletePrevWord)
+        .complete()
+        .with_shortcut("删除后一个单词", "删除下一个单词")
+        .with_action(TextInputCommand::DeleteNextWord)
+        .complete()
+        .with_shortcut("删除至行首", "删除至视觉行首")
+        .with_action(TextInputCommand::DeleteToStartOfLine)
+        .complete()
+        .with_shortcut("删除至行末", "删除至视觉行末")
+        .with_action(TextInputCommand::DeleteToEndOfLine)
+        .complete()
+        .with_shortcut("删除至段首", "删除至段首")
+        .with_action(TextInputCommand::DeleteToStartOfBlock)
+        .complete()
+        .with_shortcut("删除至段末", "删除至段末")
+        .with_action(TextInputCommand::DeleteToEndOfBlock)
+        .complete()
+        .with_shortcut("删除至文章开头", "删除至文章开头")
+        .with_action(TextInputCommand::DeleteToStartOfDocument)
+        .complete()
+        .with_shortcut("删除至文章末尾", "删除至文章末尾")
+        .with_action(TextInputCommand::DeleteToEndOfDocument)
+        .complete()
+        .with_shortcut("选中前一个字符", "向前选中一个字符")
+        .with_action(TextInputCommand::SelectPrevChar)
+        .complete()
+        .with_shortcut("选中后一个字符", "向后选中一个字符")
+        .with_action(TextInputCommand::SelectNextChar)
+        .complete()
+        .with_shortcut("选中前一个单词", "向前选中一个单词")
+        .with_action(TextInputCommand::SelectPrevWord)
+        .complete()
+        .with_shortcut("选中后一个单词", "向后选中一个单词")
+        .with_action(TextInputCommand::SelectNextWord)
+        .complete()
+        .with_shortcut("选中至上一行", "垂直选中至上一行\n若上一行不存在，则选中至段首")
+        .with_action(TextInputCommand::SelectToPrevLine)
+        .complete()
+        .with_shortcut("选中至下一行", "垂直选中至下一行\n若下一行不存在，则选中至段末")
+        .with_action(TextInputCommand::SelectToNextLine)
+        .complete()
+        .with_shortcut("选中至行首", "选中至视觉行首\n若当前已经位于行首，则选中至段首")
+        .with_action(TextInputCommand::SelectToStartOfLine)
+        .complete()
+        .with_shortcut("选中至行末", "选中至视觉行末\n若当前已经位于行末，则选中至段末")
+        .with_action(TextInputCommand::SelectToEndOfLine)
+        .complete()
+        .with_shortcut("选中至段首", "选中至段首")
+        .with_action(TextInputCommand::SelectToStartOfBlock)
+        .complete()
+        .with_shortcut("选中至段末", "选中至段末")
+        .with_action(TextInputCommand::SelectToEndOfBlock)
+        .complete()
+        .with_shortcut("选中当前段", "选中当前段\n该操作不改变编辑位置")
+        .with_action(TextInputCommand::SelectBlock)
+        .complete()
+        .with_shortcut("选中至上一页", "选中至上一页")
+        .with_action(TextInputCommand::SelectPrevPage)
+        .complete()
+        .with_shortcut("选中至下一页", "选中至下一页")
+        .with_action(TextInputCommand::SelectNextPage)
+        .complete()
+        .with_shortcut("选中至文章开头", "选中至文章开头")
+        .with_action(TextInputCommand::SelectToStartOfDoc)
+        .complete()
+        .with_shortcut("选中至文章末尾", "选中至文章末尾")
+        .with_action(TextInputCommand::SelectToEndOfDoc)
+        .complete()
+        .with_shortcut("全选", "文章全选\n该操作不改变编辑位置")
+        .with_action(TextInputCommand::SelectAll)
+        .complete()
         .build();
 
     layout->addSpacing(32);

@@ -185,27 +185,27 @@ QChar TextInputCommandManager::translate_printable_char(QKeyEvent *e) {
     return e->text().at(0);
 }
 
-GeneralTextInputCommandManager::GeneralTextInputCommandManager(const TextViewEngine &engine)
-    : engine_(engine) {}
-
 TextInputCommand GeneralTextInputCommandManager::match(QKeyEvent *e) const {
-    const auto cmd = TextInputCommandManager::match(e);
+    const auto lock_guard = lock_state_.read_lock_guard();
+    const auto cmd        = TextInputCommandManager::match(e);
+    const auto engine     = engine_stack_.empty() ? nullptr : engine_stack_.top();
+    if (!engine) { return cmd; }
     switch (cmd) {
         case TextInputCommand::MoveToStartOfLine: {
-            if (engine_.cursor.col == 0) { return TextInputCommand::MoveToStartOfBlock; }
+            if (engine->cursor.col == 0) { return TextInputCommand::MoveToStartOfBlock; }
         } break;
         case TextInputCommand::MoveToEndOfLine: {
-            const auto &cursor = engine_.cursor;
-            const auto  block  = engine_.current_block();
+            const auto &cursor = engine->cursor;
+            const auto  block  = engine->current_block();
             const auto  len    = block->len_of_line(cursor.row);
             if (cursor.col == len) { return TextInputCommand::MoveToEndOfBlock; }
         } break;
         case TextInputCommand::SelectToStartOfLine: {
-            if (engine_.cursor.col == 0) { return TextInputCommand::SelectToStartOfBlock; }
+            if (engine->cursor.col == 0) { return TextInputCommand::SelectToStartOfBlock; }
         } break;
         case TextInputCommand::SelectToEndOfLine: {
-            const auto &cursor = engine_.cursor;
-            const auto  block  = engine_.current_block();
+            const auto &cursor = engine->cursor;
+            const auto  block  = engine->current_block();
             const auto  len    = block->len_of_line(cursor.row);
             if (cursor.col == len) { return TextInputCommand::SelectToEndOfBlock; }
         } break;
@@ -220,6 +220,22 @@ TextInputCommand GeneralTextInputCommandManager::match(QKeyEvent *e) const {
         } break;
     }
     return cmd;
+}
+
+void GeneralTextInputCommandManager::push(TextViewEngine *engine) {
+    lock_state_.lock_write();
+    engine_stack_.push(engine);
+    lock_state_.unlock_write();
+}
+
+void GeneralTextInputCommandManager::pop() {
+    lock_state_.lock_write();
+    engine_stack_.pop();
+    lock_state_.unlock_write();
+}
+
+size_t GeneralTextInputCommandManager::total_saved_context() const {
+    return engine_stack_.size();
 }
 
 }; // namespace jwrite

@@ -1,6 +1,9 @@
 #pragma once
 
 #include <jwrite/ColorScheme.h>
+#include <jwrite/GlobalCommand.h>
+#include <jwrite/TextInputCommand.h>
+#include <jwrite/TextViewEngine.h>
 #include <QObject>
 #include <QMap>
 #include <QSet>
@@ -114,6 +117,13 @@ public:
     QString value(ValOption opt) const;
     void    set_value(ValOption opt, const QString& value);
 
+    GlobalCommandManager&       global_command_manager();
+    const GlobalCommandManager& global_command_manager() const;
+
+    void                                  set_primary_text_input_context(TextViewEngine* ctx);
+    GeneralTextInputCommandManager&       primary_text_input_command_manager();
+    const GeneralTextInputCommandManager& primary_text_input_command_manager() const;
+
     void load();
     void save();
 
@@ -131,10 +141,12 @@ protected:
     void load_default();
 
 private:
-    QMap<ValOption, QString> settings_values_;
-    QSet<Option>             settings_options_;
-    ColorTheme               theme_;
-    ColorScheme              scheme_;
+    GlobalCommandManager           global_command_manager_;
+    GeneralTextInputCommandManager primary_text_input_command_manager_;
+    QMap<ValOption, QString>       settings_values_;
+    QSet<Option>                   settings_options_;
+    ColorTheme                     theme_;
+    ColorScheme                    scheme_;
 };
 
 inline ColorTheme AppConfig::theme() const {

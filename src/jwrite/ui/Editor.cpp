@@ -508,7 +508,6 @@ Editor::~Editor() {
     delete context_;
     delete restrict_rule_;
     delete tokenizer_;
-    delete input_manager_;
 }
 
 void Editor::init() {
@@ -555,9 +554,6 @@ void Editor::init() {
 
     blink_timer_.setInterval(500);
     blink_timer_.setSingleShot(false);
-
-    input_manager_ = new GeneralTextInputCommandManager(context_->engine);
-    input_manager_->load_default();
 
     scrollToStart();
 
@@ -939,8 +935,14 @@ void Editor::keyPressEvent(QKeyEvent *e) {
     //! FIXME: the solution is not fully tested to be safe and correct
     if (context_->engine.preedit) { return; }
 
-    const auto action = input_manager_->match(e);
-    qDebug() << "COMMAND" << magic_enum::enum_name(action).data();
+    auto &config = AppConfig::get_instance();
+    auto &man    = config.primary_text_input_command_manager();
+
+    man.push(&context_->engine);
+    const auto action = man.match(e);
+    man.pop();
+
+    ON_DEBUG(qDebug() << "COMMAND" << magic_enum::enum_name(action).data());
 
     auto        &engine       = context_->engine;
     auto        &cursor       = engine.cursor;
@@ -952,7 +954,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         case TextInputCommand::Reject: {
         } break;
         case TextInputCommand::InsertPrintable: {
-            insert(input_manager_->translate_printable_char(e), false);
+            insert(TextInputCommandManager::translate_printable_char(e), false);
         } break;
         case TextInputCommand::InsertTab: {
         } break;

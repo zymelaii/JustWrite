@@ -1,33 +1,12 @@
 #pragma once
 
+#include <jwrite/RwLock.h>
 #include <QStringView>
 #include <QVariant>
 #include <QList>
-#include <atomic>
 #include <stddef.h>
 
 namespace jwrite::core {
-
-class RwLock {
-public:
-    RwLock();
-    RwLock(const RwLock &)            = delete;
-    RwLock &operator=(const RwLock &) = delete;
-
-    bool try_lock_read();
-    void lock_read();
-    void unlock_read();
-
-    bool try_lock_write();
-    void lock_write();
-    void unlock_write();
-
-    bool on_read() const;
-    bool on_write() const;
-
-private:
-    std::atomic_int state_;
-};
 
 struct RefTextBlockView;
 struct CoreTextViewEngine;

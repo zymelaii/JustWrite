@@ -1,9 +1,11 @@
 #pragma once
 
 #include <jwrite/TextViewEngine.h>
+#include <jwrite/RwLock.h>
 #include <QKeyEvent>
 #include <QMap>
 #include <optional>
+#include <stack>
 
 namespace jwrite {
 
@@ -86,11 +88,16 @@ private:
 
 class GeneralTextInputCommandManager : public TextInputCommandManager {
 public:
-    GeneralTextInputCommandManager(const TextViewEngine &engine);
     TextInputCommand match(QKeyEvent *e) const override;
 
+    void push(TextViewEngine *engine);
+    void pop();
+
+    size_t total_saved_context() const;
+
 private:
-    const TextViewEngine &engine_;
+    mutable core::RwLock         lock_state_;
+    std::stack<TextViewEngine *> engine_stack_;
 };
 
 }; // namespace jwrite

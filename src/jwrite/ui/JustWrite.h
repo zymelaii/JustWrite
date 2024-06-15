@@ -99,7 +99,8 @@ public:
     void update_color_scheme(const ColorScheme &scheme);
 
     std::optional<GlobalCommand> try_match_shortcut(QKeyEvent *event) const {
-        return GlobalCommandManager::get_instance().match(event);
+        const auto &config = AppConfig::get_instance();
+        return config.global_command_manager().match(event);
     }
 
     void wait(std::function<void()> job) {

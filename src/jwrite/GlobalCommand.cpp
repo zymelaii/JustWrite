@@ -1,16 +1,6 @@
 #include <jwrite/GlobalCommand.h>
-#include <memory>
 
 namespace jwrite {
-
-GlobalCommandManager &GlobalCommandManager::get_instance() {
-    static std::unique_ptr<GlobalCommandManager> instance{};
-    if (!instance) {
-        instance.reset(new GlobalCommandManager);
-        instance->load_default();
-    }
-    return *instance;
-}
 
 void GlobalCommandManager::load_default() {
     clear();

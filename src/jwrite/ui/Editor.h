@@ -127,20 +127,7 @@ public:
     }
 
     auto lock_guard() const {
-        struct LockGuard {
-            LockGuard(VisualTextEditContext *context)
-                : lock(context->lock) {
-                lock.lock_write();
-            }
-
-            ~LockGuard() {
-                lock.unlock_write();
-            }
-
-            core::RwLock &lock;
-        };
-
-        return LockGuard(context_);
+        return context_->lock.write_lock_guard();
     }
 
 protected slots:
@@ -187,7 +174,6 @@ protected:
 private:
     VisualTextEditContext    *context_;
     AbstractTextRestrictRule *restrict_rule_;
-    TextInputCommandManager  *input_manager_;
     Tokenizer                *tokenizer_;
     QFuture<Tokenizer *>      fut_tokenizer_;
     TextEditHistory           history_;

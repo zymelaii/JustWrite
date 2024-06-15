@@ -233,6 +233,28 @@ void AppConfig::set_value(ValOption opt, const QString& value) {
     emit on_value_change(opt, value);
 }
 
+GlobalCommandManager& AppConfig::global_command_manager() {
+    return global_command_manager_;
+}
+
+const GlobalCommandManager& AppConfig::global_command_manager() const {
+    return global_command_manager_;
+}
+
+void AppConfig::set_primary_text_input_context(TextViewEngine* ctx) {
+    auto& d = primary_text_input_command_manager_;
+    while (d.total_saved_context() > 0) { d.pop(); }
+    if (ctx) { d.push(ctx); }
+}
+
+GeneralTextInputCommandManager& AppConfig::primary_text_input_command_manager() {
+    return primary_text_input_command_manager_;
+}
+
+const GeneralTextInputCommandManager& AppConfig::primary_text_input_command_manager() const {
+    return primary_text_input_command_manager_;
+}
+
 void AppConfig::load() {
     BlockSignalGuard guard(this);
 
@@ -559,6 +581,9 @@ void AppConfig::load_default() {
     const auto default_theme = ColorTheme::Dark;
     set_theme(default_theme);
     set_scheme(ColorScheme::get_default_scheme_of_theme(default_theme));
+
+    global_command_manager_.load_default();
+    primary_text_input_command_manager_.load_default();
 }
 
 } // namespace jwrite
