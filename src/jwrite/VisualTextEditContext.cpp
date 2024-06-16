@@ -187,6 +187,18 @@ int VisualTextEditContext::get_column_at_vpos(const TextLine &line, double x_pos
     return col;
 }
 
+int VisualTextEditContext::get_vpos_at_cursor_col() const {
+    Q_ASSERT(!engine.is_dirty());
+    Q_ASSERT(engine.is_cursor_available());
+    const auto &fm            = engine.fm;
+    const auto &cursor        = engine.cursor;
+    const auto &line          = engine.current_line();
+    const int   leading_space = line.is_first_line() ? engine.standard_char_width * 2 : 0;
+    double      x_pos         = leading_space + cursor.col * line.char_spacing();
+    for (const auto c : line.text().left(cursor.col)) { x_pos += fm.horizontalAdvance(c); }
+    return x_pos;
+}
+
 VisualTextEditContext::TextLoc
     VisualTextEditContext::get_textloc_at_rel_vpos(const QPoint &pos, bool clip) const {
     Q_ASSERT(!engine.preedit);
@@ -247,7 +259,6 @@ VisualTextEditContext::TextLoc
 }
 
 QPointF VisualTextEditContext::get_vpos_at_cursor() const {
-    Q_ASSERT(!engine.preedit);
     Q_ASSERT(!engine.is_dirty());
     Q_ASSERT(engine.is_cursor_available());
 

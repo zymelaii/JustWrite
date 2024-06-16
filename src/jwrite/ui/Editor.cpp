@@ -17,31 +17,39 @@
 #include <QClipboard>
 #include <QTimer>
 #include <QMap>
+#include <QScreen>
 #include <magic_enum.hpp>
 #include <spdlog/spdlog.h>
 
 namespace jwrite::ui {
 
-bool Editor::softCenterMode() const {
+bool Editor::soft_center_mode_enabled() const {
     return soft_center_mode_;
 }
 
-void Editor::setSoftCenterMode(bool value) {
+void Editor::set_soft_center_mode_enabled(bool value) {
+    if (soft_center_mode_ == value) { return; }
     soft_center_mode_ = value;
-    if (soft_center_mode_) {
-        const auto min_margin     = 32;
-        const auto max_text_width = 1000;
-        const auto mean_width     = qMax(0, width() - min_margin * 2);
-        const auto text_width     = qMin<int>(mean_width * 0.8, max_text_width);
-        const auto margin         = (width() - text_width) / 2;
-        ui_margins_               = QMargins(margin, 4, margin, 4);
-    } else {
-        ui_margins_ = QMargins(4, 4, 4, 4);
-    }
-    emit textAreaChanged(textArea());
+    update_text_view_margins();
 }
 
-QRect Editor::textArea() const {
+bool Editor::elastic_resize_enabled() const {
+    return elastic_resize_;
+}
+
+void Editor::set_elastic_resize_enabled(bool value) {
+    if (elastic_resize_ == value) { return; }
+    elastic_resize_ = value;
+    if (!elastic_resize_) { update_text_view_margins(); }
+}
+
+void Editor::update_text_view_margins() {
+    const int margin = smart_margin();
+    ui_margins_      = QMargins(margin, 4, margin, 4);
+    emit on_text_area_change(text_area());
+}
+
+QRect Editor::text_area() const {
     return contentsRect() - ui_margins_;
 }
 
@@ -102,7 +110,7 @@ void Editor::scrollToCursor() {
     Q_ASSERT(e.is_cursor_available());
     Q_ASSERT(context_->cached_render_data_ready);
 
-    const auto   viewport     = textArea();
+    const auto   viewport     = text_area();
     const auto  &line         = e.current_line();
     const auto  &cursor       = e.cursor;
     const double line_spacing = e.line_height * e.line_spacing_ratio;
@@ -204,6 +212,31 @@ void Editor::scrollToEnd() {
     const double line_spacing = context_->engine.line_spacing_ratio * context_->engine.line_height;
     const double y_pos        = max_y_pos + line_spacing - context_->viewport_height / 2;
     scrollTo(y_pos, false);
+}
+
+int Editor::smart_margin_hint() const {
+    if (!soft_center_mode_) { return 4; }
+    const auto min_margin     = 32;
+    const auto max_text_width = 1000;
+    const auto mean_width     = qMax(0, width() - min_margin * 2);
+    const auto text_width     = qMin<int>(mean_width * 0.8, max_text_width);
+    const auto margin         = (width() - text_width) / 2;
+    return margin;
+}
+
+int Editor::smart_margin() const {
+    const int margin_hint = smart_margin_hint();
+    if (!soft_center_mode_ || !elastic_resize_enabled()) { return margin_hint; }
+    const int margin = ui_margins_.left();
+    if (margin_hint == margin) { return margin_hint; }
+    const auto bb         = contentsRect();
+    const int  last_width = context_->viewport_width + margin * 2;
+    const int  dw         = bb.width() - last_width;
+    if (dw >= 0) {
+        return qMin(margin_hint, (margin * 2 + dw) / 2);
+    } else {
+        return qMax(4, (margin * 2 + dw) / 2);
+    }
 }
 
 void Editor::direct_remove_sel(QString *deleted_text) {
@@ -524,6 +557,7 @@ void Editor::init() {
     min_text_line_chars_       = 12;
     focus_mode_                = AppConfig::TextFocusMode::Highlight;
     soft_center_mode_          = false;
+    elastic_resize_            = false;
     expected_scroll_           = 0.0;
     auto_centre_edit_line_     = AutoCentre::Never;
     blink_cursor_should_paint_ = true;
@@ -535,9 +569,11 @@ void Editor::init() {
     ui_cursor_shape_[0]        = Qt::ArrowCursor;
     ui_cursor_shape_[1]        = Qt::ArrowCursor;
 
-    setSoftCenterMode(true);
+    set_soft_center_mode_enabled(true);
+    set_elastic_resize_enabled(false);
+    update_text_view_margins();
 
-    const auto text_area = textArea();
+    const auto text_area = this->text_area();
     context_ = new VisualTextEditContext(QFontMetrics(ui_content_font_), text_area.width());
     context_->resize_viewport(context_->viewport_width, text_area.height());
     context_->viewport_y_pos = 0;
@@ -557,7 +593,7 @@ void Editor::init() {
 
     scrollToStart();
 
-    connect(this, &Editor::textAreaChanged, this, [this](QRect area) {
+    connect(this, &Editor::on_text_area_change, this, [this](QRect area) {
         context_->resize_viewport(area.width(), area.height());
         requestUpdate(false);
     });
@@ -615,7 +651,7 @@ void Editor::drawTextArea(QPainter *p) {
     const auto  &e            = context_->engine;
     const double indent       = e.standard_char_width * 2;
     const double line_spacing = e.line_height * e.line_spacing_ratio;
-    const auto   viewport     = textArea();
+    const auto   viewport     = text_area();
 
     QRectF bb(viewport.left(), viewport.top(), viewport.width(), e.line_height);
     bb.translate(0, d.first_visible_block_y_pos - context_->viewport_y_pos);
@@ -715,7 +751,7 @@ void Editor::drawSelection(QPainter *p) {
 
     const auto pal = palette();
 
-    const auto   viewport     = textArea();
+    const auto   viewport     = text_area();
     const double line_spacing = e.line_height * e.line_spacing_ratio;
 
     double y_pos = d.cached_block_y_pos[d.visible_sel.first];
@@ -778,7 +814,7 @@ void Editor::drawHighlightBlock(QPainter *p) {
     p->setPen(Qt::transparent);
     p->setBrush(pal.highlightedText());
 
-    const auto viewport = textArea();
+    const auto viewport = text_area();
 
     const double line_spacing = e.line_height * e.line_spacing_ratio;
     const double line_slack   = qMax(0.0, line_spacing - e.line_height);
@@ -808,7 +844,7 @@ void Editor::drawCursor(QPainter *p) {
 
     jwrite_profiler_start(CursorRenderCost);
 
-    const auto   viewport     = textArea();
+    const auto   viewport     = text_area();
     const auto  &line         = e.current_line();
     const auto  &cursor       = e.cursor;
     const double line_spacing = e.line_height * e.line_spacing_ratio;
@@ -840,8 +876,7 @@ void Editor::drawCursor(QPainter *p) {
 
 void Editor::resizeEvent(QResizeEvent *e) {
     QWidget::resizeEvent(e);
-    if (soft_center_mode_) { setSoftCenterMode(true); }
-    emit textAreaChanged(textArea());
+    update_text_view_margins();
 }
 
 void Editor::paintEvent(QPaintEvent *e) {
@@ -1049,10 +1084,10 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             scrollToEnd();
         } break;
         case TextInputCommand::MoveToPrevPage: {
-            scroll(-textArea().height() * 0.5, true);
+            scroll(-text_area().height() * 0.5, true);
         } break;
         case TextInputCommand::MoveToNextPage: {
-            scroll(textArea().height() * 0.5, true);
+            scroll(text_area().height() * 0.5, true);
         } break;
         case TextInputCommand::MoveToPrevBlock: {
             if (engine.active_block_index > 0) {
@@ -1281,7 +1316,7 @@ void Editor::mousePressEvent(QMouseEvent *e) {
     if (engine.is_empty() || engine.is_dirty()) { return; }
     if (engine.preedit) { return; }
 
-    const auto loc = context_->get_textloc_at_rel_vpos(e->pos() - textArea().topLeft(), true);
+    const auto loc = context_->get_textloc_at_rel_vpos(e->pos() - text_area().topLeft(), true);
     Q_ASSERT(loc.block_index != -1);
 
     const bool success = context_->set_cursor_to_textloc(loc, 0);
@@ -1306,7 +1341,7 @@ void Editor::mouseDoubleClickEvent(QMouseEvent *e) {
     context_->unset_sel();
 
     if (e->button() == Qt::LeftButton) {
-        const auto loc = context_->get_textloc_at_rel_vpos(e->pos() - textArea().topLeft(), true);
+        const auto loc = context_->get_textloc_at_rel_vpos(e->pos() - text_area().topLeft(), true);
         if (loc.block_index != -1) {
             const auto block = context_->engine.active_blocks[loc.block_index];
             select(block->text_pos, block->text_pos + block->text_len());
@@ -1327,7 +1362,7 @@ void Editor::mouseMoveEvent(QMouseEvent *e) {
             auto &engine = context_->engine;
             if (!engine.is_cursor_available()) { break; }
             if (engine.preedit) { break; }
-            const auto bb            = textArea();
+            const auto bb            = text_area();
             const auto vpos          = e->globalPosition().toPoint() - mapToGlobal(bb.topLeft());
             const bool out_of_bounds = updateTextLocToVisualPos(vpos);
             oob_drag_sel_flag_       = out_of_bounds;
@@ -1335,7 +1370,7 @@ void Editor::mouseMoveEvent(QMouseEvent *e) {
         } while (0);
     }
 
-    const auto &area = textArea();
+    const auto &area = text_area();
     if (area.contains(e->pos())) {
         setCursorShape(Qt::IBeamCursor);
     } else {
@@ -1352,7 +1387,22 @@ void Editor::wheelEvent(QWheelEvent *e) {
     scroll((e->modifiers() & Qt::ControlModifier) ? delta * 8 : delta, true);
 }
 
+void Editor::dragEnterEvent(QDragEnterEvent *e) {
+    if (e->mimeData()->hasUrls()) {
+        e->acceptProposedAction();
+    } else {
+        e->ignore();
+    }
+}
+
+void Editor::dropEvent(QDropEvent *e) {
+    QWidget::dropEvent(e);
+    const auto urls = e->mimeData()->urls();
+    //! TODO: filter plain text files and handle open action
+}
+
 void Editor::inputMethodEvent(QInputMethodEvent *e) {
+    QWidget::inputMethodEvent(e);
     auto &engine = context_->engine;
     if (!engine.is_cursor_available()) { return; }
     jwrite_profiler_start(InputMethodEditorResponse);
@@ -1366,18 +1416,35 @@ void Editor::inputMethodEvent(QInputMethodEvent *e) {
     jwrite_profiler_record(InputMethodEditorResponse);
 }
 
-void Editor::dragEnterEvent(QDragEnterEvent *e) {
-    if (e->mimeData()->hasUrls()) {
-        e->acceptProposedAction();
-    } else {
-        e->ignore();
-    }
-}
+QVariant Editor::inputMethodQuery(Qt::InputMethodQuery query) const {
+    switch (query) {
+        case Qt::ImCursorRectangle: {
+            const auto &e = context_->engine;
+            if (e.is_dirty() || !e.is_cursor_available()) { return QRect(0, 0, 1, 1); }
 
-void Editor::dropEvent(QDropEvent *e) {
-    QWidget::dropEvent(e);
-    const auto urls = e->mimeData()->urls();
-    //! TODO: filter plain text files and handle open action
+            const auto   text_area    = this->text_area();
+            const double line_spacing = e.line_height * e.line_spacing_ratio;
+
+            auto [x_pos, y_pos] = context_->get_vpos_at_cursor();
+            const auto  pos = QPoint(x_pos, y_pos - context_->viewport_y_pos) + text_area.topLeft();
+            const QSize size(1, e.line_height);
+            QRect       bb(pos, size);
+
+            const int threshould = 64;
+            const int offset_to_screen_bottom =
+                screen()->size().height() - mapToGlobal(QPoint(0, bb.bottom())).y();
+            if (offset_to_screen_bottom < threshould) {
+                const int preferred_ime_editor_height = 128;
+                bb.translate(0, -preferred_ime_editor_height);
+                bb.setHeight(1);
+            }
+
+            return bb;
+        } break;
+        default: {
+            return QWidget::inputMethodQuery(query);
+        } break;
+    }
 }
 
 } // namespace jwrite::ui

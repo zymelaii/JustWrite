@@ -24,7 +24,7 @@ public:
     };
 
 signals:
-    void textAreaChanged(QRect area);
+    void on_text_area_change(QRect area);
     void textChanged(const QString &text);
     void focusLost(VisualTextEditContext::TextLoc last_loc);
     void activated();
@@ -76,10 +76,15 @@ public slots:
     }
 
 public:
-    bool softCenterMode() const;
-    void setSoftCenterMode(bool value);
+    bool soft_center_mode_enabled() const;
+    void set_soft_center_mode_enabled(bool value);
 
-    QRect textArea() const;
+    bool elastic_resize_enabled() const;
+    void set_elastic_resize_enabled(bool value);
+
+    void update_text_view_margins();
+
+    QRect text_area() const;
 
     void    reset(QString &text, bool swap);
     QString take();
@@ -95,6 +100,9 @@ public:
     void                  scrollTo(double pos_y, bool smooth);
     void                  scrollToStart();
     void                  scrollToEnd();
+
+    int smart_margin_hint() const;
+    int smart_margin() const;
 
     void direct_remove_sel(QString *deleted_text);
     void direct_delete(int times, QString *deleted_text);
@@ -157,19 +165,20 @@ protected:
     void drawHighlightBlock(QPainter *p);
     void drawCursor(QPainter *p);
 
-    void resizeEvent(QResizeEvent *e) override;
-    void paintEvent(QPaintEvent *e) override;
-    void focusInEvent(QFocusEvent *e) override;
-    void focusOutEvent(QFocusEvent *e) override;
-    void keyPressEvent(QKeyEvent *e) override;
-    void mousePressEvent(QMouseEvent *e) override;
-    void mouseReleaseEvent(QMouseEvent *e) override;
-    void mouseDoubleClickEvent(QMouseEvent *e) override;
-    void mouseMoveEvent(QMouseEvent *e) override;
-    void wheelEvent(QWheelEvent *e) override;
-    void inputMethodEvent(QInputMethodEvent *e) override;
-    void dragEnterEvent(QDragEnterEvent *e) override;
-    void dropEvent(QDropEvent *e) override;
+    void     resizeEvent(QResizeEvent *e) override;
+    void     paintEvent(QPaintEvent *e) override;
+    void     focusInEvent(QFocusEvent *e) override;
+    void     focusOutEvent(QFocusEvent *e) override;
+    void     keyPressEvent(QKeyEvent *e) override;
+    void     mousePressEvent(QMouseEvent *e) override;
+    void     mouseReleaseEvent(QMouseEvent *e) override;
+    void     mouseDoubleClickEvent(QMouseEvent *e) override;
+    void     mouseMoveEvent(QMouseEvent *e) override;
+    void     wheelEvent(QWheelEvent *e) override;
+    void     dragEnterEvent(QDragEnterEvent *e) override;
+    void     dropEvent(QDropEvent *e) override;
+    void     inputMethodEvent(QInputMethodEvent *e) override;
+    QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
 
 private:
     VisualTextEditContext    *context_;
@@ -182,6 +191,7 @@ private:
 
     int                      min_text_line_chars_;
     bool                     soft_center_mode_;
+    bool                     elastic_resize_;
     bool                     inserted_filter_enabled_;
     double                   expected_scroll_;
     AutoCentre               auto_centre_edit_line_;

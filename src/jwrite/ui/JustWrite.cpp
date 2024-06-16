@@ -942,6 +942,7 @@ void JustWrite::handle_config_on_option_change(AppConfig::Option opt, bool on) {
         case Option::FirstLineIndent: {
         } break;
         case Option::ElasticTextViewResize: {
+            ui_edit_page_->editor()->set_elastic_resize_enabled(on);
         } break;
         case Option::AutoChapter: {
         } break;

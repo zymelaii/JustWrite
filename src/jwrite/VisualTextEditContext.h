@@ -92,6 +92,8 @@ struct VisualTextEditContext {
      */
     int get_column_at_vpos(const TextLine &line, double x_pos) const;
 
+    int get_vpos_at_cursor_col() const;
+
     /*!
      * \param [in] pos cursor position relative to viewport top-left corner
      * \param [in] clip whether to clip the position to the viewport

@@ -37,13 +37,7 @@ public:
 public:
     static QString get_friendly_word_count(int count);
 
-    void reset_word_counter(AbstractWordCounter *word_counter) {
-        Q_ASSERT(word_counter);
-        word_counter_.reset(word_counter);
-        request_invalidate_wcstate();
-        do_flush_wcstate();
-        request_sync_wcstate();
-    }
+    void reset_word_counter(AbstractWordCounter *word_counter);
 
     void update_color_scheme(const ColorScheme &scheme);
 
@@ -64,7 +58,7 @@ public:
     }
 
     void toggle_soft_center_mode() {
-        ui_editor_->setSoftCenterMode(!ui_editor_->softCenterMode());
+        ui_editor_->set_soft_center_mode_enabled(!ui_editor_->soft_center_mode_enabled());
     }
 
     Editor *editor() {
