@@ -101,7 +101,18 @@ public:
     void                  scrollToStart();
     void                  scrollToEnd();
 
+    /*!
+     * \return expected horizontal margin hint in pixels
+     *
+     * \note calc one side margin requires a division by 2, and this would lose precision in some
+     * cases, so let `h-margin = left-margin + right-margin` and recalc `left-margin = h-margin /
+     * 2`, `right-margin = h-margin - left-margin`
+     */
     int smart_margin_hint() const;
+
+    /*!
+     * \return horizontal margin in pixels
+     */
     int smart_margin() const;
 
     void direct_remove_sel(QString *deleted_text);

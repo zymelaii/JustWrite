@@ -44,8 +44,10 @@ void Editor::set_elastic_resize_enabled(bool value) {
 }
 
 void Editor::update_text_view_margins() {
-    const int margin = smart_margin();
-    ui_margins_      = QMargins(margin, 4, margin, 4);
+    const int margin       = smart_margin();
+    const int left_margin  = margin / 2;
+    const int right_margin = margin - left_margin;
+    ui_margins_            = QMargins(left_margin, 4, right_margin, 4);
     emit on_text_area_change(text_area());
 }
 
@@ -215,27 +217,27 @@ void Editor::scrollToEnd() {
 }
 
 int Editor::smart_margin_hint() const {
-    if (!soft_center_mode_) { return 4; }
-    const auto min_margin     = 32;
+    if (!soft_center_mode_) { return 8; }
+    const auto min_margin     = 64;
     const auto max_text_width = 1000;
     const auto mean_width     = qMax(0, width() - min_margin * 2);
     const auto text_width     = qMin<int>(mean_width * 0.8, max_text_width);
-    const auto margin         = (width() - text_width) / 2;
+    const auto margin         = width() - text_width;
     return margin;
 }
 
 int Editor::smart_margin() const {
     const int margin_hint = smart_margin_hint();
     if (!soft_center_mode_ || !elastic_resize_enabled()) { return margin_hint; }
-    const int margin = ui_margins_.left();
+    const int margin = ui_margins_.left() + ui_margins_.right();
     if (margin_hint == margin) { return margin_hint; }
     const auto bb         = contentsRect();
-    const int  last_width = context_->viewport_width + margin * 2;
+    const int  last_width = context_->viewport_width + margin;
     const int  dw         = bb.width() - last_width;
     if (dw >= 0) {
-        return qMin(margin_hint, (margin * 2 + dw) / 2);
+        return qMin(margin_hint, margin + dw);
     } else {
-        return qMax(4, (margin * 2 + dw) / 2);
+        return qMax(8, margin + dw);
     }
 }
 
