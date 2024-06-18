@@ -163,7 +163,7 @@ void EditPage::do_open_chapter(int cid) {
                   : QString{};
 
     if (last_cid != -1) {
-        const auto loc = ui_editor_->currentTextLoc();
+        const auto loc = ui_editor_->current_text_loc();
         if (loc.block_index != -1) { chapter_locs_[last_cid] = loc; }
     }
 
@@ -351,9 +351,9 @@ void EditPage::sync_chapter_from_editor() {
 void EditPage::focus_editor() {
     if (ui_editor_->hasFocus()) { return; }
     if (last_loc_.block_index != -1) {
-        ui_editor_->setCursorToTextLoc(last_loc_);
+        ui_editor_->set_cursor_to_text_loc(last_loc_);
     } else {
-        ui_editor_->scrollToStart();
+        ui_editor_->scroll_to_start();
     }
     ui_editor_->raise();
     ui_editor_->activateWindow();
@@ -385,7 +385,7 @@ void EditPage::create_and_open_chapter(int vid) {
 
     const int cid = add_chapter(volume_index, "");
     do_open_chapter(cid);
-    if (ui_editor_->currentTextLoc().block_index == -1) { ui_editor_->scrollToStart(); }
+    if (ui_editor_->current_text_loc().block_index == -1) { ui_editor_->scroll_to_start(); }
     request_sync_wcstate();
     ui_editor_->update();
     focus_editor();

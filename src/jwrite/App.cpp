@@ -1,5 +1,6 @@
 #include <jwrite/ui/JustWrite.h>
 #include <jwrite/ProfileUtils.h>
+#include <jwrite/InputMethodHook.h>
 #include <jwrite/Version.h>
 #include <jwrite/AppConfig.h>
 #include <QApplication>
@@ -192,10 +193,11 @@ int main(int argc, char *argv[]) {
     auto       screen     = get_current_screen();
     const auto screen_geo = screen->geometry();
 
-    setup_jwrite_profiler(10);
+    setup_jwrite_profiler(60);
 
     auto client = std::make_unique<JustWrite>();
     app.bind(client.get());
+    app.installNativeEventFilter(new jwrite::InputMethodHook);
 
     //! NOTE: helps to find the window
     client->setWindowTitle(QApplication::applicationName());

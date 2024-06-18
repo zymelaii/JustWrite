@@ -106,7 +106,7 @@ QString Editor::take() {
     return std::move(text);
 }
 
-void Editor::scrollToCursor() {
+void Editor::scroll_to_cursor() {
     const auto &d = context_->cached_render_state;
     const auto &e = context_->engine;
     Q_ASSERT(e.is_cursor_available());
@@ -144,10 +144,10 @@ void Editor::scrollToCursor() {
     const double y_pos_end   = y_pos + line_spacing - slack + h_slack;
 
     if (const double top = context_->viewport_y_pos; y_pos_start < top) {
-        scrollTo(y_pos_start, true);
+        scroll_to_pos(y_pos_start, true);
     } else if (const double bottom = context_->viewport_y_pos + context_->viewport_height;
                y_pos_end > bottom) {
-        scrollTo(y_pos_end - context_->viewport_height, true);
+        scroll_to_pos(y_pos_end - context_->viewport_height, true);
     }
 }
 
@@ -163,15 +163,15 @@ QString Editor::text() const {
     return blocks.join("\n");
 }
 
-VisualTextEditContext::TextLoc Editor::currentTextLoc() const {
+VisualTextEditContext::TextLoc Editor::current_text_loc() const {
     return context_->current_textloc();
 }
 
-void Editor::setCursorToTextLoc(const VisualTextEditContext::TextLoc &loc) {
+void Editor::set_cursor_to_text_loc(const VisualTextEditContext::TextLoc &loc) {
     context_->set_cursor_to_textloc(loc, 0);
 }
 
-QPair<double, double> Editor::scrollBound() const {
+QPair<double, double> Editor::scroll_bound() const {
     const auto  &e            = context_->engine;
     const double line_spacing = e.line_spacing_ratio * e.line_height;
 
@@ -189,31 +189,45 @@ QPair<double, double> Editor::scrollBound() const {
 }
 
 void Editor::scroll(double delta, bool smooth) {
-    const auto [min_y_pos, max_y_pos] = scrollBound();
+    const auto [min_y_pos, max_y_pos] = scroll_bound();
     expected_scroll_ = qBound(min_y_pos, context_->viewport_y_pos + delta, max_y_pos);
     if (!smooth_scroll_enabled_ || !smooth) { context_->scroll_to(expected_scroll_); }
     requestUpdate(true);
 }
 
-void Editor::scrollTo(double pos_y, bool smooth) {
-    const auto [min_y_pos, max_y_pos] = scrollBound();
+void Editor::scroll_to_pos(double pos_y, bool smooth) {
+    const auto [min_y_pos, max_y_pos] = scroll_bound();
     expected_scroll_                  = qBound(min_y_pos, pos_y, max_y_pos);
     if (!smooth_scroll_enabled_ || !smooth) { context_->scroll_to(expected_scroll_); }
     requestUpdate(true);
 }
 
-void Editor::scrollToStart() {
-    const auto [min_y_pos, _] = scrollBound();
+void Editor::scroll_to_start() {
+    const auto [min_y_pos, _] = scroll_bound();
     expected_scroll_          = min_y_pos;
     context_->scroll_to(expected_scroll_);
     requestUpdate(true);
 }
 
-void Editor::scrollToEnd() {
-    const auto [_, max_y_pos] = scrollBound();
+void Editor::scroll_to_end() {
+    const auto [_, max_y_pos] = scroll_bound();
     const double line_spacing = context_->engine.line_spacing_ratio * context_->engine.line_height;
     const double y_pos        = max_y_pos + line_spacing - context_->viewport_height / 2;
-    scrollTo(y_pos, false);
+    scroll_to_pos(y_pos, false);
+}
+
+void Editor::process_scroll_request() {
+    if (qAbs(context_->viewport_y_pos - expected_scroll_) < 1e-3) { return; }
+    const double new_scroll_pos = smooth_scroll_enabled_
+                                    ? context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51
+                                    : expected_scroll_;
+    const double scroll_delta   = new_scroll_pos - context_->viewport_y_pos;
+    if (qAbs(scroll_delta) < 10) {
+        context_->scroll_to(expected_scroll_);
+    } else {
+        context_->scroll_to(new_scroll_pos);
+        update_requested_ = true;
+    }
 }
 
 int Editor::smart_margin_hint() const {
@@ -260,7 +274,7 @@ void Editor::execute_delete_action(int times) {
     } else {
         direct_delete(times, &deleted_text);
     }
-    const auto loc = currentTextLoc();
+    const auto loc = current_text_loc();
     history_.push(TextEditAction::from_action(TextEditAction::Type::Delete, loc, deleted_text));
 }
 
@@ -288,7 +302,7 @@ void Editor::execute_insert_action(const QString &text, bool batch_mode) {
     Q_ASSERT(context_->engine.is_cursor_available());
     Q_ASSERT(!context_->engine.preedit);
     Q_ASSERT(!context_->has_sel());
-    const auto loc = currentTextLoc();
+    const auto loc = current_text_loc();
     if (batch_mode) {
         direct_batch_insert(text);
     } else {
@@ -428,7 +442,7 @@ void Editor::undo() {
     if (auto opt = history_.get_undo_action()) {
         auto action = opt.value();
         context_->unset_sel();
-        setCursorToTextLoc(action.loc);
+        set_cursor_to_text_loc(action.loc);
         switch (action.type) {
             case TextEditAction::Insert: {
                 direct_batch_insert(action.text);
@@ -446,7 +460,7 @@ void Editor::redo() {
     if (auto opt = history_.get_redo_action()) {
         auto action = opt.value();
         context_->unset_sel();
-        setCursorToTextLoc(action.loc);
+        set_cursor_to_text_loc(action.loc);
         switch (action.type) {
             case TextEditAction::Insert: {
                 direct_batch_insert(action.text);
@@ -460,15 +474,7 @@ void Editor::redo() {
     }
 }
 
-void Editor::breakIntoNewLine(bool should_update) {
-    if (context_->engine.current_block()->text_len() == 0) { return; }
-    context_->remove_sel_region(nullptr);
-    context_->engine.break_block_at_cursor_pos();
-    context_->cursor_moved = true;
-    if (should_update) { requestUpdate(true); }
-}
-
-void Editor::verticalMove(bool up) {
+void Editor::vertical_move(bool up) {
     context_->vertical_move(up);
     requestUpdate(true);
 }
@@ -478,18 +484,7 @@ Tokenizer *Editor::tokenizer() const {
     return tokenizer_;
 }
 
-void Editor::setTimerEnabled(bool enabled) {
-    if (enabled) {
-        stable_timer_.start();
-        blink_timer_.start();
-    } else {
-        stable_timer_.stop();
-        blink_timer_.stop();
-    }
-    timer_enabled_ = enabled;
-}
-
-void Editor::renderBlinkCursor() {
+void Editor::render_caret() {
     blink_cursor_should_paint_ = !blink_cursor_should_paint_;
     requestUpdate(false);
 }
@@ -509,7 +504,7 @@ void Editor::render() {
         const auto   pos   = context_->get_vpos_at_cursor();
         const double y_pos = pos.y() + e.line_height - context_->viewport_height * 0.5;
         if (auto_centre_edit_line_ == AutoCentre::Always || y_pos > context_->viewport_y_pos) {
-            scrollTo(y_pos, true);
+            scroll_to_pos(y_pos, true);
         }
     }
 
@@ -593,13 +588,13 @@ void Editor::init() {
     blink_timer_.setInterval(500);
     blink_timer_.setSingleShot(false);
 
-    scrollToStart();
+    scroll_to_start();
 
     connect(this, &Editor::on_text_area_change, this, [this](QRect area) {
         context_->resize_viewport(area.width(), area.height());
         requestUpdate(false);
     });
-    connect(&blink_timer_, &QTimer::timeout, this, &Editor::renderBlinkCursor);
+    connect(&blink_timer_, &QTimer::timeout, this, &Editor::render_caret);
     connect(&stable_timer_, &QTimer::timeout, this, &Editor::render);
 
     stable_timer_.start();
@@ -838,7 +833,7 @@ void Editor::drawHighlightBlock(QPainter *p) {
     p->restore();
 }
 
-void Editor::drawCursor(QPainter *p) {
+void Editor::drawCaret(QPainter *p) {
     const auto &d = context_->cached_render_state;
     const auto &e = context_->engine;
     if (!(e.is_cursor_available() && blink_cursor_should_paint_)) { return; }
@@ -882,19 +877,7 @@ void Editor::resizeEvent(QResizeEvent *e) {
 }
 
 void Editor::paintEvent(QPaintEvent *e) {
-    //! smooth scroll
-    if (qAbs(context_->viewport_y_pos - expected_scroll_) > 1e-3) {
-        const double new_scroll_pos = smooth_scroll_enabled_
-                                        ? context_->viewport_y_pos * 0.49 + expected_scroll_ * 0.51
-                                        : expected_scroll_;
-        const double scroll_delta   = new_scroll_pos - context_->viewport_y_pos;
-        if (qAbs(scroll_delta) < 10) {
-            context_->scroll_to(expected_scroll_);
-        } else {
-            context_->scroll_to(new_scroll_pos);
-            update_requested_ = true;
-        }
-    }
+    process_scroll_request();
 
     jwrite_profiler_start(PrepareRenderData);
     context_->prepare_render_data();
@@ -920,9 +903,9 @@ void Editor::paintEvent(QPaintEvent *e) {
     drawTextArea(&p);
 
     //! draw cursor
-    drawCursor(&p);
+    drawCaret(&p);
     if (context_->engine.is_cursor_available() && context_->cursor_moved) {
-        scrollToCursor();
+        scroll_to_cursor();
         context_->cursor_moved = false;
     }
 
@@ -941,7 +924,7 @@ void Editor::focusInEvent(QFocusEvent *e) {
         emit activated();
     } else if (last_text_loc_ && last_text_loc_->block_index != -1) {
         if (e->reason() != Qt::FocusReason::MouseFocusReason) {
-            setCursorToTextLoc(*last_text_loc_);
+            set_cursor_to_text_loc(*last_text_loc_);
         }
         last_text_loc_ = std::nullopt;
     }
@@ -954,7 +937,7 @@ void Editor::focusOutEvent(QFocusEvent *e) {
     context_->unset_sel();
     blink_timer_.stop();
 
-    const auto text_loc = currentTextLoc();
+    const auto text_loc = current_text_loc();
     last_text_loc_      = text_loc;
 
     context_->engine.active_block_index = -1;
@@ -1054,10 +1037,10 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             }
         } break;
         case TextInputCommand::MoveToPrevLine: {
-            verticalMove(true);
+            vertical_move(true);
         } break;
         case TextInputCommand::MoveToNextLine: {
-            verticalMove(false);
+            vertical_move(false);
         } break;
         case TextInputCommand::MoveToStartOfLine: {
             const auto block = engine.current_block();
@@ -1079,11 +1062,11 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         } break;
         case TextInputCommand::MoveToStartOfDocument: {
             move_to(0, false);
-            scrollToStart();
+            scroll_to_start();
         } break;
         case TextInputCommand::MoveToEndOfDocument: {
             move_to(engine.text_ref->length(), false);
-            scrollToEnd();
+            scroll_to_end();
         } break;
         case TextInputCommand::MoveToPrevPage: {
             scroll(-text_area().height() * 0.5, true);
@@ -1201,7 +1184,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             auto     &c        = *context_;
             const int sel_from = c.has_sel() ? c.sel.from : c.edit_cursor_pos;
             if (c.has_sel()) { c.unset_sel(); }
-            verticalMove(true);
+            vertical_move(true);
             c.sel.from = sel_from;
             c.sel.to   = c.edit_cursor_pos;
         } break;
@@ -1209,7 +1192,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
             auto     &c        = *context_;
             const int sel_from = c.has_sel() ? c.sel.from : c.edit_cursor_pos;
             if (c.has_sel()) { c.unset_sel(); }
-            verticalMove(false);
+            vertical_move(false);
             c.sel.from = sel_from;
             c.sel.to   = c.edit_cursor_pos;
         } break;

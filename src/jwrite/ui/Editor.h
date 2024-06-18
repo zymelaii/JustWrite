@@ -88,18 +88,19 @@ public:
 
     void    reset(QString &text, bool swap);
     QString take();
-    void    scrollToCursor();
+    void    scroll_to_cursor();
 
     QString text() const;
 
-    VisualTextEditContext::TextLoc currentTextLoc() const;
-    void                           setCursorToTextLoc(const VisualTextEditContext::TextLoc &loc);
+    VisualTextEditContext::TextLoc current_text_loc() const;
+    void set_cursor_to_text_loc(const VisualTextEditContext::TextLoc &loc);
 
-    QPair<double, double> scrollBound() const;
+    QPair<double, double> scroll_bound() const;
     void                  scroll(double delta, bool smooth);
-    void                  scrollTo(double pos_y, bool smooth);
-    void                  scrollToStart();
-    void                  scrollToEnd();
+    void                  scroll_to_pos(double pos_y, bool smooth);
+    void                  scroll_to_start();
+    void                  scroll_to_end();
+    virtual void          process_scroll_request();
 
     /*!
      * \return expected horizontal margin hint in pixels
@@ -134,12 +135,9 @@ public:
     void undo();
     void redo();
 
-    [[deprecated]] void breakIntoNewLine(bool should_update);
-    void                verticalMove(bool up);
+    void vertical_move(bool up);
 
     Tokenizer *tokenizer() const;
-
-    void setTimerEnabled(bool enabled);
 
     void prepare_render_data() {
         context_->prepare_render_data();
@@ -150,7 +148,7 @@ public:
     }
 
 protected slots:
-    void renderBlinkCursor();
+    void render_caret();
     void render();
 
 public:
@@ -174,7 +172,7 @@ protected:
     void drawTextArea(QPainter *p);
     void drawSelection(QPainter *p);
     void drawHighlightBlock(QPainter *p);
-    void drawCursor(QPainter *p);
+    void drawCaret(QPainter *p);
 
     void     resizeEvent(QResizeEvent *e) override;
     void     paintEvent(QPaintEvent *e) override;
