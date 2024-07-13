@@ -52,6 +52,21 @@ struct TextBlock {
 };
 
 struct TextViewEngine {
+    struct TextLoc {
+        int block_index;
+        int row;
+        int col;
+        int pos;
+    };
+
+    struct CursorPosition {
+        int pos;
+        int row;
+        int col;
+
+        void reset();
+    };
+
     constexpr static QChar SAMPLE_CHAR = QChar(U'\u3000');
 
     QFontMetrics fm;
@@ -65,13 +80,7 @@ struct TextViewEngine {
     double block_spacing;
     double line_spacing_ratio;
 
-    struct CursorPosition {
-        int pos;
-        int row;
-        int col;
-
-        void reset();
-    } cursor;
+    CursorPosition cursor;
 
     int            text_ref_origin;
     const QString *text_ref;
@@ -99,6 +108,7 @@ struct TextViewEngine {
     const TextLine  &current_line() const;
     TextBlock       *current_block();
     const TextBlock *current_block() const;
+    int              text_pos_at_text_loc(const TextLoc &loc) const;
     void             reset_max_width(int width);
     void             reset_block_spacing(double spacing);
     void             reset_line_spacing(double ratio);

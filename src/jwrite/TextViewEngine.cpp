@@ -215,6 +215,14 @@ const TextBlock *TextViewEngine::current_block() const {
     return active_blocks[active_block_index];
 }
 
+int TextViewEngine::text_pos_at_text_loc(const TextLoc &loc) const {
+    Q_ASSERT(loc.block_index >= 0 && loc.block_index < active_blocks.size());
+    const auto block = active_blocks[loc.block_index];
+    Q_ASSERT(loc.row >= 0 && loc.row < block->lines.size());
+    Q_ASSERT(loc.pos >= 0 && loc.pos <= block->text_len());
+    return block->text_pos + loc.pos;
+}
+
 void TextViewEngine::reset_max_width(int width) {
     max_width = width;
     for (auto &block : active_blocks) { block->mark_as_dirty(0); }

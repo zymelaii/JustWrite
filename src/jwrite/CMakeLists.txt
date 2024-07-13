@@ -3,15 +3,20 @@ configure_file(
 	${CMAKE_CURRENT_BINARY_DIR}/Version.cpp
 )
 
+aux_source_directory(jeditor JEDITOR_SOURCE_FILES)
+aux_source_directory(ui UI_SOURCE_FILES)
+aux_source_directory(epub EPUB_SOURCE_FILES)
+aux_source_directory(sample SAMPLE_SOURCE_FILES)
+
 file(GLOB CORE_SOURCE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
 list(REMOVE_ITEM CORE_SOURCE_FILES App.cpp)
 
-aux_source_directory(ui UI_SOURCE_FILES)
-aux_source_directory(epub EPUB_SOURCE_FILES)
+list(APPEND CORE_SOURCE_FILES ${JEDITOR_SOURCE_FILES})
 
 set(SOURCE_FILES App.cpp)
 list(APPEND SOURCE_FILES ${UI_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${EPUB_SOURCE_FILES})
+list(APPEND SOURCE_FILES ${SAMPLE_SOURCE_FILES})
 list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/res.qrc)
 list(APPEND SOURCE_FILES ${CMAKE_SOURCE_DIR}/assets/JustWrite.rc)
 list(APPEND SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/Version.cpp)

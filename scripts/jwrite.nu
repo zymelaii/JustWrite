@@ -18,7 +18,26 @@ export def "jwrite versions" [] {
     let row_width = $prefix | each {|e| $e | str length} | math max
     $prefix | zip $diffs | each {|e|
         let diff_row = $"('' | fill -w ($max_width + 11))($e.1)"
-        print $"\e[34m($e.0 | fill -w $row_width)\e[0m"
-        print $"\e[30m($diff_row | fill -w $row_width)\e[0m"
+        print $"\e[33m($e.0 | fill -w $row_width)\e[0m"
+        print $"\e[36m($diff_row | fill -w $row_width)\e[0m"
     } | ignore
+}
+
+# List available JustWrite archive types.
+export def "jwrite list" [] {
+    ls install | where type == dir | get name | filter {|e|
+        $e | path join VERSION | path exists
+    } | each {|e|
+        $e | path relative-to install
+    }
+}
+
+# Archive the JustWrite application.
+export def "jwrite archive" [
+    type: string@"jwrite list"
+] {
+    cd ('install' | path join $type)
+    let version = open VERSION  | parse -r '(?<version>\d+(?:\.\d+){2})' | get 0.version
+    let name = $env.PWD | path dirname | path join $'jwrite-v($version)-($type).zip'
+    ^zip -r $name . -x '*.log' '/data/*'
 }

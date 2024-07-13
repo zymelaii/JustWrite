@@ -570,7 +570,7 @@ void EditPage::init() {
     connect(quit_edit_action, &QAction::triggered, this, &EditPage::on_request_quit_edit);
     connect(open_settings_action, &QAction::triggered, this, &EditPage::on_request_open_settings);
     connect(ui_editor_, &Editor::activated, this, &EditPage::handle_editor_on_activate);
-    connect(ui_editor_, &Editor::textChanged, this, &EditPage::handle_editor_on_text_change);
+    connect(ui_editor_, &Editor::on_text_change, this, &EditPage::handle_editor_on_text_change);
     connect(
         ui_book_dir_, &TwoLevelTree::itemSelected, this, &EditPage::handle_book_dir_on_select_item);
     connect(ui_new_volume_, &FlatButton::pressed, this, &EditPage::handle_on_create_volume);

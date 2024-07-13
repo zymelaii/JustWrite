@@ -31,6 +31,7 @@
         <file>res/themes/dark/icons/toolbar/settings.svg</file>
         <file>res/themes/dark/icons/toolbar/share.svg</file>
         <file>res/themes/dark/icons/toolbar/trash.svg</file>
+        <file>res/themes/dark/icons/misc/image.svg</file>
         <file>res/themes/light/icons/button/close.svg</file>
         <file>res/themes/light/icons/button/up.svg</file>
         <file>res/themes/light/icons/button/down.svg</file>
@@ -59,6 +60,7 @@
         <file>res/themes/light/icons/toolbar/settings.svg</file>
         <file>res/themes/light/icons/toolbar/share.svg</file>
         <file>res/themes/light/icons/toolbar/trash.svg</file>
+        <file>res/themes/light/icons/misc/image.svg</file>
         <file>res/default-cover.png</file>
         <file>res/template/epub/style.css</file>
         <file alias="lang.en_US">lang/en_US.qm</file>

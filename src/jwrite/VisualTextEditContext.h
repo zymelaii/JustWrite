@@ -1,11 +1,13 @@
 #pragma once
 
 #include <jwrite/TextViewEngine.h>
-#include <jwrite/CoreTextViewEngine.h>
+#include <jwrite/RwLock.h>
 
 namespace jwrite {
 
 struct VisualTextEditContext {
+    using TextLoc = TextViewEngine::TextLoc;
+
     struct Selection {
         int from;
         int to;
@@ -21,13 +23,6 @@ struct VisualTextEditContext {
         int len() {
             return qAbs(from - to);
         }
-    };
-
-    struct TextLoc {
-        int block_index;
-        int row;
-        int col;
-        int pos;
     };
 
     struct BlockRange {

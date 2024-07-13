@@ -1,0 +1,58 @@
+name: Release
+
+on: push
+  #push:
+  #  tags:
+  #  - 'v\d+.\d+*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    env:
+      BUILD_TYPE: Release
+      ARCH: x86_64
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Get CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+
+    - name: Build
+      uses: lukka/run-cmake@v10
+      with:
+        configurePreset: 'default'
+        configurePresetAdditionalArgs: "['-DBUILD_TEST=OFF', '-DCMAKE_INSTALL_PREFIX=release']"
+
+        buildPreset: 'default'
+        buildPresetAdditionalArgs: "['--config Release']"
+
+        testPreset: 'default'
+        testPresetAdditionalArgs: "['--config Release']"
+
+    - name: Get Version
+      id: get_version
+      run: echo VERSION=`cat VERSION | grep -Po '^(\d+(\.\d+){2})'` >> $env:GITHUB_OUTPUT
+
+    - name: Archive
+      id: archive
+      env:
+        ARCHIVE_FILES: JustWrite-${{ steps.get_version.outputs.VERSION }}-${{ env.ARCH }}.tar.gz
+      run: |
+        cmake --install release
+        tar -czf ${{ env.ARCHIVE_FILES }} -C${{ env.BUILD_TYPE }} *
+        echo ARCHIVE_FILES=${{ env.ARCHIVE_FILES }} >> $env:GITHUB_OUTPUT
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: ${{ steps.get_version.outputs.VERSION }}
+        draft: false
+        generate_release_notes: true
+        append_body: true
+        files: ${{ steps.archive.outputs.ARCHIVE_FILES }}

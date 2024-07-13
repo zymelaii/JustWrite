@@ -51,6 +51,22 @@ void Editor::update_text_view_margins() {
     emit on_text_area_change(text_area());
 }
 
+bool Editor::sel_area_hit_test(const QPoint &vpos) const {
+    if (!context_->has_sel()) { return false; }
+    const auto loc = context_->get_textloc_at_rel_vpos(vpos, false);
+    if (loc.block_index == -1) { return false; }
+    const auto &e     = context_->engine;
+    const auto  block = e.active_blocks[loc.block_index];
+    const auto &line  = block->lines[loc.row];
+    const int   pos   = block->text_pos + pos;
+    const auto &sel   = context_->sel;
+    Q_ASSERT(!block->is_dirty());
+    if (!(pos >= qMin(sel.from, sel.to) && pos <= qMax(sel.from, sel.to))) { return false; }
+    const double leading_space = line.is_first_line() ? e.standard_char_width * 2 : 0;
+    if (!(vpos.x() >= leading_space && vpos.x() < line.cached_text_width)) { return false; }
+    return true;
+}
+
 QRect Editor::text_area() const {
     return contentsRect() - ui_margins_;
 }
@@ -346,7 +362,7 @@ bool Editor::insert_action_filter(const QString &text) {
 
 void Editor::del(int times) {
     execute_delete_action(times);
-    emit textChanged(context_->edit_text);
+    emit on_text_change(context_->edit_text);
     requestUpdate(true);
 }
 
@@ -373,7 +389,7 @@ void Editor::insert(const QString &text, bool batch_mode) {
 
         if (!filtered) { execute_insert_action(text_in, false); }
     }
-    emit textChanged(context_->edit_text);
+    emit on_text_change(context_->edit_text);
     requestUpdate(true);
 }
 
@@ -451,7 +467,7 @@ void Editor::undo() {
                 direct_delete(action.text.length(), nullptr);
             } break;
         }
-        emit textChanged(context_->edit_text);
+        emit on_text_change(context_->edit_text);
         requestUpdate(true);
     }
 }
@@ -469,7 +485,7 @@ void Editor::redo() {
                 direct_delete(action.text.length(), nullptr);
             } break;
         }
-        emit textChanged(context_->edit_text);
+        emit on_text_change(context_->edit_text);
         requestUpdate(true);
     }
 }
@@ -869,6 +885,11 @@ void Editor::drawCaret(QPainter *p) {
     p->restore();
 
     jwrite_profiler_record(CursorRenderCost);
+}
+
+bool Editor::focusNextPrevChild(bool next) {
+    //! NOTE: allow to accept a single tab key
+    return false;
 }
 
 void Editor::resizeEvent(QResizeEvent *e) {

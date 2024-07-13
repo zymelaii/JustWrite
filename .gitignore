@@ -54,3 +54,6 @@ install/
 *.log
 *.trace
 *.dump
+
+# Documentation files
+doc

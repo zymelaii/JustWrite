@@ -12,6 +12,7 @@ enum class GlobalCommand {
     ToggleSoftCenterMode,
     CreateNewChapter,
     Rename,
+    PopContextMenu,
 };
 
 class GlobalCommandManager {

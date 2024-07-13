@@ -17,5 +17,20 @@
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "Build Windows x64 Debug",
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Windows x64 Release",
+            "program": "${workspaceFolder}/install/windows-x64-release/JustWrite",
+            "cwd": "${workspaceFolder}/install/windows-x64-release",
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Windows x64 Debug JwriteHelper",
+            "program": "${workspaceFolder}/build/windows-x64-debug/src/jwrite-helper/jwrite-helper",
+            "cwd": "${workspaceFolder}/build/windows-x64-debug/src/jwrite-helper",
+            "preLaunchTask": "Build Windows x64 Debug",
+        },
     ]
 }

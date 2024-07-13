@@ -925,6 +925,9 @@ void JustWrite::handle_on_trigger_shortcut(GlobalCommand shortcut) {
                 ui_edit_page_->handle_on_rename_selected_toc_item();
             }
         } break;
+        case GlobalCommand::PopContextMenu: {
+            //! TODO: dispatch context menu request
+        } break;
     }
 }
 

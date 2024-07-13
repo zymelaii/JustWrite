@@ -1,4 +1,7 @@
+#if 0
+
 #include <jwrite/ui/JustWrite.h>
+#include <jwrite/ui/Jeditor.h>
 #include <jwrite/ProfileUtils.h>
 #include <jwrite/InputMethodHook.h>
 #include <jwrite/Version.h>
@@ -72,7 +75,8 @@ protected:
                 case QEvent::ScreenChangeInternal: {
                     if (client_ == w && client_->is_fullscreen_mode()) {
                         //! NOTE: switch screen in fullscreen mode will destroy the original
-                        //! geometry, force to refresh it to keep the fullscreenn mode behaves well
+                        //! geometry, force to refresh it to keep the fullscreenn mode behaves
+                        //! well
                         client_->set_fullscreen_mode(false);
                         client_->set_fullscreen_mode(true);
                     }
@@ -233,3 +237,132 @@ int main(int argc, char *argv[]) {
 
     return exit_code;
 }
+
+#else
+
+#include <jwrite/ui/JustWrite.h>
+#include <jwrite/ui/Jeditor.h>
+#include <jwrite/ProfileUtils.h>
+#include <jwrite/InputMethodHook.h>
+#include <jwrite/Version.h>
+#include <jwrite/AppConfig.h>
+#include <QApplication>
+#include <QScreen>
+#include <QFontDatabase>
+#include <QMouseEvent>
+#include <memory>
+#include <magic_enum.hpp>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <toml++/toml.h>
+
+using jwrite::AppConfig;
+using jwrite::ui::JustWrite;
+
+constexpr QSize PREFERRED_CLIENT_SIZE(1000, 600);
+
+QScreen *get_current_screen() {
+    return QApplication::screenAt(QCursor::pos());
+}
+
+QRect compute_preferred_geometry(const QRect &parent_geo) {
+    const auto w    = qMin(parent_geo.width(), PREFERRED_CLIENT_SIZE.width());
+    const auto h    = qMin(parent_geo.height(), PREFERRED_CLIENT_SIZE.height());
+    const auto left = parent_geo.left() + (parent_geo.width() - w) / 2;
+    const auto top  = parent_geo.top() + (parent_geo.height() - h) / 2;
+    return QRect(left, top, w, h);
+}
+
+void load_default_fonts() {
+    const auto &config        = AppConfig::get_instance();
+    const auto  home          = config.path(AppConfig::StandardPath::AppHome);
+    const auto  font_path_fmt = QString("%1/fonts/SarasaGothicSC-%2.ttf").arg(home);
+
+    for (const auto font_name : magic_enum::enum_values<AppConfig::FontStyle>()) {
+        const auto &path = font_path_fmt.arg(magic_enum::enum_name(font_name).data());
+        if (!QFile::exists(path)) { continue; }
+        const int id = QFontDatabase::addApplicationFont(path);
+        Q_ASSERT(id != -1);
+    }
+
+    QApplication::setFont(config.font(AppConfig::FontStyle::Light, 16));
+}
+
+void init_logger() {
+    auto      &config   = AppConfig::get_instance();
+    const auto log_path = QString("%1/jwrite-%2.log")
+                              .arg(config.path(AppConfig::StandardPath::Log))
+                              .arg(QDateTime::currentDateTime().toString("yyyyMMddHHmm"));
+#ifdef NDEBUG
+    auto logger = spdlog::basic_logger_mt("jwrite.default", log_path.toLocal8Bit().toStdString());
+    logger->set_pattern("%Y-%m-%d %H:%M:%S.%e [%l] %v");
+    logger->set_level(spdlog::level::info);
+    spdlog::set_default_logger(logger);
+#else
+    auto con_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    con_sink->set_pattern("%^%Y-%m-%d %H:%M:%S.%e [%l]%$ %v");
+    con_sink->set_level(spdlog::level::trace);
+
+    auto file_sink =
+        std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_path.toLocal8Bit().toStdString());
+    file_sink->set_pattern("%Y-%m-%d %H:%M:%S.%e [%l] %v");
+    file_sink->set_level(spdlog::level::info);
+
+    spdlog::set_default_logger(std::make_shared<spdlog::logger>(
+        "jwrite.default", spdlog::sinks_init_list{con_sink, file_sink}));
+#endif
+
+    spdlog::flush_every(std::chrono::minutes(1));
+    spdlog::flush_on(spdlog::level::warn);
+}
+
+void init_language() {
+    auto lang = AppConfig::get_instance().value(AppConfig::ValOption::Language);
+    if (!QFile::exists(QString(":/lang.%1").arg(lang))) {
+        lang = AppConfig::default_option(AppConfig::ValOption::Language);
+    }
+    auto       translator = new QTranslator;
+    const bool succeed    = translator->load(QString(":/lang.%1").arg(lang));
+    Q_ASSERT(succeed);
+    QApplication::installTranslator(translator);
+}
+
+void init_settings() {
+    spdlog::info("load settings BEGIN -->");
+    AppConfig::get_instance().load();
+    spdlog::info("<-- DONE");
+}
+
+void save_settings() {
+    spdlog::info("write out settings BEGIN -->");
+    AppConfig::get_instance().save();
+    spdlog::info("<-- DONE");
+}
+
+int main(int argc, char *argv[]) {
+    //! TODO: ensure single jwrite instance in the system
+    //! HINT: or ensure the book is always editable in only one instance
+
+    QApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
+    QApplication app(argc, argv);
+
+    init_logger();
+    init_settings();
+    init_language();
+
+    load_default_fonts();
+
+    auto       screen     = get_current_screen();
+    const auto screen_geo = screen->geometry();
+
+    setup_jwrite_profiler(60);
+
+    jwrite::ui::Jeditor editor;
+    editor.setGeometry(compute_preferred_geometry(screen_geo));
+    editor.show();
+
+    return app.exec();
+}
+
+#endif

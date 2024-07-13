@@ -25,7 +25,7 @@ public:
 
 signals:
     void on_text_area_change(QRect area);
-    void textChanged(const QString &text);
+    void on_text_change(const QString &text);
     void focusLost(VisualTextEditContext::TextLoc last_loc);
     void activated();
 
@@ -83,6 +83,8 @@ public:
     void set_elastic_resize_enabled(bool value);
 
     void update_text_view_margins();
+
+    bool sel_area_hit_test(const QPoint &vpos) const;
 
     QRect text_area() const;
 
@@ -174,6 +176,7 @@ protected:
     void drawHighlightBlock(QPainter *p);
     void drawCaret(QPainter *p);
 
+    bool     focusNextPrevChild(bool next) override;
     void     resizeEvent(QResizeEvent *e) override;
     void     paintEvent(QPaintEvent *e) override;
     void     focusInEvent(QFocusEvent *e) override;
